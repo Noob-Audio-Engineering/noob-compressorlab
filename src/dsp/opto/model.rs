@@ -33,17 +33,23 @@
 //! flushed to zero when it decays below `1e-12`, so nothing here can leave
 //! a denormal after silence. No allocation, no locks.
 
-use super::filters::{Biquad, OnePole, Shelf, flush};
+use super::filters::{Biquad, OnePole, Shelf};
+
+/// The photocell itself lives in its own crate, because the LA-3A shares
+/// it exactly and the CL-1B deliberately does not, which is what
+/// established where its edge lies. Re-exported here so this module still
+/// reads as the whole of the LA-2A's circuit: what follows is the divider
+/// around the cell, the sidechain that lights it and the amplifier after
+/// it, which are this machine's and not the part's.
+pub use noob_electrical_components::photocell::{
+    CELL_GAMMA, CELL_SPEEDS, Cell, CellParams, EL_B, K_G, LA2_FAST_SHARE, LA2_FAST_SPEED, R_DARK,
+    R_MIN, cell_params_for, resistance_for,
+};
 
 /// The divider's series resistance, `R6 + R7` of the schematic (ohms).
 pub const R_SERIES: f32 = 70.7e3;
 /// The Gain pot across the cell (ohms).
 pub const R_POT: f32 = 100e3;
-/// Photocell resistance in the dark (ohms).
-pub const R_DARK: f32 = 2.0e6;
-/// Photocell resistance under full light (ohms); with `R_DARK` this gives
-/// about 38 dB of range.
-pub const R_MIN: f32 = 500.0;
 /// Limit mode's feed-forward share of the sidechain tap. The schematic's
 /// `R7 / (R6 + R7)` is 0.038; with this model's sidechain gain that gave only
 /// 2 dB more reduction than Compress at 20 dB, so it is tuned to 0.09, which
@@ -65,16 +71,10 @@ pub const VU10_REF_AMP: f32 = 0.251_188_64 * std::f32::consts::SQRT_2;
 /// Average of `|sin|`, the rectifier's DC for a sine of unit amplitude.
 pub const SINE_MEAN_ABS: f32 = std::f32::consts::FRAC_2_PI;
 
-/// Electroluminescent light law exponent (`L = exp(−b / √(u / V_ref))`).
-pub const EL_B: f32 = 5.0;
 /// Sidechain amplifier saturation as a multiple of the sidechain amplitude
 /// at the calibration onset (the 6AQ5 runs out of swing; this caps the
 /// deepest gain reduction and tames the attack on big overshoots).
 pub const V_SAT_OVER_ONSET: f32 = 10.0;
-/// Photocell gamma (conductance ∝ light^γ).
-pub const CELL_GAMMA: f32 = 0.8;
-/// Photocell conductance for full light, so `n_f = 1` gives `R_MIN`.
-pub const K_G: f32 = 1.0 / R_MIN - 1.0 / R_DARK;
 /// Photocell cubic distortion strength at full gain reduction.
 pub const CELL_CUBIC: f32 = 0.6;
 /// Reference amplitude for the photocell cubic.
@@ -90,310 +90,6 @@ pub const TUBE_BIAS: f32 = 0.05;
 pub const R37_HZ: f32 = 1000.0;
 /// R37 low shelf depth at full counter-clockwise, dB.
 pub const R37_DEPTH_DB: f32 = -10.0;
-
-/// Time constants of the photocell, in seconds, for one cell variant.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CellParams {
-    /// Open-loop attack time constant in dim light. The loop closes faster
-    /// than this (about 10 to 15 ms for a moderate hit), which is what the
-    /// specifications quote.
-    pub tau_f0: f32,
-    /// Light (normalised 0..1) at which the attack has become twice as fast.
-    pub l_a: f32,
-    /// First-stage release (free carriers recombining).
-    pub tau_r1: f32,
-    /// Slow release with empty traps.
-    pub tau_t0: f32,
-    /// How much full traps slow the slow release (`tau_t = tau_t0 · (1 + k_m · n_t)`).
-    pub k_m: f32,
-    /// Trap capture rate, per second.
-    pub capture: f32,
-    /// Carrier generation at full light.
-    pub k_gen: f32,
-    /// Smoothing of the panel drive, seconds: the phosphor plus whatever
-    /// the driver's output impedance does to it. 1 ms for the LA-2A, whose
-    /// panel hangs off a pentode plate through 10 kΩ; a quarter of that for
-    /// the LA-3A, which drives the same panel from a transistor stage
-    /// through a step-up transformer (`research/LA-3A.md` 7.5).
-    pub tau_u: f32,
-    /// Share of the cell's conductance carried by a **second, faster
-    /// photocell wired in parallel** with the main one. `0.0` for every
-    /// cell that has only the main pair, which is every T4B from about
-    /// 1969 onward and so both the Gray and Silver positions.
-    ///
-    /// The T4A in the LA-2 and early LA-2A, and very early T4Bs, carried
-    /// three photocells: the main Clairex CL-505L pair plus a fast
-    /// CL-705 across the audio cell, "giving a dual time constant that
-    /// broadcast engineers liked" (`research/LA-2A.md` section 3). That
-    /// is the one difference between the eras with a physical basis, and
-    /// a speed multiplier cannot express it, because the point is a
-    /// *shape*: a quick partial recovery followed by the slow one, not a
-    /// uniformly quicker cell.
-    ///
-    /// **The share is an estimate.** The sources establish that the cell
-    /// exists, that it is faster, and that it sits in parallel, but not
-    /// how much of the conductance it carries. Kantor, who examined the
-    /// modules, concluded the overall response "is dominated by the
-    /// response of the slower photocell", so this is deliberately a
-    /// secondary contribution: enough to hear on a transient, not enough
-    /// to make the LA-2 position a different compressor.
-    pub fast_share: f32,
-    /// How much faster that second cell is than the main one, as a
-    /// divisor on its time constants. **Estimate**: the research calls
-    /// the CL-705 "fast" without giving a figure, and Clairex type-5
-    /// material spans 5 ms to 120 ms of decay depending on light, so a
-    /// single figure inside that span is the best that can be justified.
-    pub fast_speed: f32,
-}
-
-impl CellParams {
-    /// The reference ("Gray") cell.
-    pub const GRAY: CellParams = CellParams {
-        tau_f0: 0.040,
-        l_a: 0.05,
-        tau_r1: 0.060,
-        tau_t0: 0.5,
-        k_m: 12.0,
-        capture: 1.0 / 0.3,
-        k_gen: 7.0,
-        tau_u: 0.001,
-        fast_share: 0.0,
-        fast_speed: 1.0,
-    };
-
-    /// Scale every time constant (the "cell" parameter: Silver 0.7, Gray
-    /// 1.0, LA-2 1.6, estimates after the research).
-    pub fn scaled(self, k: f32) -> CellParams {
-        CellParams {
-            tau_f0: self.tau_f0 * k,
-            tau_r1: self.tau_r1 * k,
-            tau_t0: self.tau_t0 * k,
-            capture: self.capture / k,
-            ..self
-        }
-    }
-
-    /// Add the T4A's third photocell: a faster population carrying
-    /// `share` of the conductance in parallel with the main one.
-    pub fn with_fast_cell(self, share: f32, speed: f32) -> CellParams {
-        CellParams {
-            fast_share: share,
-            fast_speed: speed,
-            ..self
-        }
-    }
-}
-
-/// The T4A's fast parallel photocell, for the LA-2 position only.
-///
-/// **Both numbers are estimates**, for the reasons at
-/// [`CellParams::fast_share`]. The share keeps the slower cell dominant,
-/// as the one source that examined the modules says it is; the speed sits
-/// inside the range Clairex quote for the material.
-pub const LA2_FAST_SHARE: f32 = 0.22;
-pub const LA2_FAST_SPEED: f32 = 8.0;
-
-/// Cell parameters for a variant index: the speed multiplier, plus the
-/// T4A's third photocell for the LA-2 position only.
-///
-/// **Only the LA-2 position gets the fast cell, and that is deliberate.**
-/// The third photocell was fitted to the T4A and to very early T4Bs, and
-/// dropped from about 1969; the Silver position is a late-1960s T4B and
-/// every reissue is one, so neither has it. The LA-3A, which shares this
-/// cell, is a 1969-onward unit whose own control is about a cell's *age*
-/// rather than its era, so it does not get one either and calls the
-/// parameters it already builds.
-pub fn cell_params_for(cell: usize) -> CellParams {
-    let base = CellParams::GRAY.scaled(CELL_SPEEDS[cell.min(2)]);
-    if cell.min(2) == 2 {
-        base.with_fast_cell(LA2_FAST_SHARE, LA2_FAST_SPEED)
-    } else {
-        base
-    }
-}
-
-/// Speed multipliers for the three cell variants: Silver, Gray, LA-2.
-///
-/// **These are an estimate, and what follows is the whole of what the
-/// research establishes**, because a variant switch calibrated against
-/// nothing is how a control drifts away from the machine it names.
-///
-/// *The one physical, era-specific fact.* The T4A, fitted to the LA-2 and
-/// early LA-2A, and very early T4Bs up to about 1969, contained **three**
-/// photocells: the main Clairex CL-505L pair plus a fast CL-705 wired in
-/// parallel with the audio cell, giving a dual time constant. Later T4Bs,
-/// which is what the late-1960s silver units and every reissue use,
-/// dropped the third cell. So the documented difference between the eras
-/// is a *construction* difference, and it runs the opposite way to the
-/// speed ordering: the older cell had an extra **fast** element, not a
-/// slower one. Its own source qualifies that immediately, though: Kantor
-/// concluded the overall response "is dominated by the response of the
-/// slower photocell". (`research/LA-2A.md` section 3.)
-///
-/// *The ordering these multipliers follow* is Universal Audio's product
-/// description of the three eras, with Silver fast, Gray the medium
-/// reference and the LA-2 slowest, "mellowed" by fifty years of panel
-/// ageing. That is a manufacturer's qualitative claim about ageing rather
-/// than a measurement, and it is the only statement of ordering anywhere
-/// in the research.
-///
-/// *The one real measurement does not support an era effect at all.*
-/// Moore measured six units and found attack spread 33 to 81 ms and
-/// release 449 to 1670 ms, wider than the 2.3 here, but reports **"no
-/// consistent vintage-versus-reissue grouping"**. That spread is
-/// therefore unit-to-unit variation, conflating cell age, component
-/// tolerance and calibration, and borrowing it to size an era switch
-/// would attribute to the three cells a variation its own source says the
-/// three cells do not explain.
-///
-/// So: the ordering is documented, the magnitude is not, and the span
-/// stays where a manufacturer's description puts it rather than being
-/// widened to make the control feel more useful. Gray is exactly 1.0, so
-/// the default sound is the reference one.
-///
-/// **A known gap, recorded rather than fixed.** A single speed multiplier
-/// cannot express the T4A's dual time constant, which is the one
-/// era-specific difference with a physical basis. Representing it would
-/// mean a second, faster carrier population in [`Cell`] for the LA-2
-/// position, and it is not done here because the same source says the
-/// slow cell dominates the result. It is in the README's table of
-/// figures the models do not reach.
-pub const CELL_SPEEDS: [f32; 3] = [0.7, 1.0, 1.6];
-
-/// The T4 cell: an electroluminescent panel and a CdS photoresistor with
-/// traps. Two states, free carriers `n_f` (0..1, conductance) and trapped
-/// carriers `n_t` (0..1, the memory), plus the panel's smoothed drive `u`.
-#[derive(Clone, Copy, Debug)]
-pub struct Cell {
-    /// Smoothed rectified sidechain drive, in sidechain volts.
-    pub u: f32,
-    /// Light, normalised 0..1.
-    pub light: f32,
-    /// Free carriers (conductance), 0..1.
-    pub n_f: f32,
-    /// Free carriers in the T4A's second, faster photocell. Only moves
-    /// when [`CellParams::fast_share`] is non-zero, which is the LA-2
-    /// position alone.
-    pub n_fast: f32,
-    /// Trapped carriers (memory), 0..1.
-    pub n_t: f32,
-    params: CellParams,
-    dt: f32,
-    a_u: f32,
-}
-
-impl Cell {
-    pub fn new(params: CellParams, sr: f32) -> Self {
-        let mut c = Cell {
-            u: 0.0,
-            light: 0.0,
-            n_f: 0.0,
-            n_fast: 0.0,
-            n_t: 0.0,
-            params,
-            dt: 1.0 / sr,
-            a_u: 0.0,
-        };
-        c.set_sample_rate(sr);
-        c
-    }
-
-    pub fn set_sample_rate(&mut self, sr: f32) {
-        self.dt = 1.0 / sr;
-        self.a_u = 1.0 - (-self.dt / self.params.tau_u.max(1e-6)).exp();
-    }
-
-    pub fn set_params(&mut self, params: CellParams) {
-        let retune = params.tau_u != self.params.tau_u;
-        self.params = params;
-        if retune {
-            let sr = 1.0 / self.dt;
-            self.set_sample_rate(sr);
-        }
-    }
-
-    pub fn reset(&mut self) {
-        self.u = 0.0;
-        self.light = 0.0;
-        self.n_f = 0.0;
-        self.n_fast = 0.0;
-        self.n_t = 0.0;
-    }
-
-    /// The Alfrey-Taylor electroluminescent law: zero slope near zero (a
-    /// soft threshold) and saturating at high drive.
-    #[inline]
-    pub fn light_for(u: f32) -> f32 {
-        if u <= 1e-6 {
-            0.0
-        } else {
-            (-EL_B / u.sqrt()).exp()
-        }
-    }
-
-    /// Steady-state free carriers for a given light (what the cell settles
-    /// to under constant illumination).
-    #[inline]
-    pub fn carriers_for(light: f32, params: &CellParams) -> f32 {
-        if light <= 0.0 {
-            0.0
-        } else {
-            params.k_gen * light.powf(CELL_GAMMA)
-        }
-    }
-
-    /// Advance one sample with the instantaneous sidechain voltage `v`
-    /// (signed; rectified here).
-    #[inline]
-    pub fn step(&mut self, v: f32) {
-        let p = self.params;
-        self.u += self.a_u * (v.abs() - self.u);
-        self.u = flush(self.u);
-        let light = Self::light_for(self.u);
-        self.light = light;
-        let generation = Self::carriers_for(light, &p);
-        let tau = if generation > self.n_f {
-            p.tau_f0 / (1.0 + light / p.l_a)
-        } else {
-            p.tau_r1
-        };
-        let capture = p.capture * self.n_f * (1.0 - self.n_t);
-        let tau_t = p.tau_t0 * (1.0 + p.k_m * self.n_t);
-        let detrap = self.n_t / tau_t;
-        let n_f = self.n_f + self.dt * ((generation - self.n_f) / tau - capture + detrap);
-        let n_t = self.n_t + self.dt * (capture - detrap);
-        self.n_f = flush(n_f.clamp(0.0, 1.0));
-        self.n_t = flush(n_t.clamp(0.0, 1.0));
-        if p.fast_share > 0.0 {
-            // The T4A's third cell: same light, no traps, and quicker.
-            let tau_fast = tau / p.fast_speed;
-            let n = self.n_fast + self.dt * (generation - self.n_fast) / tau_fast;
-            self.n_fast = flush(n.clamp(0.0, 1.0));
-        }
-    }
-
-    /// The conductance the divider sees, 0..1.
-    ///
-    /// With only the main photocell this is exactly `n_f`, returned
-    /// untouched so the Gray and Silver positions are bit-for-bit what
-    /// they were. With the T4A's third cell the two conductances add in
-    /// parallel, weighted by the share the fast one carries.
-    #[inline]
-    pub fn conductance(&self) -> f32 {
-        let share = self.params.fast_share;
-        if share <= 0.0 {
-            self.n_f
-        } else {
-            (1.0 - share) * self.n_f + share * self.n_fast
-        }
-    }
-
-    /// Photocell resistance for the current carriers.
-    #[inline]
-    pub fn resistance(&self) -> f32 {
-        resistance_for(self.conductance())
-    }
-}
 
 /// The resistive divider the cell sits in. Both optical models use the
 /// same arrangement and the same cell; only the three resistances differ,
@@ -447,13 +143,6 @@ impl Divider {
     pub fn gr_db(&self, n_f: f32) -> f32 {
         -20.0 * self.attenuation(self.resistance(n_f)).log10()
     }
-}
-
-/// Cell resistance for `n_f` free carriers (conductance linear in `n_f`).
-#[inline]
-pub fn resistance_for(n_f: f32) -> f32 {
-    let g = 1.0 / R_DARK + K_G * n_f;
-    (1.0 / g).clamp(R_MIN, R_DARK)
 }
 
 /// Divider gain for a cell resistance, normalised so a dark cell is unity.

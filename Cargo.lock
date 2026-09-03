@@ -1609,10 +1609,24 @@ dependencies = [
  "include_dir",
  "log",
  "nih_plug",
+ "noob-electrical-components",
  "noob-vst-webgui-framework",
  "noob-vst-webgui-framework-nih",
  "serde_json",
 ]
+
+[[package]]
+name = "noob-electrical-components"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#d6515f5f9bca46d5377a5fbf82f809641573c21c"
+dependencies = [
+ "noob-electrical-components-photocell",
+]
+
+[[package]]
+name = "noob-electrical-components-photocell"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#d6515f5f9bca46d5377a5fbf82f809641573c21c"
 
 [[package]]
 name = "noob-vst-webgui-framework"

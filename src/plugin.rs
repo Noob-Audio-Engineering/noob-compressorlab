@@ -335,7 +335,7 @@ impl Default for NoobCompressorLab {
                 .assets(Assets::Lookup(ui_lookup)),
             |b| {
                 b.meta(serde_json::json!({
-                    "vendor": "Ely Erin Fox",
+                    "vendor": "Noob Audio Engineering",
                     "version": env!("CARGO_PKG_VERSION"),
                     "sample_rate": 48_000.0,
                     "vu_ref_dbfs": dsp::VU_REF_DBFS,
@@ -359,7 +359,7 @@ impl Default for NoobCompressorLab {
 
 impl Plugin for NoobCompressorLab {
     const NAME: &'static str = "Noob CompressorLab";
-    const VENDOR: &'static str = "Ely Erin Fox";
+    const VENDOR: &'static str = "Noob Audio Engineering";
     const URL: &'static str = env!("CARGO_PKG_HOMEPAGE");
     const EMAIL: &'static str = "";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");

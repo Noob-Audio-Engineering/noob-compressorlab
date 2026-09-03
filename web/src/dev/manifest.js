@@ -31,7 +31,7 @@ const VU_REF_DBFS = -18;
 
 export const offline = {
   name: 'noob-compressorlab',
-  meta: { vendor: 'Ely Erin Fox', version: 'dev', sample_rate: 48000, vu_ref_dbfs: VU_REF_DBFS, transfer_points: 128, standalone: true },
+  meta: { vendor: 'Noob Audio Engineering', version: 'dev', sample_rate: 48000, vu_ref_dbfs: VU_REF_DBFS, transfer_points: 128, standalone: true },
   params: [
     { id: 'model', name: 'Model', labels: ['1176', 'LA-2A'], default: 0, group: 'lab', automatable: false },
 

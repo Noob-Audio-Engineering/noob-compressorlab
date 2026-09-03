@@ -27,8 +27,9 @@ const knob = { size: 42, color: '#dda43f' };
 </script>
 
 <template>
-  <div class="extrasla3a">
-    <span class="extrasla3a__rear">REAR PANEL</span>
+  <div class="extrasla3a lab-bar">
+    <div class="lab-bar__left">
+      <span class="extrasla3a__rear">REAR PANEL</span>
     <div class="extrasla3a__item">
       <span class="extrasla3a__caption">MODE</span>
       <Segmented :p="c.mode" :labels="['COMPRESS', 'LIMIT']" />
@@ -43,17 +44,20 @@ const knob = { size: 42, color: '#dda43f' };
       <span class="extrasla3a__caption">METER</span>
       <Segmented :p="c.meter" :labels="['GR', 'OUT', 'OFF']" />
     </div>
-    <span class="extrasla3a__rear">LAB</span>
-    <div class="extrasla3a__item">
-      <span class="extrasla3a__caption">LINK</span>
-      <Toggle :p="c.link" :labels="['', 'stereo']" />
     </div>
+    <div class="lab-bar__globals">
+      <span class="lab-bar__tag" title="Ours, not the hardware's: every model carries these.">LAB</span>
     <div class="extrasla3a__item"><Knob :p="c.mix" v-bind="knob" label="Mix" /></div>
     <div class="extrasla3a__item"><Knob :p="c.scHpf" v-bind="knob" label="SC HPF" /></div>
+    <div class="extrasla3a__item">
+      <span class="extrasla3a__caption">STEREO</span>
+      <Toggle :p="c.link" :labels="['', 'stereo']" />
+    </div>
     <div v-if="c.source" class="extrasla3a__item source">
       <span class="extrasla3a__caption">DEMO SOURCE</span>
       <Segmented :p="c.source.kind" :labels="['VOCAL', 'BASS', 'DRUMS', 'PINK', 'WHITE', 'SAW', 'SINE']" />
     </div>
     <button class="extrasla3a__scope" :class="{ on: ui.scope }" title="Show or hide the analysis drawer" @click="ui.scope = !ui.scope">SCOPE</button>
+    </div>
   </div>
 </template>

@@ -3,7 +3,7 @@
  * that model not listed loads at its default), and the user presets, which
  * live in the plug-in's UI store under one key per model
  * (`presets.user.fet`, `presets.user.opto`, `presets.user.la3a`,
- * `presets.user.vca`, `presets.user.pre6176`) so they persist with the
+ * `presets.user.vca`, `presets.user.pre6176`, `presets.user.cl1b`) so they persist with the
  * plug-in state and every window of the instance sees them.
  *
  * A preset only ever touches its own model's parameters and the shared
@@ -15,7 +15,7 @@
  */
 import { getClient } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 
-/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176', Preset[]>} */
+/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', Preset[]>} */
 export const FACTORY_PRESETS = {
   // fet_ratio: 0 4:1, 1 8:1, 2 12:1, 3 20:1, 4 All. fet_revision: 0 A .. 7 H, 8 LN (see REVISIONS in models/fet/useFet.js).
   fet: [
@@ -150,6 +150,30 @@ export const FACTORY_PRESETS = {
       name: 'Drum Room',
       description: 'Mic input driven hard, all buttons in on the compressor half.',
       values: { pre_input: 2, pre_gain: 4, pre_level: 8, fet_input: 33, fet_output: 17, fet_ratio: 4, fet_attack: 6, fet_release: 7 },
+    },
+  ],
+  // cl1b: every continuous control runs 0..1 (the pot's own travel); the knobs sweep 239 degrees, so
+  // 11 o'clock is 0.374 and 1 o'clock is 0.626. cl1b_mode: 0 Fixed, 1 Fix/Man, 2 Manual.
+  cl1b: [
+    {
+      name: 'Vocal',
+      description: "Lydkraft's own published vocal setting, which is where every control already starts: attack at 2 o'clock, release at 10 o'clock, meter on compression.",
+      values: {},
+    },
+    {
+      name: 'Bass, on the road',
+      description: "Scotty Simpson's setting for the Oak Ridge Boys' bass rig: gain a shade above unity, attack around 11 o'clock, release around 1 o'clock, ratio near 2.5:1.",
+      values: { cl1b_gain: 0.3, cl1b_ratio: 0.09, cl1b_threshold: 0.52, cl1b_attack: 0.374, cl1b_release: 0.626, cl1b_mode: 2 },
+    },
+    {
+      name: 'Smooth and slow',
+      description: 'Mine, not theirs: a low ratio and a long release for the glue this unit is known for, riding a couple of decibels and never letting go quickly.',
+      values: { cl1b_gain: 0.34, cl1b_ratio: 0.15, cl1b_threshold: 0.62, cl1b_attack: 0.85, cl1b_release: 0.8, cl1b_mode: 2 },
+    },
+    {
+      name: 'Fixed times',
+      description: "Mine: the same idea with the attack and release knobs out of circuit, so the unit picks its own times from the programme. Ratio up for a firmer hand.",
+      values: { cl1b_gain: 0.32, cl1b_ratio: 0.6, cl1b_threshold: 0.58, cl1b_mode: 0 },
     },
   ],
 };

@@ -29,7 +29,7 @@ export { getClient, hasParam, useParam, useNoobVstWebguiFramework };
  * view setting a preset leaves alone). The 6176 owns two prefixes: its own
  * 610 section and the 1176 half it drives, which is why ownership is a list
  * and not the key.
- * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176', label: string, name: string, sub: string, owns: string[], meter: string | null, initPreset: string }[]}
+ * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', label: string, name: string, sub: string, owns: string[], meter: string | null, initPreset: string }[]}
  */
 export const MODELS = [
   { key: 'fet', label: '1176', name: 'NOOB 1176', sub: 'FET limiting amplifier', owns: ['fet_'], meter: 'fet_meter', initPreset: 'Default' },
@@ -37,6 +37,7 @@ export const MODELS = [
   { key: 'la3a', label: 'LA-3A', name: 'NOOB LA-3A', sub: 'solid-state optical leveler', owns: ['la3a_'], meter: 'la3a_meter', initPreset: 'Init' },
   { key: 'vca', label: 'Distressor', name: 'NOOB DISTRESSOR', sub: 'feedback VCA compressor', owns: ['dist_'], meter: null, initPreset: '5 5 5 5' },
   { key: 'pre6176', label: '6176', name: 'NOOB 6176', sub: 'tube preamp into the FET limiter', owns: ['pre_', 'fet_'], meter: 'pre_meter', initPreset: 'Unity' },
+  { key: 'cl1b', label: 'CL-1B', name: 'NOOB CL 1B', sub: 'optical tube compressor', owns: ['cl1b_'], meter: 'cl1b_meter', initPreset: 'Vocal' },
 ];
 
 /** Smallest window the page lays out well in, `[width, height]` CSS pixels; `src/plugin.rs` clamps to the same. */

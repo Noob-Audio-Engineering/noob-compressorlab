@@ -62,6 +62,15 @@ fn the_parameter_contract_holds() {
             "la3a_meter",
             "la3a_emphasis",
             "la3a_cell",
+            "cl1b_gain",
+            "cl1b_ratio",
+            "cl1b_threshold",
+            "cl1b_attack",
+            "cl1b_release",
+            "cl1b_mode",
+            "cl1b_meter",
+            "cl1b_bus",
+            "cl1b_power",
             "dist_input",
             "dist_output",
             "dist_attack",
@@ -108,11 +117,11 @@ fn the_parameter_contract_holds() {
     assert_eq!(by_id("opto_cell").default, 1.0);
     assert_eq!(by_id("src_kind").labels.len(), 7);
     assert_eq!(by_id("src_level").default, 0.4);
-    assert_eq!(param_specs(false).len(), 50);
+    assert_eq!(param_specs(false).len(), 59);
 
     let (bridge, ix) = build_bridge("test", SR);
     assert_eq!(ix.model, 0);
-    assert_eq!(ix.src_freq, Some(52));
+    assert_eq!(ix.src_freq, Some(61));
     let streams = streams(SR);
     assert_eq!(streams[STREAM_IX.meter].id, "meter");
     assert_eq!(streams[STREAM_IX.cell].id, "cell");

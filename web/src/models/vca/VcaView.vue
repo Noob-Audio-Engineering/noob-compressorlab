@@ -26,15 +26,15 @@ const win = useWindow();
  * having. A one-unit panel is short, so this rarely binds; it does once the
  * window is wide and shallow.
  */
-const CHROME_PX = 300;
+const CHROME_PX = 338;
 const PLATE_ASPECT = 19 / 1.75;
 const plateMax = computed(() => `${Math.max(760, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
 </script>
 
 <template>
   <main class="lab-model lab-model--vca">
-    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <ExtrasBar />
+    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <section v-if="ui.scope" class="lab-bench">
       <HistoryPanel />
       <TransferPanel />

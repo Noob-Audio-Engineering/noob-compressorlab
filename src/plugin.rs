@@ -26,7 +26,7 @@ use nih_plug::prelude::*;
 use noob_vst_webgui_framework::{Assets, AudioHandle, NoobVstWebguiFramework};
 use noob_vst_webgui_framework_nih::{EditorConfig, NoobVstWebguiFrameworkEditor, StoreSlot};
 
-use crate::dsp::{self, Model, Processor, Settings, Shared, fet, opto, opto3, pre, vca};
+use crate::dsp::{self, Model, Processor, Settings, Shared, fet, opto, opto1b, opto3, pre, vca};
 
 static UI: Dir = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
 
@@ -47,6 +47,8 @@ pub enum ModelParam {
     Vca,
     #[name = "6176"]
     Pre6176,
+    #[name = "CL-1B"]
+    Opto1b,
 }
 
 /// The 1176's ratio buttons, as the host sees them.
@@ -136,6 +138,36 @@ pub enum La3aMeterParam {
     GainReduction,
     Output,
     Off,
+}
+
+/// The CL 1B's attack/release select, in the panel's own left-to-right
+/// order.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Cl1bModeParam {
+    Fixed,
+    #[name = "Fix/Man"]
+    FixMan,
+    Manual,
+}
+
+/// What the CL 1B's meter shows. Three positions on the hardware, and no
+/// Off among them.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Cl1bMeterParam {
+    Input,
+    Compression,
+    Output,
+}
+
+/// The CL 1B's side-chain bus select. On the hardware it chooses which of
+/// two busses the unit joins; here it picks the stereo link group.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Cl1bBusParam {
+    Off,
+    #[name = "1"]
+    One,
+    #[name = "2"]
+    Two,
 }
 
 /// The Distressor's ratio switch.
@@ -346,6 +378,21 @@ pub struct NoobCompressorLabParams {
     pub la3a_emphasis: FloatParam,
     /// LA-3A cell age: a depleted T4 compresses far less.
     pub la3a_cell: EnumParam<CellParam>,
+    /// The CL 1B's five knobs. All 0..1, because the panel prints scales
+    /// rather than numbers and the taper is the pot's own: Gain and
+    /// Threshold share one log law, Ratio and Release are linear, Attack
+    /// is logarithmic.
+    pub cl1b_gain: FloatParam,
+    pub cl1b_ratio: FloatParam,
+    pub cl1b_threshold: FloatParam,
+    pub cl1b_attack: FloatParam,
+    pub cl1b_release: FloatParam,
+    pub cl1b_mode: EnumParam<Cl1bModeParam>,
+    pub cl1b_meter: EnumParam<Cl1bMeterParam>,
+    pub cl1b_bus: EnumParam<Cl1bBusParam>,
+    /// The panel's OFF/ON mains knob. Parks the machine rather than
+    /// silencing it, as the 1176's METER OFF does in this same plug-in.
+    pub cl1b_power: BoolParam,
     /// Distressor knobs, 0..10.5.
     pub dist_input: FloatParam,
     pub dist_output: FloatParam,
@@ -409,6 +456,12 @@ impl Default for NoobCompressorLabParams {
                 },
             )
             .with_step_size(0.1)
+        };
+        // The CL 1B's knobs are 0..1: its panel prints scales, not
+        // numbers, and each pot has its own taper.
+        let unit_knob = |name: &str, default: f32| {
+            FloatParam::new(name, default, FloatRange::Linear { min: 0.0, max: 1.0 })
+                .with_step_size(0.001)
         };
         let percent = |name: &str, default: f32| {
             FloatParam::new(
@@ -479,6 +532,31 @@ impl Default for NoobCompressorLabParams {
             )
             .with_step_size(0.01),
             la3a_cell: EnumParam::new("Cell", CellParam::Silver).non_automatable(),
+            // The host sees the panel's own units too, formatted by the
+            // same engine functions the manifest's tables are sampled
+            // from, so there is still exactly one copy of each pot law.
+            cl1b_gain: unit_knob("Gain", 0.265).with_value_to_string(Arc::new(|p| {
+                let db = opto1b::engine::gain_db(p);
+                if db <= -60.0 {
+                    "off".to_string()
+                } else {
+                    format!("{db:.1} dB")
+                }
+            })),
+            cl1b_ratio: unit_knob("Ratio", 0.375),
+            cl1b_threshold: unit_knob("Threshold", 0.5).with_value_to_string(Arc::new(|p| {
+                format!("{:.1} dBu", opto1b::engine::threshold_dbu(p))
+            })),
+            cl1b_attack: unit_knob("Attack", 0.75).with_value_to_string(Arc::new(|p| {
+                format!("{:.2} ms", opto1b::engine::attack_s(p) * 1e3)
+            })),
+            cl1b_release: unit_knob("Release", 0.25).with_value_to_string(Arc::new(|p| {
+                format!("{:.2} s", opto1b::engine::release_s(p))
+            })),
+            cl1b_mode: EnumParam::new("Attack/Release Select", Cl1bModeParam::Manual),
+            cl1b_meter: EnumParam::new("Meter", Cl1bMeterParam::Compression).non_automatable(),
+            cl1b_bus: EnumParam::new("Sidechain Bus", Cl1bBusParam::Off),
+            cl1b_power: BoolParam::new("Power", true).non_automatable(),
             dist_input: knob("Input"),
             dist_output: knob("Output"),
             dist_attack: knob("Attack"),
@@ -626,6 +704,19 @@ unsafe impl Params for NoobCompressorLabParams {
             (g("pre_load"), self.pre_load.as_ptr(), g("6176")),
             (g("pre_meter"), self.pre_meter.as_ptr(), g("6176")),
             (g("pre_phantom"), self.pre_phantom.as_ptr(), g("6176")),
+            (g("cl1b_gain"), self.cl1b_gain.as_ptr(), g("CL-1B")),
+            (g("cl1b_ratio"), self.cl1b_ratio.as_ptr(), g("CL-1B")),
+            (
+                g("cl1b_threshold"),
+                self.cl1b_threshold.as_ptr(),
+                g("CL-1B"),
+            ),
+            (g("cl1b_attack"), self.cl1b_attack.as_ptr(), g("CL-1B")),
+            (g("cl1b_release"), self.cl1b_release.as_ptr(), g("CL-1B")),
+            (g("cl1b_mode"), self.cl1b_mode.as_ptr(), g("CL-1B")),
+            (g("cl1b_meter"), self.cl1b_meter.as_ptr(), g("CL-1B")),
+            (g("cl1b_bus"), self.cl1b_bus.as_ptr(), g("CL-1B")),
+            (g("cl1b_power"), self.cl1b_power.as_ptr(), g("CL-1B")),
             (g("link"), self.link.as_ptr(), g("extras")),
             (g("mix"), self.mix.as_ptr(), g("extras")),
             (g("sc_hpf"), self.sc_hpf.as_ptr(), g("extras")),
@@ -677,6 +768,18 @@ impl NoobCompressorLabParams {
                 emphasis: self.la3a_emphasis.value(),
                 cell: self.la3a_cell.value() as usize,
                 ..opto3::Settings::default()
+            },
+            opto1b: opto1b::Settings {
+                gain: self.cl1b_gain.value(),
+                ratio: self.cl1b_ratio.value(),
+                threshold: self.cl1b_threshold.value(),
+                attack: self.cl1b_attack.value(),
+                release: self.cl1b_release.value(),
+                mode: self.cl1b_mode.value() as usize,
+                meter: self.cl1b_meter.value() as usize,
+                bus: self.cl1b_bus.value() as usize,
+                power: self.cl1b_power.value(),
+                ..opto1b::Settings::default()
             },
             vca: vca::Settings {
                 input: self.dist_input.value(),

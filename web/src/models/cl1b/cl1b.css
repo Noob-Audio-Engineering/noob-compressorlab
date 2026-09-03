@@ -1,0 +1,652 @@
+/*
+ * The CL-1B page's rules: a blue 19 inch panel three units tall, white
+ * lettering, five faceted black knobs with their scales printed on the
+ * panel, three lever switches, a bat toggle, a ruby jewel and a mains
+ * knob.
+ *
+ * On the blue. Tube-Tech publish the paint as RAL 5001, which renders about
+ * #0E4C64, a dark muted green-blue. Their own photographs are nowhere near
+ * it: I sampled a median of #0056B7 from the hi-res front shot, and the
+ * dossier got #005EB6 from the same file and two other values from two
+ * other press images, all of them brighter and bluer than the stated code
+ * and all disagreeing with each other. Those are CMYK press files shot with
+ * direct flash on gloss powder coat. So this takes the manufacturer's
+ * stated colour as the base and lightens it towards the photographs,
+ * landing at #0F5A8C, and says so rather than pretending either source is
+ * the truth.
+ *
+ * `.abs`, `.screw` and the shared `.lab-*` chrome come from the 1176's file
+ * and `src/style.css`, both imported alongside this one.
+ */
+.lab-model--cl1b {
+  background: #070a0e;
+  color: #e8edf2;
+  --noob-vst-webgui-framework-accent: var(--color-cl1b-amber);
+  --noob-vst-webgui-framework-text: #e8edf2;
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(232, 237, 242, 0.45);
+}
+
+/* ------------------------------------------------------------- faceplate */
+.facecl1b {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  background: #10141a;
+  padding: 6px 0;
+}
+.facecl1b__ear {
+  width: 22px;
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, #dfe2e7, #b0b5bc 45%, #8a8f97);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 2px 0 0 2px;
+}
+.facecl1b__ear.right {
+  background: linear-gradient(270deg, #dfe2e7, #b0b5bc 45%, #8a8f97);
+  border-radius: 0 2px 2px 0;
+}
+/* the rounded oval rack slots, two per ear */
+.facecl1b__ear .slot {
+  width: 9px;
+  height: 15px;
+  border-radius: 5px;
+  background: #14171c;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.facecl1b__plate {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+/* 483 by 131 mm: 19 inch wide, three units tall. */
+.facecl1b__panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 483 / 131;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 150% at 30% 0%, rgba(255, 255, 255, 0.1), transparent 60%),
+    linear-gradient(180deg, #12639a, #0f5a8c 45%, #0d4f7c);
+  font-family: var(--font-panel);
+  color: #f2f6fa;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+  transition: filter 160ms ease;
+}
+/* mains off: the panel loses its lamps, not its signal. */
+.facecl1b.unlit .facecl1b__panel {
+  filter: brightness(0.82) saturate(0.85);
+}
+
+.screwcl1b {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.05cqw;
+  height: 1.05cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fbfcfd, #a8adb5 58%, #62666d);
+  box-shadow: 0 0.1cqw 0.15cqw rgba(0, 0, 0, 0.45);
+}
+.screwcl1b::after,
+.screwcl1b::before {
+  content: '';
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  top: 45%;
+  height: 10%;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 1px;
+}
+.screwcl1b::before {
+  transform: rotate(90deg);
+}
+
+.facecl1b__mark {
+  position: absolute;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35cqw;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+.facecl1b__mark b {
+  font-size: 1.62cqw;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.facecl1b__mark span {
+  /* 1.0cqw keeps these above 7 px at the 900 x 520 minimum, where the plate
+   * is height-capped to about 737 px wide */
+  font-size: 1.0cqw;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+}
+.facecl1b__cap {
+  font-size: 1.24cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+/* the VU meter in its black moulded bezel */
+.facecl1b__meter {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 0.5cqw;
+  padding: 0.55cqw;
+  background: linear-gradient(180deg, #2b2f34, #16191d 40%, #0c0e11);
+  box-shadow:
+    inset 0 0.1cqw 0.2cqw rgba(255, 255, 255, 0.12),
+    0 0.2cqw 0.4cqw rgba(0, 0, 0, 0.5);
+}
+
+/* the ruby pilot jewel in its chrome bezel */
+.facecl1b__jewel {
+  width: 2.6cqw;
+  height: 2.6cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #6d3038, #3a141b 60%, #240c11);
+  box-shadow:
+    0 0 0 0.45cqw #c9ced5,
+    0 0 0 0.62cqw #7f858d,
+    inset 0 0 0.3cqw rgba(0, 0, 0, 0.6);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+.facecl1b__jewel.on {
+  background: radial-gradient(circle at 34% 30%, #ff9a86, #f0323f 45%, #a2101f);
+  box-shadow:
+    0 0 0 0.45cqw #c9ced5,
+    0 0 0 0.62cqw #7f858d,
+    0 0 1.2cqw rgba(255, 60, 70, 0.5);
+}
+
+/* --------------------------------------------------------------- knobs */
+.cl1bknob {
+  position: relative;
+  user-select: none;
+}
+.cl1bknob__dial {
+  display: block;
+  width: 100%;
+  cursor: ns-resize;
+  overflow: visible;
+}
+.cl1bknob__dial:focus-visible {
+  outline: 2px solid var(--color-cl1b-amber);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.cl1bknob__marks circle {
+  fill: #f2f6fa;
+}
+.cl1bknob__marks text {
+  fill: #f2f6fa;
+  font-size: 7.4px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.cl1bknob__skirt {
+  fill: #171d1c;
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 0.7;
+}
+.cl1bknob__rim {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 0.7;
+}
+.cl1bknob__index {
+  fill: #f4f7fa;
+}
+.cl1bknob__value {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(6, 10, 14, 0.92);
+  color: var(--color-cl1b-amber);
+  font: 700 10px var(--font-panel);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------- lever switches */
+.cl1blev {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* the attack/release and sidechain levers sit 0.115 of the panel apart, so
+   * anything wider than that would run their legends together */
+  width: 9.2cqw;
+}
+.cl1blev__legends {
+  position: relative;
+  width: 100%;
+  height: 3.4cqw;
+}
+.cl1blev__leg {
+  position: absolute;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(242, 246, 250, 0.72);
+  font: 700 0.92cqw var(--font-panel);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  line-height: 1.05;
+  transition: color 120ms ease;
+}
+.cl1blev__leg:hover {
+  color: #fff;
+}
+.cl1blev__leg.on {
+  color: #fff;
+  text-shadow: 0 0 0.6cqw rgba(255, 255, 255, 0.5);
+}
+.cl1blev__leg.left {
+  left: 0;
+  bottom: 0.2cqw;
+}
+.cl1blev__leg.right {
+  right: 0;
+  bottom: 0.2cqw;
+}
+.cl1blev__leg.top {
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.cl1blev__body {
+  position: relative;
+  width: 3.1cqw;
+  height: 4.4cqw;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.cl1blev__body:focus-visible {
+  outline: 2px solid var(--color-cl1b-amber);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* the chrome ball bushing the lever sits on */
+.cl1blev__bush {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 2.6cqw;
+  height: 1.5cqw;
+  border-radius: 50% 50% 40% 40%;
+  background: radial-gradient(circle at 40% 25%, #f4f6f8, #b7bcc3 55%, #767b83);
+  box-shadow: 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.45);
+}
+/* the lever: leans left at 0, upright at 1, leans right at 2 */
+.cl1blev__bat {
+  position: absolute;
+  left: 50%;
+  bottom: 0.7cqw;
+  width: 1.05cqw;
+  height: 3.5cqw;
+  border-radius: 0.5cqw 0.5cqw 0.2cqw 0.2cqw;
+  background: linear-gradient(90deg, #0b0f0e, #2c3433 45%, #0b0f0e);
+  transform-origin: 50% 100%;
+  transition: transform 140ms ease;
+  box-shadow: 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.5);
+}
+.cl1blev__bat::after {
+  content: '';
+  position: absolute;
+  left: 38%;
+  right: 38%;
+  top: 12%;
+  bottom: 28%;
+  background: rgba(244, 247, 250, 0.85);
+  border-radius: 1px;
+}
+.cl1blev__bat.at0 {
+  transform: translateX(-50%) rotate(-26deg);
+}
+.cl1blev__bat.at1 {
+  transform: translateX(-50%) rotate(0deg);
+}
+.cl1blev__bat.at2 {
+  transform: translateX(-50%) rotate(26deg);
+}
+.cl1blev__caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 0.4cqw;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.cl1blev__caption span {
+  font-size: 1.0cqw;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.cl1blev__caption b {
+  font-size: 1.06cqw;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+/* ------------------------------------------------------------ IN toggle */
+.cl1btog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45cqw;
+}
+.cl1btog__leg {
+  font-size: 1.2cqw;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.cl1btog__body {
+  position: relative;
+  width: 2.6cqw;
+  height: 3.7cqw;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.cl1btog__body:focus-visible {
+  outline: 2px solid var(--color-cl1b-amber);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+/* the chrome hex bushing */
+.cl1btog__bush {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 2.2cqw;
+  height: 1.2cqw;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: linear-gradient(180deg, #eef0f3, #adb2b9 55%, #71767e);
+}
+.cl1btog__bat {
+  position: absolute;
+  left: 50%;
+  bottom: 0.6cqw;
+  width: 0.92cqw;
+  height: 2.9cqw;
+  border-radius: 0.46cqw 0.46cqw 0.16cqw 0.16cqw;
+  background: linear-gradient(90deg, #0b0f0e, #2c3433 45%, #0b0f0e);
+  transform-origin: 50% 100%;
+  transition: transform 140ms ease;
+}
+.cl1btog__bat.up {
+  transform: translateX(-50%) rotate(-16deg);
+}
+.cl1btog__bat.down {
+  transform: translateX(-50%) rotate(16deg);
+}
+
+/* -------------------------------------------------------- mains switch */
+.cl1bpwr {
+  position: relative;
+  width: 6.6cqw;
+  display: flex;
+  justify-content: center;
+}
+.cl1bpwr__leg {
+  position: absolute;
+  top: -1.5cqw;
+  font-size: 1.06cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.cl1bpwr__leg.off {
+  left: 0;
+}
+.cl1bpwr__leg.on {
+  right: 0;
+  top: -0.7cqw;
+}
+.cl1bpwr__body {
+  width: 4.55cqw;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.cl1bpwr__body:focus-visible {
+  outline: 2px solid var(--color-cl1b-amber);
+  outline-offset: 2px;
+}
+.cl1bpwr__dial {
+  display: block;
+  width: 100%;
+}
+.cl1bpwr__skirt {
+  fill: #141a19;
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 2;
+}
+.cl1bpwr__cap {
+  fill: #232a29;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 1.5;
+}
+.cl1bpwr__index {
+  fill: #f4f7fa;
+}
+
+/* --------------------------------------------------------------- VU face */
+.cl1bvu {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.25cqw;
+  overflow: hidden;
+  transition: filter 160ms ease;
+}
+.cl1bvu.dark {
+  filter: brightness(0.42) saturate(0.5);
+}
+.cl1bvu__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.cl1bvu__arc {
+  fill: none;
+  stroke: #201c14;
+  stroke-width: 1.6;
+}
+.cl1bvu__arc.red {
+  stroke: #d8352c;
+}
+.cl1bvu__band {
+  fill: none;
+  stroke: #d8352c;
+  stroke-width: 5.5;
+}
+.cl1bvu__tick {
+  stroke: #201c14;
+  stroke-width: 1.2;
+}
+.cl1bvu__tick.major {
+  stroke-width: 2;
+}
+.cl1bvu__tick.red {
+  stroke: #d8352c;
+}
+.cl1bvu__tick.pct {
+  stroke: #3a3428;
+  stroke-width: 1;
+}
+.cl1bvu__num {
+  fill: #201c14;
+  font: 700 12px var(--font-panel);
+}
+.cl1bvu__num.red {
+  fill: #d8352c;
+}
+.cl1bvu__pct {
+  fill: #6b6049;
+  font: 600 7px var(--font-panel);
+}
+.cl1bvu__end {
+  fill: #201c14;
+  font: 700 14px var(--font-panel);
+}
+.cl1bvu__end.red {
+  fill: #d8352c;
+}
+.cl1bvu__maker {
+  fill: #2a2419;
+  font: 600 15px var(--font-vu, Georgia, 'Times New Roman', serif);
+  letter-spacing: 0.16em;
+}
+.cl1bvu__rule {
+  stroke: #2a2419;
+  stroke-width: 1;
+}
+.cl1bvu__vu {
+  fill: #201c14;
+  font: 800 13px var(--font-panel);
+  letter-spacing: 0.06em;
+}
+.cl1bvu__needle {
+  stroke: #14110c;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.cl1bvu__hub {
+  fill: #1d1a14;
+}
+
+/* ------------------------------------------------------------ the strip */
+.extrascl1b {
+  /* chrome, placement and layout come from the shared `.lab-bar` */
+  font-family: var(--font-panel);
+}
+.extrascl1b__tag {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: rgba(232, 176, 74, 0.55);
+  border: 1px solid rgba(232, 176, 74, 0.25);
+  border-radius: 3px;
+  padding: 3px 5px;
+}
+.extrascl1b__hint {
+  font-size: 10px;
+  color: rgba(232, 237, 242, 0.35);
+}
+.extrascl1b__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extrascl1b__item.source {
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrascl1b__caption {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(232, 237, 242, 0.45);
+}
+.extrascl1b .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #070a0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrascl1b .noob-vst-webgui-framework-segment {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(232, 237, 242, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.extrascl1b .noob-vst-webgui-framework-segment.is-on {
+  background: var(--color-cl1b-amber);
+  color: #07110f;
+}
+.extrascl1b .noob-vst-webgui-framework-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  color: rgba(232, 237, 242, 0.55);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.extrascl1b .noob-vst-webgui-framework-toggle.is-on {
+  color: var(--color-cl1b-amber);
+}
+.extrascl1b__scope {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(232, 176, 74, 0.3);
+  background: transparent;
+  color: rgba(232, 237, 242, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+.extrascl1b__scope.on {
+  background: var(--color-cl1b-amber);
+  border-color: var(--color-cl1b-amber);
+  color: #07110f;
+}
+.extrascl1b__item.source ~ .extrascl1b__scope {
+  margin-left: 0;
+}
+
+/*
+ * The strip sheds its wordier parts before it wraps. A media query, not a
+ * container query: the strip is a sibling of the faceplate rather than
+ * inside it, so it has no container ancestor to ask, which is why the
+ * container query I first wrote here never matched. The window width is
+ * what matters anyway, and it is what the other models' strips use.
+ */
+@media (max-width: 1250px) {
+  .extrascl1b__hint {
+    display: none;
+  }
+}
+@media (max-width: 1050px) {
+  .extrascl1b {
+    gap: 12px;
+    padding: 6px 10px;
+  }
+  .extrascl1b__caption {
+    letter-spacing: 0.1em;
+  }
+}

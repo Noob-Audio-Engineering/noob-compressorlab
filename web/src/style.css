@@ -21,6 +21,7 @@
 @import './models/vca/vca.css';
 @import './models/pre6176/pre6176.css';
 @import './models/la3a/la3a.css';
+@import './models/cl1b/cl1b.css';
 /*
  * Tailwind scans only this app's sources by default. The shared Vue
  * components live in the linked `@noob-audio-engineering/noob-vst-webgui-framework` package and
@@ -70,6 +71,78 @@
 
   /* the LA-3A: the same silver family as the LA-2A, with its own accent */
   --color-la3a-amber: #dda43f;
+
+  /* the CL-1B: the panel blue is in its own file; this is the shell's accent */
+  --color-cl1b-amber: #e8b04a;
+}
+
+/*
+ * The bar every model carries directly under the app's top bar: the
+ * controls that are ours rather than the hardware's. Its placement and its
+ * look are the same on all six; only the contents differ, which is why this
+ * lives here and not in a model's own file. `bench-panel` is the LA-2A's
+ * original treatment, moved here so every bar wears it.
+ */
+.bench-panel {
+  background: var(--color-bench-800);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 0;
+}
+/*
+ * The bar's two halves. The model's own controls sit left, the ones we
+ * added sit right in one fixed order on every model, so a user's eye lands
+ * in the same place whichever compressor is loaded. A model with nothing of
+ * its own simply has an empty left half.
+ */
+.lab-bar__left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  min-width: 0;
+}
+.lab-bar__globals {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-left: auto;
+}
+/* The chip that says the group beside it is ours rather than the hardware's. */
+/*
+ * Narrow windows: stop pushing the globals to the right, so the two halves
+ * flow as one run instead of stacking into a second and third row. The
+ * arrangement still reads left-to-right, it simply stops being justified.
+ */
+@media (max-width: 1000px) {
+  .lab-bar__globals {
+    margin-left: 0;
+  }
+}
+.lab-bar__tag {
+  font: 800 8px var(--font-sans);
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+  padding: 3px 5px;
+  cursor: help;
+}
+.lab-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  padding: 6px 16px;
+  /* no bottom margin: the faceplate below brings its own top padding */
+  margin: 10px 12px 0;
+  border-radius: 8px;
+  background: var(--color-bench-800);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: 0;
 }
 
 html,

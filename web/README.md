@@ -4,18 +4,20 @@ The front panels of [Noob CompressorLab](../README.md), a Vue 3 + Tailwind
 single-page app rendered inside the plug-in's native web view (or a browser
 tab), talking to the Rust DSP over
 [noob-vst-webgui-framework](https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework). One instance is one compressor at a
-time: the `model` parameter picks one of five, the page shows that model's
+time: the `model` parameter picks one of six, the page shows that model's
 face, extras and workbench, and because the choice is a parameter it is
 saved with the host's project and can differ per instance.
 
-Everything you see is this plug-in's own look, five times over: the 1176's
+Everything you see is this plug-in's own look, six times over: the 1176's
 black (or silver, or blue-striped) panel with its machined knobs, push
 buttons and cream VU face; the LA-2A's brushed plate with its bakelite
 knobs, bat-handle levers, rotary selector and bevelled meter; the LA-3A's
 flat black half-rack panel with two cream knobs and no chrome at all; the
 Distressor's charcoal single unit with its ivory knobs and rows of coloured
 lamps; and the 6176's brushed aluminium carrying two black inset panels,
-the tube preamp on the left and the limiter on the right. The framework
+the tube preamp on the left and the limiter on the right; and the CL-1B's
+blue three-unit panel with its faceted black knobs, three-position levers
+and a ruby pilot jewel. The framework
 supplies behaviour only: parameter handles, knob gestures in rotation space
 (`useKnobGesture` with the `rotation` option, so a printed taper stays under
 the pointer), the needle's ballistics and scale maths, the history and
@@ -93,11 +95,19 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
     │   ├── GrBargraph.vue            the sixteen-lamp gain-reduction bargraph, 1 to 26 dB
     │   ├── MiniToggle.vue            the two toggles the EL8-X adds between the knobs
     │   └── ExtrasBar.vue             finish, link mode, headroom, mix, side-chain HPF, the demo source, SCOPE
-    └── models/pre6176/Pre6176View.vue  the 6176: the two-unit faceplate, the extras bar, the drawer
-        ├── Faceplate.vue             the 19 : 3.5 aluminium panel with two black insets; reuses the 1176's VU
-        ├── PreKnob.vue               the glossy black knobs, continuous and stepped alike
-        ├── RatioKnob.vue             the RATIO rotary, the one control that drives two parameters
-        └── PreToggle.vue             the small bat toggles, two or three positions
+    ├── models/pre6176/Pre6176View.vue  the 6176: the two-unit faceplate, the extras bar, the drawer
+    │   ├── Faceplate.vue             the 19 : 3.5 aluminium panel with two black insets; reuses the 1176's VU
+    │   ├── PreKnob.vue               the glossy black knobs, continuous and stepped alike
+    │   ├── RatioKnob.vue             the RATIO rotary, the one control that drives two parameters
+    │   └── PreToggle.vue             the small bat toggles, two or three positions
+    └── models/cl1b/Cl1bView.vue      the CL-1B: the three-unit faceplate, the lab strip, the drawer
+        ├── Faceplate.vue             the blue 483 x 131 mm panel, laid out from the dossier's measured fractions
+        ├── Cl1bKnob.vue              the five faceted black knobs, scale printed on the panel, 239 degrees
+        ├── Cl1bLever.vue             the three-position levers: meter, attack/release select, sidechain bus
+        ├── Cl1bToggle.vue            the IN switch, which is the shared bypass wearing the hardware's legend
+        ├── Cl1bPower.vue             the mains switch
+        ├── VuFaceCl1b.vue            its own VU: two arcs, dB over percentage, maker's script, VU lower right
+        └── ExtrasStrip.vue           mix, side-chain HPF, link, the demo source, SCOPE
 ```
 
 Composables and data:
@@ -109,6 +119,7 @@ Composables and data:
 | `models/opto/useOpto.js` | the LA-2A's handles (`useOpto()`, ids `opto_*`) |
 | `models/la3a/useLa3a.js` | the LA-3A's handles (`useControls()`, ids `la3a_*`) and its drawer state |
 | `models/vca/useVca.js` | the Distressor's handles (ids `dist_*`), the ratio / detector / audio tables, the bargraph steps, the knob taper |
+| `models/cl1b/useCl1b.js` | the CL-1B's handles (`useControls()`, ids `cl1b_*`), the measured scale marks, the mains handle |
 | `models/pre6176/usePre.js` | the 6176's handles (`pre_*` plus the `fet_*` half it drives) and the mappings between the 6176's printed numbers and the 1176's |
 | `presets.js` | factory presets per model and the `presets.user.<model>` store helpers |
 | `dev/manifest.js` | the design-mode manifest |
@@ -166,6 +177,10 @@ switch again.
 | JOIN / SPLIT (6176) | `pre_join` | the same routing parameter the RATIO knob's BP position reaches, so switch and knob agree instead of each having a path |
 | GR / OUTPUT toggle | `la3a_meter` | the hardware's two positions; the third, Off, is on the extras strip |
 | MODE, HF CONTOUR | `la3a_mode`, `la3a_emphasis` | rear-panel controls, so they live on the strip; the contour is 0 = flat, the opposite sense to the LA-2A's emphasis |
+| GAIN, RATIO, THRESHOLD, ATTACK, RELEASE (CL-1B) | `cl1b_gain`, `cl1b_ratio`, `cl1b_threshold`, `cl1b_attack`, `cl1b_release` | every one runs 0..1, the pot's own travel; the dossier found the panel print approximate, so the dots go where they are on the metal and the value follows the pot's law |
+| METER, attack/release SELECT, sidechain BUS SELECT | `cl1b_meter`, `cl1b_mode`, `cl1b_bus` | three positions each, not two; the bus picks a stereo link group |
+| IN (CL-1B) | `bypass` | the hardware's own bypass, so it drives the shared parameter and reads inverted |
+| OFF / ON (CL-1B) | `cl1b_power` if the engine has it, else page state | the panel has a mains switch; when the parameter exists the unit powers down, and powering down passes audio through rather than silencing it, which is what the 1176 here does too |
 | INPUT, ATTACK, RELEASE, OUTPUT (Distressor) | `dist_input`, `dist_attack`, `dist_release`, `dist_output` | 0 to 10.5, as the knobs turn |
 | the eight ratio lamps | `dist_ratio` | clicking a lamp selects it; the RATIO button cycles |
 | DETECTOR lamps and button | `dist_detector` | HP and Band are bits of the four-state selector; the Link lamp is the shared `link` |
@@ -258,6 +273,7 @@ height is left and the charts grow with it.
 | LA-3A | two units, in the SR-3A rack kit | 19 : 3.5 |
 | Distressor | one unit, full rack | 19 : 1.75 |
 | 6176 | two units, full rack | 19 : 3.5 |
+| CL-1B | three units, full rack | 483 : 131 |
 
 The LA-3A is the odd one: the unit itself is only half a rack wide, so its
 face draws the SR-3A mounting kit the hardware is sold with — a full

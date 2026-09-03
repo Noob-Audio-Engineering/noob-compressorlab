@@ -72,7 +72,7 @@
   top: 50%;
   transform: translateY(-50%) rotate(-90deg);
   transform-origin: center;
-  font: 600 0.8cqw var(--font-panel);
+  font: 600 0.95cqw var(--font-panel);
   letter-spacing: 0.26em;
   color: rgba(42, 44, 48, 0.35);
   white-space: nowrap;
@@ -289,17 +289,8 @@
 
 /* ------------------------------------------------------------ extras bar */
 .extrasla3a {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 6px 16px;
-  margin: 10px 12px 0;
-  border-radius: 6px;
-  background: #171614;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* chrome, placement and layout come from the shared `.lab-bar` */
   font-family: var(--font-panel);
-  flex-wrap: wrap;
 }
 .extrasla3a__rear {
   font-size: 8px;

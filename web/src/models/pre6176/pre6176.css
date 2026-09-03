@@ -95,7 +95,15 @@
  * Below about a thousand pixels of panel they go rather than shrink, and the
  * numerals 1 to 9 still say which way is which.
  */
-@container (max-width: 1000px) {
+/*
+ * "Slow" and "Fast" flank the ATTACK and RELEASE captions, and there is not
+ * room for all three between knobs 0.087 of the panel apart until the panel
+ * is wide. Below that they are hidden and the 1 to 9 numerals carry the
+ * direction. The threshold went up when the bar moved above the faceplate:
+ * the plate is smaller for a given window, so the panel reaches this width
+ * later than it used to.
+ */
+@container (max-width: 1240px) {
   .face6176__print.tiny {
     display: none;
   }
@@ -277,6 +285,40 @@
   z-index: 3;
 }
 
+/*
+ * Rockers and segments in the bar. Without this the rocker's two positions
+ * render as bare adjacent buttons and their labels run together into one
+ * non-word: LOW CUT read "OUTIN" and STEREO read "DUALLINK". They are two
+ * choices, so they are drawn as two chips, matching the segmented controls
+ * beside them and the 1176's bar, which already had this.
+ */
+.extras6176 .noob-vst-webgui-framework-toggle.rocker,
+.extras6176 .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extras6176 .noob-vst-webgui-framework-toggle .pos,
+.extras6176 .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extras6176 .noob-vst-webgui-framework-toggle .pos.is-on,
+.extras6176 .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--color-fet-amber);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
 /* ---------------------------------------------------------------- toggle */
 .pretog {
   position: relative;
@@ -356,17 +398,8 @@
 
 /* ------------------------------------------------------------ extras bar */
 .extras6176 {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 6px 16px;
-  margin: 8px 12px 0;
-  border-radius: 6px;
-  background: #131417;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* chrome, placement and layout come from the shared `.lab-bar` */
   font-family: var(--font-panel);
-  flex-wrap: wrap;
 }
 .extras6176__item {
   display: flex;

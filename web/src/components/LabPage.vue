@@ -1,7 +1,7 @@
 <script setup>
 /**
  * The page once the manifest is in: the shared top bar, the active
- * model's view (any of the five compressors the lab can be) and the
+ * model's view (any of the six compressors the lab can be) and the
  * framework's resize grip. Which view shows follows the `model` parameter,
  * so the choice is per instance and saved with the host's project;
  * switching re-mounts the view, and each view keeps its own colours (the
@@ -22,8 +22,9 @@ import OptoView from '../models/opto/OptoView.vue';
 import La3aView from '../models/la3a/La3aView.vue';
 import VcaView from '../models/vca/VcaView.vue';
 import Pre6176View from '../models/pre6176/Pre6176View.vue';
+import Cl1bView from '../models/cl1b/Cl1bView.vue';
 
-const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View };
+const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View, cl1b: Cl1bView };
 const lab = useLab();
 useWindow();
 const key = lab.key;

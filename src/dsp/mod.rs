@@ -92,6 +92,7 @@
 
 pub mod fet;
 pub mod opto;
+pub mod opto1b;
 pub mod opto3;
 pub mod pre;
 pub mod source;
@@ -107,7 +108,7 @@ pub use source::{SOURCE_NAMES, Source};
 
 /// Labels of `model`, in parameter order. The first two keep their places
 /// so that a project saved before the lab grew still loads.
-pub const MODEL_NAMES: [&str; 5] = ["1176", "LA-2A", "LA-3A", "Distressor", "6176"];
+pub const MODEL_NAMES: [&str; 6] = ["1176", "LA-2A", "LA-3A", "Distressor", "6176", "CL-1B"];
 /// Points in the `transfer` stream (both engines draw the same grid).
 pub const TRANSFER_POINTS: usize = fet::TRANSFER_POINTS;
 /// Input range of the transfer curve, dBFS.
@@ -139,16 +140,19 @@ pub enum Model {
     Vca,
     /// The 6176: the 610 preamp ([`pre`]) in front of the 1176.
     Pre6176,
+    /// The CL 1B ([`opto1b`]).
+    Opto1b,
 }
 
 impl Model {
     /// Every model in parameter order.
-    pub const ALL: [Model; 5] = [
+    pub const ALL: [Model; 6] = [
         Model::Fet,
         Model::Opto,
         Model::Opto3,
         Model::Vca,
         Model::Pre6176,
+        Model::Opto1b,
     ];
 
     /// From the parameter value / label index (clamped).
@@ -203,6 +207,7 @@ pub struct Settings {
     pub vca: vca::Settings,
     /// The 610 section, which only the 6176 model uses.
     pub pre: pre::Settings,
+    pub opto1b: opto1b::Settings,
 }
 
 impl Default for Settings {
@@ -214,6 +219,7 @@ impl Default for Settings {
             opto3: opto3::Settings::default(),
             vca: vca::Settings::default(),
             pre: pre::Settings::default(),
+            opto1b: opto1b::Settings::default(),
         }
         .with_shared(Shared::default())
     }
@@ -243,6 +249,10 @@ impl Settings {
         // else; without this a bypassed 6176 still passed a saturating
         // stage worth about +9 dB at the default Level.
         self.pre.bypass = s.bypass;
+        self.opto1b.link = s.link;
+        self.opto1b.mix = s.mix;
+        self.opto1b.sc_hpf = s.sc_hpf_hz;
+        self.opto1b.bypass = s.bypass;
         self
     }
 
@@ -282,6 +292,15 @@ pub struct ParamIx {
     pub la3a_meter: usize,
     pub la3a_emphasis: usize,
     pub la3a_cell: usize,
+    pub cl1b_gain: usize,
+    pub cl1b_ratio: usize,
+    pub cl1b_threshold: usize,
+    pub cl1b_attack: usize,
+    pub cl1b_release: usize,
+    pub cl1b_mode: usize,
+    pub cl1b_meter: usize,
+    pub cl1b_bus: usize,
+    pub cl1b_power: usize,
     pub dist_input: usize,
     pub dist_output: usize,
     pub dist_attack: usize,
@@ -458,6 +477,76 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
             .default(0.0)
             .not_automatable()
             .group("LA-3A"),
+        // The CL 1B's continuous knobs publish their **real** units with a
+        // table sampled from the engine's own pot laws, so the page reads
+        // decibels and seconds from the manifest instead of a 0-to-1
+        // travel. The law therefore exists once, here, and nothing
+        // reimplements it on the other side of the wire; two copies of one
+        // law is the drift an audit of this repository punished across
+        // five plug-ins.
+        //
+        // The normalised value stays linear in pot travel, which is what a
+        // knob turns by and what the panel's measured scale dots are
+        // fractions of, so `read_settings` takes the normalised value.
+        ParamSpec::new("cl1b_gain", "Gain")
+            .range(opto1b::engine::gain_db(0.0), opto1b::engine::gain_db(1.0))
+            .with_table(opto1b::gain_table())
+            .default(opto1b::engine::gain_db(0.265))
+            .unit("dB")
+            .group("CL-1B"),
+        // Ratio keeps its travel. The panel prints 2:1 and 10:1 with
+        // nothing between, and the research is explicit that the printed
+        // ratio "is a label, not a slope", so publishing a 2-to-10 plain
+        // value would be inventing a number the machine does not have.
+        ParamSpec::new("cl1b_ratio", "Ratio")
+            .range(0.0, 1.0)
+            .default(0.375)
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_threshold", "Threshold")
+            .range(
+                opto1b::engine::threshold_dbu(1.0),
+                opto1b::engine::threshold_dbu(0.0),
+            )
+            .with_table(opto1b::threshold_table())
+            .default(opto1b::engine::threshold_dbu(0.5))
+            .unit("dBu")
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_attack", "Attack")
+            .range(
+                opto1b::engine::attack_s(0.0) * 1e3,
+                opto1b::engine::attack_s(1.0) * 1e3,
+            )
+            .with_table(opto1b::attack_table())
+            .default(opto1b::engine::attack_s(0.75) * 1e3)
+            .unit("ms")
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_release", "Release")
+            .range(
+                opto1b::engine::release_s(0.0),
+                opto1b::engine::release_s(1.0),
+            )
+            .with_table(opto1b::release_table())
+            .default(opto1b::engine::release_s(0.25))
+            .unit("s")
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_mode", "Attack/Release Select")
+            .labels(opto1b::MODE_NAMES)
+            .default(opto1b::MODE_MANUAL as f32)
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_meter", "Meter")
+            .labels(opto1b::METER_NAMES)
+            .default(opto1b::METER_COMP as f32)
+            .not_automatable()
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_bus", "Sidechain Bus")
+            .labels(opto1b::BUS_NAMES)
+            .default(0.0)
+            .group("CL-1B"),
+        ParamSpec::new("cl1b_power", "Power")
+            .toggle()
+            .default(1.0)
+            .not_automatable()
+            .group("CL-1B"),
         ParamSpec::new("dist_input", "Input")
             .range(0.0, vca::KNOB_MAX)
             .default(5.0)
@@ -649,6 +738,15 @@ pub fn param_index(s: &NoobVstWebguiFramework) -> ParamIx {
         la3a_meter: ix("la3a_meter"),
         la3a_emphasis: ix("la3a_emphasis"),
         la3a_cell: ix("la3a_cell"),
+        cl1b_gain: ix("cl1b_gain"),
+        cl1b_ratio: ix("cl1b_ratio"),
+        cl1b_threshold: ix("cl1b_threshold"),
+        cl1b_attack: ix("cl1b_attack"),
+        cl1b_release: ix("cl1b_release"),
+        cl1b_mode: ix("cl1b_mode"),
+        cl1b_meter: ix("cl1b_meter"),
+        cl1b_bus: ix("cl1b_bus"),
+        cl1b_power: ix("cl1b_power"),
         dist_input: ix("dist_input"),
         dist_output: ix("dist_output"),
         dist_attack: ix("dist_attack"),
@@ -724,6 +822,21 @@ pub fn read_settings(audio: &AudioHandle, ix: &ParamIx) -> Settings {
             cell: audio.param(ix.la3a_cell).round().clamp(0.0, 2.0) as usize,
             ..opto3::Settings::default()
         },
+        opto1b: opto1b::Settings {
+            // The normalised value is the pot's travel, which is what the
+            // engine's laws take; the plain value is the decibels or
+            // seconds the panel is marked in.
+            gain: audio.param_norm(ix.cl1b_gain),
+            ratio: audio.param_norm(ix.cl1b_ratio),
+            threshold: audio.param_norm(ix.cl1b_threshold),
+            attack: audio.param_norm(ix.cl1b_attack),
+            release: audio.param_norm(ix.cl1b_release),
+            mode: audio.param(ix.cl1b_mode).round().clamp(0.0, 2.0) as usize,
+            meter: audio.param(ix.cl1b_meter).round().clamp(0.0, 2.0) as usize,
+            bus: audio.param(ix.cl1b_bus).round().clamp(0.0, 2.0) as usize,
+            power: audio.param(ix.cl1b_power) >= 0.5,
+            ..opto1b::Settings::default()
+        },
         vca: vca::Settings {
             input: audio.param(ix.dist_input),
             output: audio.param(ix.dist_output),
@@ -774,6 +887,7 @@ pub struct Processor {
     opto3: opto3::Compressor,
     vca: vca::Compressor,
     pre: pre::Stage,
+    opto1b: opto1b::Compressor,
     /// The engine fading out (only meaningful while `xfade > 0`).
     outgoing: Model,
     /// Samples of crossfade left.
@@ -806,6 +920,7 @@ impl Processor {
             opto3: opto3::Compressor::new(sr),
             vca: vca::Compressor::new(sr),
             pre: pre::Stage::new(sr),
+            opto1b: opto1b::Compressor::new(sr),
             outgoing: Model::Fet,
             xfade: 0,
             xfade_len: (XFADE_SECONDS * sr).round() as usize,
@@ -834,6 +949,7 @@ impl Processor {
         self.opto3.set_sample_rate(sr);
         self.vca.set_sample_rate(sr);
         self.pre.set_sample_rate(sr);
+        self.opto1b.set_sample_rate(sr);
         self.first = true;
         self.reset();
     }
@@ -875,6 +991,7 @@ impl Processor {
             Model::Pre6176 => self.pre.latency() + self.fet.latency(),
             Model::Vca => self.vca.latency(),
             Model::Opto3 => self.opto3.latency(),
+            Model::Opto1b => self.opto1b.latency(),
             Model::Opto => 0,
         }
     }
@@ -919,6 +1036,7 @@ impl Processor {
                     self.pre.reset();
                     self.fet.reset();
                 }
+                Model::Opto1b => self.opto1b.reset(),
             }
             changed = true;
         }
@@ -927,6 +1045,7 @@ impl Processor {
         changed |= self.opto3.configure(s.opto3);
         changed |= self.vca.configure(&s.vca);
         changed |= self.pre.configure(&s.pre);
+        changed |= self.opto1b.configure(s.opto1b);
         self.settings = *s;
         self.first = false;
         if changed {
@@ -948,6 +1067,7 @@ impl Processor {
                 self.pre.process_block(l, r);
                 self.fet.process(l, r);
             }
+            Model::Opto1b => self.opto1b.process_block(l, r),
         }
     }
 
@@ -1012,6 +1132,11 @@ impl Processor {
                 self.gr_db = -f[4];
                 f[5]
             }
+            Model::Opto1b => {
+                let f = self.opto1b.meter_frame();
+                self.gr_db = -f[4];
+                f[5]
+            }
             Model::Vca => {
                 self.gr_db = self.vca.gr_db();
                 self.gr_db
@@ -1067,6 +1192,10 @@ impl Processor {
         match self.settings.model {
             Model::Opto => self.opto.cell_state(),
             Model::Opto3 => self.opto3.cell_state(),
+            // Not the T4's three states: this machine has none. It
+            // publishes the control voltage its electronics hold, the
+            // resistance the element presents, and the drive fraction.
+            Model::Opto1b => self.opto1b.cell_state(),
             _ => [0.0; 3],
         }
     }
@@ -1103,6 +1232,9 @@ impl Processor {
                 .vca
                 .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
             Model::Pre6176 => self.transfer_6176(out),
+            Model::Opto1b => self
+                .opto1b
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
         }
     }
 
@@ -1139,7 +1271,7 @@ impl Processor {
     pub fn publish(&mut self, audio: &mut AudioHandle) {
         audio.publish_slice(STREAM_IX.meter, &self.meter_frame());
         match self.settings.model {
-            Model::Opto | Model::Opto3 => {
+            Model::Opto | Model::Opto3 | Model::Opto1b => {
                 audio.publish_slice(STREAM_IX.cell, &self.cell_state());
                 self.cell_zeroed = false;
             }

@@ -19,6 +19,7 @@ import HistoryPanel from '../../components/HistoryPanel.vue';
 import TransferPanel from '../../components/TransferPanel.vue';
 import Faceplate from './Faceplate.vue';
 import T4Panel from './T4Panel.vue';
+import { ui } from './useOpto.js';
 import ExtrasStrip from './ExtrasStrip.vue';
 
 const win = useWindow();
@@ -29,19 +30,19 @@ const win = useWindow();
  * the least workbench height worth having (100). The faceplate's width is
  * capped so its height never eats into that.
  */
-const CHROME_PX = 262;
+const CHROME_PX = 331;
 const PLATE_ASPECT = 19 / 5.25;
 const plateMax = computed(() => `${Math.max(600, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
 </script>
 
 <template>
   <main class="lab-model lab-model--opto">
+    <ExtrasStrip />
     <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
-    <section class="lab-bench has-t4">
+    <section v-if="ui.scope" class="lab-bench has-t4">
       <div class="lab-panel lab-panel--t4"><T4Panel /></div>
       <HistoryPanel />
       <TransferPanel />
     </section>
-    <ExtrasStrip class="bench-panel shrink-0 py-1 mx-3 mb-3" />
   </main>
 </template>

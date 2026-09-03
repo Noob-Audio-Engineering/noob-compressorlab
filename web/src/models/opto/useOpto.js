@@ -5,6 +5,7 @@
  * Everything here needs the manifest; call `useOpto()` only once
  * `useNoobVstWebguiFramework().ready` is true.
  */
+import { reactive } from 'vue';
 import { hasParam, useLab, useParam } from '../../composables/useLab.js';
 
 let panel = null;
@@ -34,3 +35,13 @@ export function useOpto() {
   };
   return panel;
 }
+
+/**
+ * Page state that is not a parameter: whether the analysis drawer is open.
+ * The other five models already had this; the LA-2A gained it when the
+ * bar's global half was standardised, because SCOPE is one of the controls
+ * every model now carries.
+ */
+export const ui = reactive({
+  scope: true,
+});

@@ -20,15 +20,15 @@ import ExtrasBar from './ExtrasBar.vue';
 
 const win = useWindow();
 /* The top bar, the paddings, the extras strip and the workbench's minimum. */
-const CHROME_PX = 330;
+const CHROME_PX = 355;
 const PLATE_ASPECT = 19 / 3.5;
 const plateMax = computed(() => `${Math.max(700, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
 </script>
 
 <template>
   <main class="lab-model lab-model--pre6176">
-    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <ExtrasBar />
+    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <section v-if="ui.scope" class="lab-bench">
       <HistoryPanel />
       <TransferPanel />

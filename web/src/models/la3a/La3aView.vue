@@ -25,7 +25,7 @@ const win = useWindow();
  * panel yields to that rather than the other way round, so the charts stay
  * legible at 900 x 520.
  */
-const CHROME_PX = 330;
+const CHROME_PX = 382;
 const PLATE_ASPECT = 19 / 3.5;
 /** Half a rack at a comfortable size, but never taller than the space left for the drawer. */
 const plateMax = computed(() => `${Math.max(700, Math.min(2400, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT)))}px`);
@@ -33,8 +33,8 @@ const plateMax = computed(() => `${Math.max(700, Math.min(2400, Math.round((win.
 
 <template>
   <main class="lab-model lab-model--la3a">
-    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <ExtrasStrip />
+    <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <section v-if="ui.scope" class="lab-bench">
       <HistoryPanel />
       <TransferPanel />

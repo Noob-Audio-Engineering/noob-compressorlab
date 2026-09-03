@@ -8,7 +8,8 @@ Each instance is set to one model and the page draws the matching faceplate:
 - the **LA-2A**, a tube optical leveller, with its big knobs, VU face and the T4 cell laid bare;
 - the **LA-3A**, the solid-state successor: the same cell, driven far harder;
 - the **Distressor**, a VCA compressor with eight curves, two distortion modes and British mode;
-- the **6176**, the 610 tube preamp bolted to the front of the 1176.
+- the **6176**, the 610 tube preamp bolted to the front of the 1176;
+- the **CL 1B**, the Danish tube optical one, whose time constants are on the panel rather than in the cell.
 
 Flip the model switch and the same instance becomes another box; the switch is a parameter, so a
 project remembers it.
@@ -34,6 +35,7 @@ browser client, gestures, needle ballistics and charts) comes from noob-vst-webg
 | `src/dsp/opto3/` | the LA-3A: the same cell with a transistor sidechain and a class-AB amplifier |
 | `src/dsp/vca/` | the Distressor: the dB-domain feedback loop, its eight curves and its distortion generator |
 | `src/dsp/pre/` | the 610 preamp stage, which with the 1176 behind it makes the 6176 |
+| `src/dsp/opto1b/` | the CL 1B: its own optical element, the three-node attenuator and the three timing modes |
 | `src/dsp/source.rs` | the standalone's demo signals (vocal, bass, drums, noises, tones) |
 | `src/dsp/tests.rs` | tests of the lab itself: the contract, the switch, the telemetry |
 | `src/plugin.rs` | the nih-plug VST3 / CLAP plug-in (feature `plugin`) |
@@ -116,7 +118,7 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 
 ## The model switch
 
-`model` is a non-automatable parameter of the instance, and it has five positions:
+`model` is a non-automatable parameter of the instance, and it has six positions:
 
 | position | what it is | engine |
 |---|---|---|
@@ -125,6 +127,7 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 | `LA-3A` | the solid-state optical leveller: the same cell, driven hard | `dsp::opto3` |
 | `Distressor` | the feedback VCA compressor with eight curves and two distortion modes | `dsp::vca` |
 | `6176` | the 610 tube preamp in front of the 1176 | `dsp::pre` and `dsp::fet` |
+| `CL-1B` | the tube optical one whose timing is on the panel, not in the cell | `dsp::opto1b` |
 
 The first two keep the positions they had, so a project saved before the lab grew still loads.
 
@@ -139,7 +142,8 @@ takes over.
 
 Every knob of every model is a parameter, so a project saves the whole lab. The prefixes are
 `fet_` for the 1176, `opto_` for the LA-2A, `la3a_` for the LA-3A, `dist_` for the Distressor and
-`pre_` for the 610 section of the 6176, whose compressor half reuses the 1176's `fet_` parameters.
+`pre_` for the 610 section of the 6176, whose compressor half reuses the 1176's `fet_` parameters,
+and `cl1b_` for the CL 1B.
 The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever engine is active.
 
 ## Parameters
@@ -167,6 +171,15 @@ The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever e
 | `la3a_meter` | Gain Reduction, Output, Off | Gain Reduction | LA-3A | no |
 | `la3a_emphasis` | 0 (flat, as it ships)..1 (full HF Contour) | 0 | LA-3A | yes |
 | `la3a_cell` | Fresh, Used, Tired | Fresh | LA-3A | no |
+| `cl1b_gain` | −80 to +30 dB, the pot's own log law | 0 dB | CL 1B | yes |
+| `cl1b_ratio` | 0..1 travel; the panel's 2:1 and 10:1 are labels, not slopes | 0.375 | CL 1B | yes |
+| `cl1b_threshold` | +11.6 down to −40 dBu, the same log law mirrored | −19.2 dBu | CL 1B | yes |
+| `cl1b_attack` | 0.5 to 300 ms, log | 60.6 ms | CL 1B | yes |
+| `cl1b_release` | 0.05 to 10 s, **linear** | 2.54 s | CL 1B | yes |
+| `cl1b_mode` | Fixed, Fix/Man, Manual | Manual | CL 1B | yes |
+| `cl1b_meter` | Input, Compression, Output | Compression | CL 1B | no |
+| `cl1b_bus` | Off, 1, 2 | Off | CL 1B | yes |
+| `cl1b_power` | the panel's mains knob | on | CL 1B | no |
 | `dist_input`, `dist_output` | 0..10.5 (unity at 5) | 5 | Distressor | yes |
 | `dist_attack` | 0..10.5 (50 µs..30 ms at 10) | 5 | Distressor | yes |
 | `dist_release` | 0..10.5 (50 ms..3.5 s at 10) | 5 | Distressor | yes |
@@ -399,13 +412,89 @@ instead of five, a −20 dB pad, fixed equaliser corners, more second harmonic a
 top. The shelves are first-order, and the number printed on the panel is the half-gain point, so a
 ±9 dB step is ±4.5 dB at the corner and reaches its full value about a decade away.
 
+## The CL 1B
+
+The other two optical models put their timing in the cell. This one does not, and that is the whole
+machine: its attack and release are an op-amp, a 10 µF capacitor and two front-panel pots, so the
+attack runs from 0.5 to 300 ms and the release from 50 ms to ten seconds, neither of which a T4 can
+be made to do.
+
+So it does **not** share the T4 cell, and there is a test whose only job is to prove that. Importing
+it would drag in a 60 ms first-stage release, a half-second trap and the programme memory, the
+bottom half of the Release knob would stop doing anything, and this would quietly become a third
+LA-2A with extra knobs. What it does share is the static photoconductive law, the filters, the VU
+reference and the hygiene.
+
+Three things are worth knowing before turning the knobs.
+
+**The Ratio control is not a ratio control.** It is a 10 kΩ rheostat sitting between the node the
+detector listens to and the node the cell shunts. Wound anticlockwise the two are the same node and
+the feedback loop is complete; wound clockwise the detector's view of the reduction saturates, the
+loop stops fighting back, and the audio reduction runs away. That is why the panel prints only 2:1
+and 10:1, with nothing in between, which is honest of them.
+
+**The release taper is linear, and almost nothing else is.** P5 is a linear pot, so at the 10
+o'clock setting Lydkraft recommend for vocals the release is about 2.5 seconds, where a logarithmic
+taper of the same range would have given about 350 ms. That single component value changes the
+character of every published setting, and it is the reason the research read the pot codes off the
+schematic rather than assuming.
+
+**Fix/Man is not a blend of the other two.** Its attack is always the fixed 1 ms, whatever the
+Attack knob says; the knob becomes a *delay*, over the same range, controlling how long the fast
+release runs before the slow one takes over. And it gives up on peaks longer than that delay,
+responding as Manual would. Two tests exist for that alone, because it is the easiest thing on the
+machine to get wrong.
+
+Two calibrations from the service manual pin the model, and between them leave almost no freedom:
++250.0 mV at the side-chain jack must give exactly −10.0 dB, and the Gain control's maximum must be
+exactly +30.0 dB. Both are solved numerically at construction rather than written down, so they stay
+true if a resistor value is ever corrected.
+
+The four continuous knobs publish their **real units**, with a lookup table sampled from the
+engine's own pot laws, so the page and the host both read decibels, dBu, milliseconds and seconds
+straight from the manifest. The normalised value stays linear in pot travel, which is what a knob
+turns by and what the panel's measured scale dots are fractions of. The point of doing it this way
+is that each law exists exactly once, in the engine: the alternative was reimplementing four tapers
+in JavaScript, and two copies of one law is how the equaliser next door came to draw a curve that
+disagreed with its own audio by nearly two decibels. Ratio is the exception and keeps its travel,
+because the research is explicit that its printed 2:1 and 10:1 are labels rather than slopes, so a
+plain value there would be a number the machine does not have.
+
+There is deliberately **no cell-age control**, unlike the LA-2A's and the LA-3A's. Lydkraft claim no
+long-term degradation of the element, owners report units are all alike, and nobody has published a
+contrary observation. Inventing one would be inventing a fact.
+
+The panel's OFF/ON mains knob parks the machine rather than silencing it. A real CL 1B with its
+mains off passes nothing, because its audio path runs through the tube stages; this one passes the
+input through and parks the meter, which is what the 1176 in this same plug-in does when its meter
+switch is turned to OFF. Two power switches inside one product behaving differently would be worse
+than either choice alone.
+
+### Two figures the research proposed and the model does not use
+
+Both are recorded here because they were changed deliberately, not discovered by accident.
+
+The research proposed reusing the T4's photoconductive exponent of 0.8, which comes from the CdS
+literature. But its own section 4 establishes that this element is not a T4 and that nobody outside
+Lydkraft knows what is inside it, so that number is a guess about a different part. Meanwhile the
+manual publishes a figure the exponent controls: at the 2:1 stop, ten decibels more in gives five
+more out. In a feedback loop the output slope is `1/(1 − p)` where `p` is the sensitivity of the
+attenuation to the drive, so 2:1 needs `p = −1`; at 0.8 the loop settles near 1.5:1 and cannot reach
+the published figure at any depth. The exponent is therefore **solved from the published ratio**,
+and the value that results sits just above the CdS range, which is unsurprising for a part that is
+not a CdS cell.
+
+The research also proposed clamping the drive ratio to one. That would have capped the model at the
+10 dB calibration point, while its own minimum-resistance constant exists precisely to set the
+maximum reduction, so the clamp belongs on the resistance instead.
+
 ## Where the models miss their published figures
 
 Three audits went through these engines against their research documents and found tests that had
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Four remain.
+Five remain.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -413,6 +502,7 @@ Four remain.
 | 1176 | soft knee, first 3 dB at least 30 % gentler than 10 dB up | about 8 % gentler at 4:1, and very slightly hard at 8:1 and 12:1 | the knee is whatever the diode detector's curvature makes it; nothing shapes it further |
 | 1176 | attack OFF below 0.1 % distortion at −18 dBFS | 0.14 % | the preamp and line amp are both a little into their curves at the 24 / 24 setting |
 | 610 | no alias above −80 dB with a 15 kHz tone into a hot microphone setting | −51 dB at the Gain switch's top, −64 dB at a normal setting | a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes; the pad on the front panel exists for exactly that setting |
+| CL 1B | at the 2:1 stop, ten decibels in gives five out at every depth from 3 dB | 5.2, 4.8 and 4.8 dB from 8 dB of reduction and deeper; 6.4 dB from 3 dB | a feedback optical compressor has a soft knee near its threshold, which is what the reviews describe; the manual's sentence is a description of what the Ratio control selects rather than a knee specification |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes
 for this symptom in preference to a bigger oversampling factor. It was right about the mechanism: the
@@ -433,7 +523,7 @@ ratio is what is asserted, and the note is at the test.
 
 ## Tests
 
-`cargo test` runs 116 tests (one more is `#[ignore]`d and prints curves):
+`cargo test` runs 148 tests (one more is `#[ignore]`d and prints curves):
 
 - **the lab** (`src/dsp/tests.rs`): the parameter contract (ids, labels, defaults, stream layout);
   shared values reach every engine; every model compresses and reports `gr_db` ≤ 0 with the GR meter
@@ -488,6 +578,15 @@ ratio is what is asserted, and the note is at the test.
   self-rectification lingers after a loud passage; the PRE meter reads 0 VU at the reference; the
   tube curve is normalised and monotonic; numerical hygiene.
 
+- **the CL 1B** (`src/dsp/opto1b/tests.rs`): 29 tests from its research's own plan, every one naming
+  the published figure it asserts and where that figure comes from. The two service-manual
+  calibrations; the panel's threshold dots; that the Gain knob cannot touch the compression; the 2:1
+  step and the Ratio control's range and monotonicity; the bandwidth and the 40 Hz distortion at both
+  published levels; the fixed, manual and Fix/Man timings including the trap that Fix/Man's attack is
+  the fixed one and that it gives up on long peaks; the meter's calibration; that the bus takes the
+  larger reduction rather than the average; and the structural test whose only job is to prove the T4
+  cell was not imported, which is the one that stops this becoming a third LA-2A.
+
 ## Presets and the UI store
 
 The page keeps its presets (per model) and the window size in the UI store. The standalone
@@ -505,5 +604,8 @@ components, the dev manifest that lets the page render without a plug-in, and wi
 
 - [`research/1176.md`](research/1176.md): how the 1176 works and how it is simulated, with sources.
 - [`research/LA-2A.md`](research/LA-2A.md): the same for the LA-2A.
+- [`research/LA-3A.md`](research/LA-3A.md), [`research/Distressor.md`](research/Distressor.md),
+  [`research/610.md`](research/610.md) and [`research/CL-1B.md`](research/CL-1B.md): the same for
+  the other four.
 - The framework's [guides](https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework/tree/main/docs) for the bridge, streams, store and host adapter
   this plug-in is built on.

@@ -31,7 +31,7 @@ const db = (a) => (a > 0 ? 20 * Math.log10(a) : -120);
 /** The VU reference: +4 dBu reads 0 VU at −18 dBFS. */
 const VU_REF_DBFS = -18;
 /** The model switch as a key, in the order of the `model` parameter's steps. */
-const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176'];
+const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176', 'cl1b'];
 const modelKey = () => MODEL_KEYS[Math.round(plain('model'))] || 'fet';
 
 /**
@@ -64,7 +64,7 @@ export const offline = {
   name: 'noob-compressorlab',
   meta: { vendor: 'Noob Audio Engineering', version: 'dev', sample_rate: 48000, vu_ref_dbfs: VU_REF_DBFS, transfer_points: 128, standalone: true },
   params: stepped([
-    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176'], default: 0, group: 'lab', automatable: false },
+    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B'], default: 0, group: 'lab', automatable: false },
 
     { id: 'fet_input', name: 'Input', min: 0, max: 48, default: 24, group: '1176' },
     { id: 'fet_output', name: 'Output', min: 0, max: 48, default: 24, group: '1176' },
@@ -88,6 +88,18 @@ export const offline = {
     { id: 'la3a_meter', name: 'Meter', labels: ['Gain Reduction', 'Output', 'Off'], default: 0, group: 'LA-3A', automatable: false },
     { id: 'la3a_emphasis', name: 'HF Contour', min: 0, max: 1, default: 0, group: 'LA-3A' },
     { id: 'la3a_cell', name: 'Cell', labels: ['Fresh', 'Used', 'Tired'], default: 0, group: 'LA-3A', automatable: false },
+    // CL-1B. Every continuous control is the pot's own travel, 0..1, because the panel print is
+    // approximate and the displayed value comes from the pot's law (research/CL-1B.md 9.3). The
+    // defaults are Lydkraft's own published vocal setting.
+    { id: 'cl1b_gain', name: 'Gain', min: 0, max: 1, default: 0.265, group: 'CL-1B' },
+    { id: 'cl1b_ratio', name: 'Ratio', min: 0, max: 1, default: 0.375, group: 'CL-1B' },
+    { id: 'cl1b_threshold', name: 'Threshold', min: 0, max: 1, default: 0.5, group: 'CL-1B' },
+    { id: 'cl1b_attack', name: 'Attack', min: 0, max: 1, default: 0.75, group: 'CL-1B' },
+    { id: 'cl1b_release', name: 'Release', min: 0, max: 1, default: 0.25, group: 'CL-1B' },
+    { id: 'cl1b_mode', name: 'Attack/Release Select', labels: ['Fixed', 'Fix/Man', 'Manual'], default: 2, group: 'CL-1B' },
+    { id: 'cl1b_meter', name: 'Meter', labels: ['Input', 'Compression', 'Output'], default: 1, group: 'CL-1B', automatable: false },
+    { id: 'cl1b_bus', name: 'Sidechain Bus', labels: ['Off', '1', '2'], default: 0, group: 'CL-1B' },
+    { id: 'cl1b_power', name: 'Power', toggle: true, default: 1, group: 'CL-1B', automatable: false },
 
     { id: 'dist_input', name: 'Input', min: 0, max: 10.5, default: 5, group: 'Distressor' },
     { id: 'dist_output', name: 'Output', min: 0, max: 10.5, default: 5, group: 'Distressor' },
@@ -137,7 +149,7 @@ export const offline = {
   frames: {
     meter: (t) => {
       const key = modelKey();
-      const optical = key === 'opto' || key === 'la3a';
+      const optical = key === 'opto' || key === 'la3a' || key === 'cl1b';
       let inl;
       let gr;
       if (optical) {
@@ -174,6 +186,10 @@ export const offline = {
       } else if (optical) {
         const mode = Math.round(plain('opto_meter'));
         vu = [gr, outDb - (VU_REF_DBFS + 6), outDb - VU_REF_DBFS][mode]; // +10 reads 6 dB lower than +4
+      } else if (key === 'cl1b') {
+        // the hardware's three positions: input, compression, output (0 VU is +4 dBu)
+        const mode = Math.round(plain('cl1b_meter', 1));
+        vu = [db(inl) - VU_REF_DBFS, gr, outDb - VU_REF_DBFS][mode];
       } else if (key === 'pre6176') {
         const mode = Math.round(plain('pre_meter', 1));
         vu = [preVuDb(), gr, outDb - VU_REF_DBFS][mode];

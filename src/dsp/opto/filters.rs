@@ -130,6 +130,30 @@ impl Biquad {
         self.a2 = (1.0 - alpha) / a0;
     }
 
+    /// Butterworth low-pass, the matching pair to
+    /// [`set_highpass`](Self::set_highpass).
+    ///
+    /// Added for the CL 1B, whose published −3 dB corner at 25 kHz and
+    /// its near-flat response at 20 kHz cannot both be met by the
+    /// cascaded first-order poles the other optical models use. Nothing
+    /// else in the crate calls it, and no existing behaviour changes.
+    pub fn set_lowpass(&mut self, hz: f32, sr: f32) {
+        if hz >= 0.49 * sr {
+            self.identity = true;
+            return;
+        }
+        self.identity = false;
+        let w0 = 2.0 * PI * hz / sr;
+        let (s, c) = (w0.sin(), w0.cos());
+        let alpha = s / (2.0 * std::f32::consts::FRAC_1_SQRT_2);
+        let a0 = 1.0 + alpha;
+        self.b0 = (1.0 - c) / 2.0 / a0;
+        self.b1 = (1.0 - c) / a0;
+        self.b2 = (1.0 - c) / 2.0 / a0;
+        self.a1 = -2.0 * c / a0;
+        self.a2 = (1.0 - alpha) / a0;
+    }
+
     #[inline]
     pub fn process(&mut self, x: f32) -> f32 {
         if self.identity {

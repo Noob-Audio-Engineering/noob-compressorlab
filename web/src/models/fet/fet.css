@@ -416,15 +416,7 @@
 
 /* ---------------------------------------------------------------- extras */
 .extras1176 {
-  /* a fixed band; wraps to two rows when the window is narrow */
-  flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 16px;
-  padding: 4px 28px;
-  background: var(--color-panel-900);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  /* chrome, placement and layout come from the shared `.lab-bar` */
   font-size: 11px;
 }
 .extras1176__item {

@@ -6,11 +6,13 @@
  * top on its own −24..0 dB scale (`range: [-24, 0]`, 0 at the top) and
  * draws the grid every 6 dB. The title carries the live reduction.
  *
- * The reduction series also labels its own peaks, so the chart says how hard
- * the compressor grabbed and when, rather than leaving the reader to trace
- * the scale. Only dips past 3 dB are worth naming, two labels stay at least
- * 400 ms apart so a busy passage does not become a thicket, and the four
- * deepest in the window are drawn.
+ * The reduction series marks its own peaks and names them in callout boxes,
+ * so the chart says how hard the compressor grabbed and when without the
+ * reader tracing the scale. They sit faint until the pointer is over the
+ * chart, which brings them to full strength. Only dips past 3 dB are worth
+ * marking, two stay at least 400 ms apart so a busy passage does not become
+ * a thicket, and the four deepest in the window are shown. A vertical line
+ * every second gives them something to be read against.
  *
  * The panel is identical whichever model is active: the same chrome
  * (`.lab-panel` in `style.css`), typography, grid and series colours (the
@@ -48,6 +50,6 @@ const series = [
       <span>Last 8 seconds</span>
       <span class="lab-panel__val">GR {{ gr.toFixed(1) }} dB</span>
     </div>
-    <div class="lab-panel__canvas"><Timeline :series="series" :seconds="8" :grid-series="2" :grid-step="6" /></div>
+    <div class="lab-panel__canvas"><Timeline :series="series" :seconds="8" :grid-series="2" :grid-step="6" time-grid /></div>
   </div>
 </template>

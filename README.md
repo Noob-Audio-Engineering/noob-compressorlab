@@ -501,7 +501,7 @@ Three audits went through these engines against their research documents and fou
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Five remain.
+Six remain.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -509,6 +509,7 @@ Five remain.
 | 1176 | soft knee, first 3 dB at least 30 % gentler than 10 dB up | about 8 % gentler at 4:1, and very slightly hard at 8:1 and 12:1 | the knee is whatever the diode detector's curvature makes it; nothing shapes it further |
 | 1176 | attack OFF below 0.1 % distortion at −18 dBFS | 0.14 % | the preamp and line amp are both a little into their curves at the 24 / 24 setting |
 | 610 | no alias above −80 dB with a 15 kHz tone into a hot microphone setting | −51 dB at the Gain switch's top, −64 dB at a normal setting | a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes; the pad on the front panel exists for exactly that setting |
+| LA-2A | the T4A's dual time constant, the one era-specific difference with a physical basis | a single speed multiplier per era, which cannot express it | representing it needs a second, faster carrier population in the shared cell for the LA-2 position; not done because the same source says the slower photocell dominates the response |
 | CL 1B | at the 2:1 stop, ten decibels in gives five out at every depth from 3 dB | 5.2, 4.8 and 4.8 dB from 8 dB of reduction and deeper; 6.4 dB from 3 dB | a feedback optical compressor has a soft knee near its threshold, which is what the reviews describe; the manual's sentence is a description of what the Ratio control selects rather than a knee specification |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes
@@ -530,7 +531,7 @@ ratio is what is asserted, and the note is at the test.
 
 ## Tests
 
-`cargo test` runs 148 tests (one more is `#[ignore]`d and prints curves):
+`cargo test` runs 151 tests (one more is `#[ignore]`d and prints curves):
 
 - **the lab** (`src/dsp/tests.rs`): the parameter contract (ids, labels, defaults, stream layout);
   shared values reach every engine; every model compresses and reports `gr_db` ≤ 0 with the GR meter
@@ -593,6 +594,34 @@ ratio is what is asserted, and the note is at the test.
   the fixed one and that it gives up on long peaks; the meter's calibration; that the bus takes the
   larger reduction rather than the average; and the structural test whose only job is to prove the T4
   cell was not imported, which is the one that stops this becoming a third LA-2A.
+
+### The cell switches, and what is actually known about the three eras
+
+The LA-2A's three cell variants and the LA-3A's three cell ages both have tests asserting they
+change the sound in the documented order, because a wired control with nothing testing it is how a
+dead one goes unnoticed.
+
+The LA-2A's span stays at a factor of about 2.3, and the reasoning is recorded at the constants
+because it is not obvious. Three things are known, and they do not all point the same way.
+
+The only *ordering* of the eras by speed is Universal Audio's product description: Silver fast, Gray
+the medium reference, the LA-2 slowest and mellowed by fifty years of panel ageing. That is a
+manufacturer's qualitative claim, not a measurement, and it is what these multipliers follow.
+
+The only *measurement* is Moore's six units, whose attack and release spreads of about 2.5 and 3.7
+are wider than ours. It would be wrong to borrow, because the same measurement reports no consistent
+vintage-versus-reissue grouping: that spread is unit-to-unit variation conflating cell age,
+tolerance and calibration, so sizing an era switch from it would attribute to the three cells a
+variation its own source says the three cells do not explain.
+
+The one *physical, era-specific* difference runs the other way entirely. The T4A in the LA-2 and
+early LA-2A, and very early T4Bs, carried three photocells rather than two: the main pair plus a
+fast one in parallel, giving a dual time constant. Later T4Bs dropped it. So the older cell had an
+extra **fast** element, not a slower one, although the same source notes the overall response is
+dominated by the slower photocell.
+
+So the ordering is documented, the magnitude is not, and the span is not widened to make the control
+feel more useful. It is subtle, which is what the evidence supports.
 
 ## Presets and the UI store
 

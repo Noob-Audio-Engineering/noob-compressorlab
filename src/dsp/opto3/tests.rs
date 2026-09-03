@@ -847,3 +847,45 @@ fn survives_extremes_without_nan() {
         }
     }
 }
+
+/// The LA-3A's cell-age switch changes the reduction, in the documented
+/// direction and by a measurable amount.
+///
+/// *Figure asserted:* a depleted T4 gives "up to 80 % less compression",
+/// and up to 90 % of the T4 cells in use have never been replaced.
+/// *Source:* Waves, quoted in `research/LA-2A.md` section 4.7, which is
+/// the same cell this model uses.
+///
+/// The 80 % is an upper bound on a worn cell rather than a figure for any
+/// one of the three positions, so this asserts the **direction and that
+/// the control does something**, and that the worn end stays inside that
+/// bound. It exists for the same reason as the LA-2A's: a wired control
+/// with nothing testing it is how a dead one goes unnoticed.
+#[test]
+fn the_cell_age_switch_changes_the_reduction() {
+    let gr_for = |cell: usize| -> f32 {
+        let mut c = engine(|s| {
+            s.peak_reduction = 70.0;
+            s.cell = cell;
+        });
+        run_gr(&mut c, dbu(4.0), 1000.0, 3.0)
+    };
+    let fresh = gr_for(0);
+    let used = gr_for(1);
+    let tired = gr_for(2);
+    assert!(
+        fresh > used && used > tired,
+        "the three cells did not order Fresh, Used, Tired by depth: \
+         {fresh:.2}, {used:.2}, {tired:.2} dB"
+    );
+    assert!(
+        fresh - tired > 1.0,
+        "end to end the cell switch moved the reduction by only {:.2} dB",
+        fresh - tired
+    );
+    assert!(
+        tired > 0.2 * fresh,
+        "a tired cell gave {tired:.2} dB against a fresh {fresh:.2}, which is more than the \
+         80 % loss Waves quote as the worst case"
+    );
+}

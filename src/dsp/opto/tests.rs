@@ -741,3 +741,65 @@ fn print_curves() {
         goertzel(tail, 50.0, SR)
     );
 }
+
+/// The cell-variant switch changes the recovery, in the documented order.
+///
+/// *Figure asserted:* the **ordering only**. Universal Audio describe the
+/// three eras with the late-1960s Silver fast, the mid-1960s Gray the
+/// medium "reference" and the LA-2 slowest, mellowed by fifty years of
+/// panel ageing. *Source:* `research/LA-2A.md` section 4.7.
+///
+/// **No magnitude is asserted against a published figure, because none
+/// exists.** The only measurement in the research, Moore's six units,
+/// reports no consistent vintage-versus-reissue grouping, so its spread
+/// is unit-to-unit variation and cannot size an era control; the full
+/// reasoning is at [`CELL_SPEEDS`]. The span below pins the model's own
+/// estimate so a drift is caught, and says so rather than dressing an
+/// estimate as an anchor.
+///
+/// The test exists at all because a wired control with nothing testing it
+/// is how a dead one goes unnoticed.
+#[test]
+fn the_cell_variants_recover_at_different_speeds() {
+    let recovery_blocks = |cell: usize| -> usize {
+        let mut c = Compressor::new(SR);
+        c.configure(Settings {
+            peak_reduction: 60.0,
+            cell,
+            ..Settings::default()
+        });
+        c.reset();
+        let (gr, _) = run_sine(&mut c, amp_vu(4.0), 1000.0, 4.0, SR);
+        let settled = gr[gr.len() - 1];
+        assert!(settled > 3.0, "cell {cell} only reached {settled:.2} dB");
+        let block = 256;
+        let (mut l, mut r) = (vec![0.0; block], vec![0.0; block]);
+        for i in 0..((SR as usize * 20) / block) {
+            l.iter_mut().for_each(|v| *v = 0.0);
+            r.iter_mut().for_each(|v| *v = 0.0);
+            c.process_block(&mut l, &mut r);
+            if c.meter_frame()[4] < 0.25 * settled {
+                return i;
+            }
+        }
+        usize::MAX
+    };
+    let silver = recovery_blocks(0);
+    let gray = recovery_blocks(1);
+    let la2 = recovery_blocks(2);
+    assert!(
+        silver < gray && gray < la2,
+        "the cells did not order Silver, Gray, LA-2 by speed: {silver}, {gray}, {la2} blocks"
+    );
+    // Pinning the estimate, not a published figure: the multipliers are
+    // 0.7, 1.0 and 1.6, so the recovery span should track that 2.3 and
+    // stay small. If somebody widens them to make the control feel more
+    // useful, this fails, which is the point.
+    let span = la2 as f32 / silver as f32;
+    assert!(
+        (1.4..=2.6).contains(&span),
+        "the cell switch changed the recovery by a factor of {span:.2} ({silver} to {la2} blocks); \
+         the multipliers imply about 2.3, and the research establishes no magnitude that would \
+         justify widening them"
+    );
+}

@@ -145,6 +145,51 @@ impl CellParams {
 }
 
 /// Speed multipliers for the three cell variants: Silver, Gray, LA-2.
+///
+/// **These are an estimate, and what follows is the whole of what the
+/// research establishes**, because a variant switch calibrated against
+/// nothing is how a control drifts away from the machine it names.
+///
+/// *The one physical, era-specific fact.* The T4A, fitted to the LA-2 and
+/// early LA-2A, and very early T4Bs up to about 1969, contained **three**
+/// photocells: the main Clairex CL-505L pair plus a fast CL-705 wired in
+/// parallel with the audio cell, giving a dual time constant. Later T4Bs,
+/// which is what the late-1960s silver units and every reissue use,
+/// dropped the third cell. So the documented difference between the eras
+/// is a *construction* difference, and it runs the opposite way to the
+/// speed ordering: the older cell had an extra **fast** element, not a
+/// slower one. Its own source qualifies that immediately, though: Kantor
+/// concluded the overall response "is dominated by the response of the
+/// slower photocell". (`research/LA-2A.md` section 3.)
+///
+/// *The ordering these multipliers follow* is Universal Audio's product
+/// description of the three eras, with Silver fast, Gray the medium
+/// reference and the LA-2 slowest, "mellowed" by fifty years of panel
+/// ageing. That is a manufacturer's qualitative claim about ageing rather
+/// than a measurement, and it is the only statement of ordering anywhere
+/// in the research.
+///
+/// *The one real measurement does not support an era effect at all.*
+/// Moore measured six units and found attack spread 33 to 81 ms and
+/// release 449 to 1670 ms, wider than the 2.3 here, but reports **"no
+/// consistent vintage-versus-reissue grouping"**. That spread is
+/// therefore unit-to-unit variation, conflating cell age, component
+/// tolerance and calibration, and borrowing it to size an era switch
+/// would attribute to the three cells a variation its own source says the
+/// three cells do not explain.
+///
+/// So: the ordering is documented, the magnitude is not, and the span
+/// stays where a manufacturer's description puts it rather than being
+/// widened to make the control feel more useful. Gray is exactly 1.0, so
+/// the default sound is the reference one.
+///
+/// **A known gap, recorded rather than fixed.** A single speed multiplier
+/// cannot express the T4A's dual time constant, which is the one
+/// era-specific difference with a physical basis. Representing it would
+/// mean a second, faster carrier population in [`Cell`] for the LA-2
+/// position, and it is not done here because the same source says the
+/// slow cell dominates the result. It is in the README's table of
+/// figures the models do not reach.
 pub const CELL_SPEEDS: [f32; 3] = [0.7, 1.0, 1.6];
 
 /// The T4 cell: an electroluminescent panel and a CdS photoresistor with

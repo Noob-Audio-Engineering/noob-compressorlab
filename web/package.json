@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "author": "Ely Erin Fox",
-  "description": "Noob CompressorLab interface (the 1176 and the LA-2A behind one model switch): a Vue 3 + Tailwind SPA rendered inside the plug-in's native web view, talking to the Rust DSP over noob-vst-webgui-framework.",
+  "description": "Noob CompressorLab interface (six compressors behind one model switch): a Vue 3 + Tailwind SPA rendered inside the plug-in's native web view, talking to the Rust DSP over noob-vst-webgui-framework.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

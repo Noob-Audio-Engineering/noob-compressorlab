@@ -6,6 +6,12 @@
  * top on its own −24..0 dB scale (`range: [-24, 0]`, 0 at the top) and
  * draws the grid every 6 dB. The title carries the live reduction.
  *
+ * The reduction series also labels its own peaks, so the chart says how hard
+ * the compressor grabbed and when, rather than leaving the reader to trace
+ * the scale. Only dips past 3 dB are worth naming, two labels stay at least
+ * 400 ms apart so a busy passage does not become a thicket, and the four
+ * deepest in the window are drawn.
+ *
  * The panel is identical whichever model is active: the same chrome
  * (`.lab-panel` in `style.css`), typography, grid and series colours (the
  * LA-2A's workbench look, now the lab's: dim input, blue output, amber gain
@@ -18,7 +24,21 @@ const gr = useStreamValue('meter', { index: 4, unit: 'db' });
 const series = [
   { stream: 'meter', index: 0, unit: 'linear', range: [-60, 6], color: 'rgba(231, 226, 216, 0.45)', width: 1, label: 'in' },
   { stream: 'meter', index: 2, unit: 'linear', range: [-60, 6], color: '#7cc6ff', width: 1.2, label: 'out' },
-  { stream: 'meter', index: 4, unit: 'db', range: [-24, 0], color: '#e9a23b', width: 1.5, fill: true, fillTo: 0, label: 'gain reduction' },
+  {
+    stream: 'meter',
+    index: 4,
+    unit: 'db',
+    range: [-24, 0],
+    color: '#e9a23b',
+    width: 1.5,
+    fill: true,
+    fillTo: 0,
+    label: 'gain reduction',
+    // The reduction falls, so its peaks are minima. 1.5 dB of hysteresis
+    // rides out the ripple an opto cell leaves on a sustained note without
+    // missing a real second dip.
+    peaks: { direction: 'min', threshold: -3, hysteresis: 1.5, minGapMs: 400, max: 4, format: (v) => `${v.toFixed(1)} dB` },
+  },
 ];
 </script>
 

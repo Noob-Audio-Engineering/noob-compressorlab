@@ -501,7 +501,7 @@ Three audits went through these engines against their research documents and fou
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Six remain.
+Five remain.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -509,7 +509,6 @@ Six remain.
 | 1176 | soft knee, first 3 dB at least 30 % gentler than 10 dB up | about 8 % gentler at 4:1, and very slightly hard at 8:1 and 12:1 | the knee is whatever the diode detector's curvature makes it; nothing shapes it further |
 | 1176 | attack OFF below 0.1 % distortion at −18 dBFS | 0.14 % | the preamp and line amp are both a little into their curves at the 24 / 24 setting |
 | 610 | no alias above −80 dB with a 15 kHz tone into a hot microphone setting | −51 dB at the Gain switch's top, −64 dB at a normal setting | a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes; the pad on the front panel exists for exactly that setting |
-| LA-2A | the T4A's dual time constant, the one era-specific difference with a physical basis | a single speed multiplier per era, which cannot express it | representing it needs a second, faster carrier population in the shared cell for the LA-2 position; not done because the same source says the slower photocell dominates the response |
 | CL 1B | at the 2:1 stop, ten decibels in gives five out at every depth from 3 dB | 5.2, 4.8 and 4.8 dB from 8 dB of reduction and deeper; 6.4 dB from 3 dB | a feedback optical compressor has a soft knee near its threshold, which is what the reviews describe; the manual's sentence is a description of what the Ratio control selects rather than a knee specification |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes
@@ -531,7 +530,7 @@ ratio is what is asserted, and the note is at the test.
 
 ## Tests
 
-`cargo test` runs 151 tests (one more is `#[ignore]`d and prints curves):
+`cargo test` runs 152 tests (one more is `#[ignore]`d and prints curves):
 
 - **the lab** (`src/dsp/tests.rs`): the parameter contract (ids, labels, defaults, stream layout);
   shared values reach every engine; every model compresses and reports `gr_db` ≤ 0 with the GR meter
@@ -614,14 +613,24 @@ vintage-versus-reissue grouping: that spread is unit-to-unit variation conflatin
 tolerance and calibration, so sizing an era switch from it would attribute to the three cells a
 variation its own source says the three cells do not explain.
 
-The one *physical, era-specific* difference runs the other way entirely. The T4A in the LA-2 and
-early LA-2A, and very early T4Bs, carried three photocells rather than two: the main pair plus a
-fast one in parallel, giving a dual time constant. Later T4Bs dropped it. So the older cell had an
-extra **fast** element, not a slower one, although the same source notes the overall response is
-dominated by the slower photocell.
+The one *physical, era-specific* difference runs the other way entirely, and it **is** modelled. The
+T4A in the LA-2 and early LA-2A, and very early T4Bs, carried three photocells rather than two: the
+main pair plus a fast one in parallel, giving a dual time constant that broadcast engineers liked.
+Later T4Bs, which is the Silver position and every reissue, dropped it. So the LA-2 position has a
+second, faster carrier population feeding the same divider, and it behaves as it should: measured, it
+recovers more of its reduction than Gray in the first 20 ms, less by 100 ms once the fast cell has
+done its work, and less again at three seconds. No single speed multiplier can be ahead early and
+behind later, which is why the test asserts that shape rather than a total speed.
 
-So the ordering is documented, the magnitude is not, and the span is not widened to make the control
-feel more useful. It is subtle, which is what the evidence supports.
+Its share of the conductance is an estimate, because the sources give the cell's existence, its
+direction and its topology but not its magnitude. It is deliberately secondary: the one person who
+examined the modules concluded the overall response is dominated by the slower photocell, so the
+early recovery never overtakes Silver's, and a test asserts that too.
+
+So the ordering is documented, the magnitude is not, the span is not widened to make the control feel
+more useful, and the one difference with a physical basis is modelled as the structural thing it is.
+Silver and Gray are bit-for-bit unchanged, with a test guarding it, because the LA-3A shares this
+cell.
 
 ## Presets and the UI store
 

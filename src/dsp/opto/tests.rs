@@ -742,64 +742,142 @@ fn print_curves() {
     );
 }
 
-/// The cell-variant switch changes the recovery, in the documented order.
-///
-/// *Figure asserted:* the **ordering only**. Universal Audio describe the
-/// three eras with the late-1960s Silver fast, the mid-1960s Gray the
-/// medium "reference" and the LA-2 slowest, mellowed by fifty years of
-/// panel ageing. *Source:* `research/LA-2A.md` section 4.7.
-///
-/// **No magnitude is asserted against a published figure, because none
-/// exists.** The only measurement in the research, Moore's six units,
-/// reports no consistent vintage-versus-reissue grouping, so its spread
-/// is unit-to-unit variation and cannot size an era control; the full
-/// reasoning is at [`CELL_SPEEDS`]. The span below pins the model's own
-/// estimate so a drift is caught, and says so rather than dressing an
-/// estimate as an anchor.
-///
-/// The test exists at all because a wired control with nothing testing it
-/// is how a dead one goes unnoticed.
-#[test]
-fn the_cell_variants_recover_at_different_speeds() {
-    let recovery_blocks = |cell: usize| -> usize {
-        let mut c = Compressor::new(SR);
-        c.configure(Settings {
-            peak_reduction: 60.0,
-            cell,
-            ..Settings::default()
-        });
-        c.reset();
-        let (gr, _) = run_sine(&mut c, amp_vu(4.0), 1000.0, 4.0, SR);
-        let settled = gr[gr.len() - 1];
-        assert!(settled > 3.0, "cell {cell} only reached {settled:.2} dB");
-        let block = 256;
-        let (mut l, mut r) = (vec![0.0; block], vec![0.0; block]);
-        for i in 0..((SR as usize * 20) / block) {
+/// Recovery fractions for one cell variant: how much of the settled
+/// reduction has come back at each of the given times after the tone
+/// stops.
+fn recovery_curve(cell: usize, at_s: &[f32]) -> Vec<f32> {
+    let mut c = Compressor::new(SR);
+    c.configure(Settings {
+        peak_reduction: 60.0,
+        cell,
+        ..Settings::default()
+    });
+    c.reset();
+    let (gr, _) = run_sine(&mut c, amp_vu(4.0), 1000.0, 4.0, SR);
+    let settled = gr[gr.len() - 1];
+    assert!(settled > 3.0, "cell {cell} only reached {settled:.2} dB");
+    let block = 64;
+    let (mut l, mut r) = (vec![0.0; block], vec![0.0; block]);
+    let mut out = Vec::with_capacity(at_s.len());
+    let mut done = 0usize;
+    for t in at_s {
+        let want = (SR * t) as usize;
+        while done < want {
             l.iter_mut().for_each(|v| *v = 0.0);
             r.iter_mut().for_each(|v| *v = 0.0);
             c.process_block(&mut l, &mut r);
-            if c.meter_frame()[4] < 0.25 * settled {
-                return i;
-            }
+            done += block;
         }
-        usize::MAX
-    };
-    let silver = recovery_blocks(0);
-    let gray = recovery_blocks(1);
-    let la2 = recovery_blocks(2);
+        out.push(1.0 - c.meter_frame()[4] / settled);
+    }
+    out
+}
+
+/// The LA-2 position has a **dual time constant**, which is the one
+/// difference between the three cells with a physical basis.
+///
+/// *Figure asserted:* the **shape**. The T4A in the LA-2 and early
+/// LA-2A, and very early T4Bs, carried three photocells: the main
+/// Clairex CL-505L pair plus a fast CL-705 in parallel with the audio
+/// cell, "giving a dual time constant that broadcast engineers liked".
+/// Later T4Bs, which is the Silver position and every reissue, dropped
+/// it. *Source:* `research/LA-2A.md` section 3.
+///
+/// So this asserts that the LA-2 recovers a **larger** share early and a
+/// **smaller** share later than the reference Gray cell. That pair cannot
+/// both be true of any single speed multiplier, which is the point: a
+/// scalar can be faster or slower, not both, and a test that only
+/// measured total speed would pass with one and miss the whole feature.
+///
+/// **No magnitude is asserted against a published figure**, because the
+/// sources give the cell's existence, direction and topology but not how
+/// much conductance it carries; see [`CellParams::fast_share`]. Kantor,
+/// who examined the modules, says the slower photocell dominates, so the
+/// late-recovery half of this test is also what keeps the fast cell
+/// secondary.
+#[test]
+fn the_la2_cell_has_a_dual_time_constant() {
+    // 20 ms is inside the fast photocell's reach; 100 ms is after it has
+    // done its work and the slow one has taken over; 3 s is the tail.
+    let at = [0.02f32, 0.1, 3.0];
+    let silver = recovery_curve(0, &at);
+    let gray = recovery_curve(1, &at);
+    let la2 = recovery_curve(2, &at);
+
+    // The signature: quicker at first, then slower. No single speed
+    // multiplier can be both, which is why this is the test.
     assert!(
-        silver < gray && gray < la2,
-        "the cells did not order Silver, Gray, LA-2 by speed: {silver}, {gray}, {la2} blocks"
+        la2[0] > gray[0],
+        "at 20 ms the LA-2 cell had recovered {:.3} against Gray's {:.3};          its third photocell should make the first part of the recovery quicker",
+        la2[0],
+        gray[0]
     );
-    // Pinning the estimate, not a published figure: the multipliers are
-    // 0.7, 1.0 and 1.6, so the recovery span should track that 2.3 and
-    // stay small. If somebody widens them to make the control feel more
-    // useful, this fails, which is the point.
-    let span = la2 as f32 / silver as f32;
     assert!(
-        (1.4..=2.6).contains(&span),
-        "the cell switch changed the recovery by a factor of {span:.2} ({silver} to {la2} blocks); \
-         the multipliers imply about 2.3, and the research establishes no magnitude that would \
-         justify widening them"
+        la2[1] < gray[1],
+        "at 100 ms the LA-2 cell had recovered {:.3} against Gray's {:.3};          once the fast photocell has done its work the slower one must take over",
+        la2[1],
+        gray[1]
     );
+    assert!(
+        la2[2] < gray[2],
+        "at 3 s the LA-2 cell had recovered {:.3} against Gray's {:.3};          the slower photocell dominates the response, so the tail stays behind",
+        la2[2],
+        gray[2]
+    );
+
+    // Silver and Gray have only the main pair, so between those two a
+    // scalar is the whole story and the ordering is simply speed.
+    assert!(
+        silver[0] > gray[0] && silver[2] > gray[2],
+        "Silver should lead Gray at both times: {silver:?} against {gray:?}"
+    );
+
+    // And the fast cell stays secondary, as the one source that examined
+    // the modules says it is: it cannot carry the early recovery past the
+    // fastest cell, which has no third photocell at all.
+    assert!(
+        la2[0] < silver[0],
+        "the LA-2's early recovery ({:.3}) overtook Silver's ({:.3});          the third photocell is meant to be a secondary contribution",
+        la2[0],
+        silver[0]
+    );
+}
+
+/// The third photocell touches the LA-2 position and nothing else.
+///
+/// Silver and Gray are late-1960s T4Bs and reissues, which have only the
+/// main pair, so their conductance must still be exactly the free-carrier
+/// figure. This is a bit-for-bit guard: adding a parallel population to a
+/// shared cell is the kind of change that moves a default sound by
+/// accident, and the LA-3A draws on the same cell.
+#[test]
+fn only_the_la2_cell_gained_the_third_photocell() {
+    for cell in 0..3 {
+        let p = cell_params_for(cell);
+        if cell == 2 {
+            assert!(p.fast_share > 0.0, "the LA-2 cell lost its third photocell");
+            assert!(p.fast_speed > 1.0, "the third photocell is not faster");
+        } else {
+            assert_eq!(
+                p.fast_share, 0.0,
+                "cell {cell} gained a third photocell it never had"
+            );
+        }
+    }
+    // Silver and Gray report their free carriers untouched.
+    for cell in [0usize, 1] {
+        let mut c = Cell::new(cell_params_for(cell), SR);
+        for _ in 0..2000 {
+            c.step(0.4);
+        }
+        assert_eq!(
+            c.conductance(),
+            c.n_f,
+            "cell {cell}'s conductance is no longer exactly its free carriers"
+        );
+        for _ in 0..2000 {
+            c.step(0.0);
+        }
+        assert_eq!(c.conductance(), c.n_f, "cell {cell} drifted on release");
+    }
 }

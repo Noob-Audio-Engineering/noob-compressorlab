@@ -116,6 +116,34 @@ pub struct CellParams {
     /// the LA-3A, which drives the same panel from a transistor stage
     /// through a step-up transformer (`research/LA-3A.md` 7.5).
     pub tau_u: f32,
+    /// Share of the cell's conductance carried by a **second, faster
+    /// photocell wired in parallel** with the main one. `0.0` for every
+    /// cell that has only the main pair, which is every T4B from about
+    /// 1969 onward and so both the Gray and Silver positions.
+    ///
+    /// The T4A in the LA-2 and early LA-2A, and very early T4Bs, carried
+    /// three photocells: the main Clairex CL-505L pair plus a fast
+    /// CL-705 across the audio cell, "giving a dual time constant that
+    /// broadcast engineers liked" (`research/LA-2A.md` section 3). That
+    /// is the one difference between the eras with a physical basis, and
+    /// a speed multiplier cannot express it, because the point is a
+    /// *shape*: a quick partial recovery followed by the slow one, not a
+    /// uniformly quicker cell.
+    ///
+    /// **The share is an estimate.** The sources establish that the cell
+    /// exists, that it is faster, and that it sits in parallel, but not
+    /// how much of the conductance it carries. Kantor, who examined the
+    /// modules, concluded the overall response "is dominated by the
+    /// response of the slower photocell", so this is deliberately a
+    /// secondary contribution: enough to hear on a transient, not enough
+    /// to make the LA-2 position a different compressor.
+    pub fast_share: f32,
+    /// How much faster that second cell is than the main one, as a
+    /// divisor on its time constants. **Estimate**: the research calls
+    /// the CL-705 "fast" without giving a figure, and Clairex type-5
+    /// material spans 5 ms to 120 ms of decay depending on light, so a
+    /// single figure inside that span is the best that can be justified.
+    pub fast_speed: f32,
 }
 
 impl CellParams {
@@ -129,6 +157,8 @@ impl CellParams {
         capture: 1.0 / 0.3,
         k_gen: 7.0,
         tau_u: 0.001,
+        fast_share: 0.0,
+        fast_speed: 1.0,
     };
 
     /// Scale every time constant (the "cell" parameter: Silver 0.7, Gray
@@ -141,6 +171,44 @@ impl CellParams {
             capture: self.capture / k,
             ..self
         }
+    }
+
+    /// Add the T4A's third photocell: a faster population carrying
+    /// `share` of the conductance in parallel with the main one.
+    pub fn with_fast_cell(self, share: f32, speed: f32) -> CellParams {
+        CellParams {
+            fast_share: share,
+            fast_speed: speed,
+            ..self
+        }
+    }
+}
+
+/// The T4A's fast parallel photocell, for the LA-2 position only.
+///
+/// **Both numbers are estimates**, for the reasons at
+/// [`CellParams::fast_share`]. The share keeps the slower cell dominant,
+/// as the one source that examined the modules says it is; the speed sits
+/// inside the range Clairex quote for the material.
+pub const LA2_FAST_SHARE: f32 = 0.22;
+pub const LA2_FAST_SPEED: f32 = 8.0;
+
+/// Cell parameters for a variant index: the speed multiplier, plus the
+/// T4A's third photocell for the LA-2 position only.
+///
+/// **Only the LA-2 position gets the fast cell, and that is deliberate.**
+/// The third photocell was fitted to the T4A and to very early T4Bs, and
+/// dropped from about 1969; the Silver position is a late-1960s T4B and
+/// every reissue is one, so neither has it. The LA-3A, which shares this
+/// cell, is a 1969-onward unit whose own control is about a cell's *age*
+/// rather than its era, so it does not get one either and calls the
+/// parameters it already builds.
+pub fn cell_params_for(cell: usize) -> CellParams {
+    let base = CellParams::GRAY.scaled(CELL_SPEEDS[cell.min(2)]);
+    if cell.min(2) == 2 {
+        base.with_fast_cell(LA2_FAST_SHARE, LA2_FAST_SPEED)
+    } else {
+        base
     }
 }
 
@@ -203,6 +271,10 @@ pub struct Cell {
     pub light: f32,
     /// Free carriers (conductance), 0..1.
     pub n_f: f32,
+    /// Free carriers in the T4A's second, faster photocell. Only moves
+    /// when [`CellParams::fast_share`] is non-zero, which is the LA-2
+    /// position alone.
+    pub n_fast: f32,
     /// Trapped carriers (memory), 0..1.
     pub n_t: f32,
     params: CellParams,
@@ -216,6 +288,7 @@ impl Cell {
             u: 0.0,
             light: 0.0,
             n_f: 0.0,
+            n_fast: 0.0,
             n_t: 0.0,
             params,
             dt: 1.0 / sr,
@@ -243,6 +316,7 @@ impl Cell {
         self.u = 0.0;
         self.light = 0.0;
         self.n_f = 0.0;
+        self.n_fast = 0.0;
         self.n_t = 0.0;
     }
 
@@ -290,12 +364,34 @@ impl Cell {
         let n_t = self.n_t + self.dt * (capture - detrap);
         self.n_f = flush(n_f.clamp(0.0, 1.0));
         self.n_t = flush(n_t.clamp(0.0, 1.0));
+        if p.fast_share > 0.0 {
+            // The T4A's third cell: same light, no traps, and quicker.
+            let tau_fast = tau / p.fast_speed;
+            let n = self.n_fast + self.dt * (generation - self.n_fast) / tau_fast;
+            self.n_fast = flush(n.clamp(0.0, 1.0));
+        }
+    }
+
+    /// The conductance the divider sees, 0..1.
+    ///
+    /// With only the main photocell this is exactly `n_f`, returned
+    /// untouched so the Gray and Silver positions are bit-for-bit what
+    /// they were. With the T4A's third cell the two conductances add in
+    /// parallel, weighted by the share the fast one carries.
+    #[inline]
+    pub fn conductance(&self) -> f32 {
+        let share = self.params.fast_share;
+        if share <= 0.0 {
+            self.n_f
+        } else {
+            (1.0 - share) * self.n_f + share * self.n_fast
+        }
     }
 
     /// Photocell resistance for the current carriers.
     #[inline]
     pub fn resistance(&self) -> f32 {
-        resistance_for(self.n_f)
+        resistance_for(self.conductance())
     }
 }
 
@@ -604,7 +700,7 @@ impl Compressor {
                 sr,
             );
         }
-        let params = CellParams::GRAY.scaled(CELL_SPEEDS[s.cell.min(2)]);
+        let params = cell_params_for(s.cell);
         for cell in &mut self.cells {
             cell.set_params(params);
         }
@@ -652,14 +748,14 @@ impl Compressor {
     /// The gain reduction in dB (positive) the cell of `channel` currently
     /// applies; with `link` on both are equal.
     pub fn gain_reduction_db(&self, channel: usize) -> f32 {
-        gr_db_for(self.cells[channel.min(1)].n_f)
+        gr_db_for(self.cells[channel.min(1)].conductance())
     }
 
     /// The cell state for the "inside the T4" display: light, free and
     /// trapped carriers (all 0..1), of the first cell.
     pub fn cell_state(&self) -> [f32; 3] {
         let c = &self.cells[0];
-        [c.light, c.n_f, c.n_t]
+        [c.light, c.conductance(), c.n_t]
     }
 
     /// Process one stereo block in place and refresh the meter values.
@@ -779,7 +875,7 @@ impl Compressor {
     /// steady-state loop (used for the transfer curve and by the tests).
     pub fn static_gr_db(&self, amp: f32) -> f32 {
         let shaping = self.ch[0].sidechain_gain_1k(self.sr);
-        let params = CellParams::GRAY.scaled(CELL_SPEEDS[self.settings.cell.min(2)]);
+        let params = cell_params_for(self.settings.cell);
         let mut n = 0.0f32;
         for _ in 0..80 {
             let a = attenuation_for(resistance_for(n));

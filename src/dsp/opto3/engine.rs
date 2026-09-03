@@ -453,13 +453,13 @@ impl Compressor {
 
     /// Gain reduction of one channel, in positive dB.
     pub fn gain_reduction_db(&self, channel: usize) -> f32 {
-        k::DIVIDER.gr_db(self.cells[channel.min(1)].n_f)
+        k::DIVIDER.gr_db(self.cells[channel.min(1)].conductance())
     }
 
     /// `[light, free_carriers, trapped_carriers]` of the cell.
     pub fn cell_state(&self) -> [f32; 3] {
         let c = &self.cells[0];
-        [c.light, c.n_f, c.n_t]
+        [c.light, c.conductance(), c.n_t]
     }
 
     /// Process one stereo block in place. Real-time safe.
@@ -492,12 +492,12 @@ impl Compressor {
             }
             // What the cell was doing at the end of the last sample.
             let a = if s.link {
-                let a = k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[0].n_f));
+                let a = k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[0].conductance()));
                 [a, a]
             } else {
                 [
-                    k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[0].n_f)),
-                    k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[1].n_f)),
+                    k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[0].conductance())),
+                    k::DIVIDER.attenuation(k::DIVIDER.resistance(self.cells[1].conductance())),
                 ]
             };
             let mut v = [0.0f32; 2];
@@ -598,7 +598,7 @@ impl Compressor {
         let mut last = 0.0f32;
         let steps = (self.sr * 3.0) as usize;
         for i in 0..steps {
-            let a = k::DIVIDER.attenuation(k::DIVIDER.resistance(cell.n_f));
+            let a = k::DIVIDER.attenuation(k::DIVIDER.resistance(cell.conductance()));
             let att = x * a;
             let tap = (1.0 - self.beta) * att + self.beta * x;
             // A sine drives the panel with its rectified mean; the two
@@ -606,14 +606,14 @@ impl Compressor {
             let sc = tap * SINE_MEAN_ABS * self.pr_gain * tilt;
             cell.step(self.v_sat * (sc / self.v_sat).tanh());
             if i.is_multiple_of(2048) {
-                let now = k::DIVIDER.gr_db(cell.n_f);
+                let now = k::DIVIDER.gr_db(cell.conductance());
                 if i > 8192 && (now - last).abs() < 1e-4 {
                     break;
                 }
                 last = now;
             }
         }
-        k::DIVIDER.gr_db(cell.n_f)
+        k::DIVIDER.gr_db(cell.conductance())
     }
 
     /// Fill `out` with the static output level in dBFS for inputs from

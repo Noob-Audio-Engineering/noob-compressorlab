@@ -1,0 +1,95 @@
+/*
+ * The LA-2A page's rules: the dark workbench under the faceplate (the
+ * panels, the small controls, the framework's unstyled `Segmented` and
+ * `Toggle` dressed under `.bench`). This is the styling of Noob Compressor
+ * LA-2A as it was, with its amber token renamed `--color-opto-amber` so it
+ * can live next to the 1176's amber; the tokens are declared in
+ * `src/style.css`, which imports this file. The faceplate, knobs, levers,
+ * selector and meter carry scoped styles in their components.
+ */
+.lab-model--opto {
+  background: var(--color-bench-950);
+  color: #e7e2d8;
+  --noob-vst-webgui-framework-accent: var(--color-opto-amber);
+  --noob-vst-webgui-framework-text: #e7e2d8;
+  --noob-vst-webgui-framework-track: rgba(255, 255, 255, 0.12);
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(231, 226, 216, 0.45);
+}
+.bench-panel {
+  background: var(--color-bench-800);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 0;
+}
+
+/* Small dark controls on the workbench. */
+.bench-label {
+  font: 600 9px var(--font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(231, 226, 216, 0.45);
+}
+.bench .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 5px;
+  background: var(--color-bench-800);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.bench .noob-vst-webgui-framework-segment {
+  font: 600 10px var(--font-sans);
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(231, 226, 216, 0.6);
+  cursor: pointer;
+}
+.bench .noob-vst-webgui-framework-segment.is-on {
+  background: var(--color-opto-amber);
+  color: #1a1408;
+}
+.bench .noob-vst-webgui-framework-toggle.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 10px var(--font-sans);
+  color: rgba(231, 226, 216, 0.6);
+}
+.bench .noob-vst-webgui-framework-toggle.switch .track {
+  width: 30px;
+  height: 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--color-bench-800);
+  position: relative;
+  padding: 0;
+  cursor: pointer;
+}
+.bench .noob-vst-webgui-framework-toggle.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cfcac0;
+  transition: transform 120ms;
+}
+.bench .noob-vst-webgui-framework-toggle.switch.is-on .track {
+  background: var(--color-opto-amber);
+}
+.bench .noob-vst-webgui-framework-toggle.switch.is-on .knob {
+  transform: translateX(14px);
+  background: #1a1408;
+}
+.bench .noob-vst-webgui-framework-toggle.switch .lbl {
+  opacity: 0.6;
+}
+.bench .noob-vst-webgui-framework-toggle.switch.is-on .lbl:last-child,
+.bench .noob-vst-webgui-framework-toggle.switch:not(.is-on) .lbl:first-child {
+  opacity: 1;
+}

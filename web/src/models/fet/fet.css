@@ -1,0 +1,550 @@
+/*
+ * The 1176 page's rules: the faceplate in its three finishes, the knobs,
+ * the push-button columns, the meter, the power lever, the extras strip
+ * and the scope drawer. This is the styling of Noob Compressor 1176 as it
+ * was, with its amber token renamed `--color-fet-amber` so it can live
+ * next to the LA-2A's amber; the tokens themselves are declared in
+ * `src/style.css`, which imports this file. Nothing here is generic: the
+ * framework's unstyled `Segmented` and `Toggle` are dressed under
+ * `.extras1176`, the framework's charts read the `--noob-vst-webgui-framework-*`
+ * variables set on the model's root.
+ */
+.lab-model--fet {
+  background: #08090b;
+  color: #e6e3da;
+  --noob-vst-webgui-framework-accent: var(--color-fet-amber);
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+}
+.abs {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+/* ------------------------------------------------------------- faceplate */
+/*
+ * The plate is a container: everything printed on it is sized in `cqw`
+ * (hundredths of the plate width) so lettering, screws, buttons and the
+ * switch scale with the window like the knobs and the meter do.
+ */
+.face1176 {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background: #1a1b1e;
+  padding: 6px 0;
+}
+.face1176__ear {
+  width: 26px;
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, #e2e4e8, #b4b8be 45%, #8e9299);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 2px 0 0 2px;
+}
+.face1176__ear.right {
+  background: linear-gradient(270deg, #e2e4e8, #b4b8be 45%, #8e9299);
+  border-radius: 0 2px 2px 0;
+}
+.face1176__plate {
+  /* the plate fills the window between the ears; the 5.2 : 1 aspect keeps its shape at any width,
+     and at very wide windows its width is capped from the height so the panel never takes more
+     than 50 % of the viewport (the ears hug the plate, the section centres) */
+  flex: 1;
+  min-width: 0;
+  max-width: calc(5.2 * 50vh);
+  container-type: inline-size;
+}
+.face1176__panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5.2 / 1;
+  overflow: hidden;
+  font-family: var(--font-panel);
+}
+.face1176__panel > .abs {
+  z-index: 1;
+}
+.face1176__section {
+  position: absolute;
+  z-index: 0;
+  border-radius: 0.6cqw;
+}
+.face1176__block {
+  position: absolute;
+  z-index: 0;
+  border-radius: 0.2cqw;
+  background: linear-gradient(180deg, #2f62b6, #244e97);
+  box-shadow:
+    inset 0 0.1cqw 0 rgba(255, 255, 255, 0.25),
+    inset 0 -0.1cqw 0 rgba(0, 0, 0, 0.3);
+}
+.face1176__print {
+  font-size: 0.9cqw;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.face1176__meter {
+  transform: none;
+}
+.face1176__nameplate {
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2cqw;
+  font-size: 0.7cqw;
+  letter-spacing: 0.2em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.face1176__nameplate b {
+  font-size: 0.85cqw;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+}
+.face1176__badge {
+  width: 4.6cqw;
+  height: 2.2cqw;
+  border-radius: 0.3cqw;
+  background: linear-gradient(180deg, #4a7bd0, #2f5fb3);
+  color: #fff;
+  font-weight: 900;
+  font-size: 1.1cqw;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 1px rgba(0, 0, 0, 0.4);
+}
+.face1176__badge.round {
+  width: 2.4cqw;
+  height: 2.4cqw;
+  border-radius: 50%;
+  font-size: 1.1cqw;
+  background: radial-gradient(circle at 40% 35%, #ffffff, #d8dbe0 65%, #9a9ea6);
+  color: #c8342b;
+}
+
+/* screws: two large slotted ones on each ear, four small ones at the corners */
+.screw {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f6f7f9, #9a9ea6 60%, #5d6168);
+  position: relative;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.45);
+}
+.screw::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 46%;
+  height: 8%;
+  background: #3a3d43;
+  transform: rotate(-30deg);
+}
+.screw.big {
+  width: 14px;
+  height: 14px;
+}
+.screw.small {
+  width: 0.9cqw;
+  height: 0.9cqw;
+}
+
+/* ------------------------------------------------------------------ knobs */
+.knob1176 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  position: relative;
+}
+.knob1176__dial {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  display: block;
+  cursor: ns-resize;
+  outline: none;
+  border-radius: 50%;
+}
+.knob1176__dial:focus-visible {
+  box-shadow: 0 0 0 2px rgba(240, 180, 41, 0.6);
+}
+.knob1176__marks line {
+  stroke: #26272b;
+  stroke-width: 1.2;
+}
+.knob1176__marks text {
+  fill: #26272b;
+  font-family: var(--font-panel);
+  font-weight: 700;
+}
+.knob1176__cap {
+  fill: url(#knobCap);
+}
+.knob1176__tip {
+  fill: #f4f1ea;
+}
+.knob1176__ptr {
+  stroke: #f4f1ea;
+}
+.knob1176__pin {
+  fill: #0b0c0e;
+}
+.knob1176__label {
+  font-family: var(--font-panel);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: #e6e3da;
+  margin-top: -2px;
+}
+.knob1176__value {
+  font-size: 10px;
+  color: rgba(230, 227, 218, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+.knob1176__value.float {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translate(-50%, 100%);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(14, 15, 18, 0.9);
+  color: #f4f1ea;
+  font-size: 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ------------------------------------------------- push-button columns */
+.column1176 {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqw;
+}
+.column1176__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+}
+.column1176__row.left {
+  justify-content: flex-end;
+}
+.column1176__label {
+  font-family: var(--font-panel);
+  font-size: 0.85cqw;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  min-width: 1.8cqw;
+}
+.column1176__row.left .column1176__label {
+  text-align: right;
+}
+.push1176 {
+  width: 2.2cqw;
+  height: 2.4cqw;
+  padding: 0;
+  border: 0;
+  border-radius: 0.2cqw;
+  background: linear-gradient(180deg, #34363b, #141518);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0.2cqw 0 #050506,
+    0 0.3cqw 0.3cqw rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transform: translateY(0);
+  transition:
+    transform 60ms,
+    box-shadow 60ms;
+}
+.push1176.red {
+  background: linear-gradient(180deg, #d94b3d, #8f2118);
+}
+.push1176.in {
+  transform: translateY(0.2cqw);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0.2cqw 0.5cqw rgba(0, 0, 0, 0.6),
+    0 0 0 #050506;
+  background: linear-gradient(180deg, #202226, #0f1013);
+}
+.push1176.red.in {
+  background: linear-gradient(180deg, #a82f23, #6d1810);
+}
+
+/* ----------------------------------------------------------------- meter */
+.vu1176 {
+  width: 100%;
+  height: 100%;
+  border-radius: 3px;
+  padding: 0;
+  background: #0b0c0e;
+  box-shadow:
+    0 0 0 3px #17181b,
+    0 0 0 4px #4a4d53,
+    inset 0 0 14px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  transition: filter 300ms;
+}
+.vu1176.off {
+  filter: brightness(0.55) saturate(0.6);
+}
+.vu1176__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.vu1176__arc {
+  fill: none;
+  stroke: #2a2520;
+  stroke-width: 1.6;
+}
+.vu1176__arc.red {
+  stroke: #c8342b;
+  stroke-width: 3;
+}
+.vu1176__tick {
+  stroke: #2a2520;
+  stroke-width: 1;
+}
+.vu1176__tick.major {
+  stroke-width: 1.6;
+}
+.vu1176__tick.red {
+  stroke: #c8342b;
+}
+.vu1176__num {
+  fill: #2a2520;
+  font: 700 11px var(--font-panel);
+}
+.vu1176__num.red {
+  fill: #c8342b;
+}
+.vu1176__vu {
+  fill: #2a2520;
+  font: 800 15px var(--font-panel);
+  letter-spacing: 0.1em;
+}
+.vu1176__mode {
+  fill: rgba(42, 37, 32, 0.7);
+  font: 600 8px var(--font-panel);
+  letter-spacing: 0.18em;
+}
+.vu1176__needle {
+  stroke: #1a1612;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+/* ----------------------------------------------------------------- power */
+.power1176 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqw;
+}
+.power1176__caption {
+  font-family: var(--font-panel);
+  font-size: 0.7cqw;
+  letter-spacing: 0.16em;
+  font-weight: 600;
+}
+.power1176__lever {
+  width: 1.4cqw;
+  height: 2.2cqw;
+  border-radius: 0.4cqw;
+  border: 1px solid #2b2d31;
+  background: radial-gradient(circle at 50% 50%, #3a3d43, #16171a 70%);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+}
+.power1176__bat {
+  position: absolute;
+  left: 0.4cqw;
+  width: 0.4cqw;
+  height: 1.2cqw;
+  border-radius: 0.2cqw;
+  background: linear-gradient(180deg, #e5e7eb, #8b8f96);
+  top: 0.8cqw;
+  transition: top 100ms;
+}
+.power1176__lever.on .power1176__bat {
+  top: 0.1cqw;
+}
+
+/* ---------------------------------------------------------------- extras */
+.extras1176 {
+  /* a fixed band; wraps to two rows when the window is narrow */
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 16px;
+  padding: 4px 28px;
+  background: var(--color-panel-900);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+}
+.extras1176__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extras1176__item.source {
+  margin-left: auto;
+}
+.extras1176__hint {
+  font-family: var(--font-panel);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: rgba(230, 227, 218, 0.5);
+  white-space: nowrap;
+}
+.extras1176__item.revision .noob-vst-webgui-framework-segment {
+  padding: 4px 6px;
+}
+.extras1176__caption {
+  font-family: var(--font-panel);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: rgba(230, 227, 218, 0.55);
+}
+.extras1176 .knob1176__marks line {
+  stroke: #d8d5cc;
+}
+.extras1176 .knob1176__marks text {
+  fill: #d8d5cc;
+}
+.extras1176 .knob1176__label {
+  font-size: 8px;
+}
+.extras1176 .knob1176__value {
+  font-size: 9px;
+}
+.extras1176__scope {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e3da;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+.extras1176__scope.on {
+  background: rgba(240, 180, 41, 0.18);
+  color: var(--color-fet-amber);
+  border-color: rgba(240, 180, 41, 0.4);
+}
+/* rockers and segments in the extras strip */
+.extras1176 .noob-vst-webgui-framework-toggle.rocker,
+.extras1176 .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extras1176 .noob-vst-webgui-framework-toggle .pos,
+.extras1176 .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extras1176 .noob-vst-webgui-framework-toggle .pos.is-on,
+.extras1176 .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--color-fet-amber);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* ------------------------------------------------- finishes by revision */
+/*
+ * Three looks, one class each on `.face1176`, chosen by `Faceplate.vue`
+ * from the `revision` parameter:
+ * - `blackface` (C to G and the reissue): black anodised plate, light
+ *   lettering, black knobs with silver caps and light skirt scales, the
+ *   badge above the meter and the model lettering under it;
+ * - `bluestripe` (A, B): brushed silver plate, a blue block behind and
+ *   around the meter with the lettering in white, black knobs with black
+ *   caps and dark skirt scales;
+ * - `silverface` (H): brushed silver plate with the recessed left section,
+ *   silver caps, the blue badge at the right, no lettering under the meter.
+ */
+.face1176.blackface .face1176__panel {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #2a2c31, #1a1b1f 55%, #121316);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+  color: #e3e4e8;
+}
+.face1176.blackface .knob1176__marks line {
+  stroke: #d8d5cc;
+}
+.face1176.blackface .knob1176__marks text {
+  fill: #d8d5cc;
+}
+.face1176.blackface .face1176__nameplate {
+  color: #e3e4e8;
+}
+
+.face1176.bluestripe .face1176__panel,
+.face1176.silverface .face1176__panel {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #d5d8dd, #bfc3c9 55%, #aeb2b8);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35);
+  color: #1c1d21;
+}
+.face1176.bluestripe .face1176__nameplate {
+  color: #fff;
+}
+.face1176.bluestripe .face1176__meter .vu1176 {
+  box-shadow:
+    0 0 0 0.25cqw #17181b,
+    0 0 0 0.35cqw #d8dbe0,
+    inset 0 0 14px rgba(0, 0, 0, 0.4);
+}
+
+.face1176.silverface .face1176__section {
+  background: rgba(0, 0, 0, 0.035);
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.18),
+    inset -1px -1px 1px rgba(255, 255, 255, 0.45);
+}
+
+/* silver caps on the black-face and silver-face knobs; the pointer turns dark on them */
+.face1176.blackface .knob1176__cap,
+.face1176.silverface .knob1176__cap {
+  fill: url(#knobCapSilver);
+}
+.face1176.blackface .knob1176__ptr,
+.face1176.silverface .knob1176__ptr {
+  stroke: #1a1b1e;
+}
+.face1176.blackface .knob1176__pin,
+.face1176.silverface .knob1176__pin {
+  fill: #6c7077;
+}

@@ -1,0 +1,302 @@
+/*
+ * Noob CompressorLab styling. Tailwind v4 is configured in CSS:
+ * `@import 'tailwindcss'` pulls in the framework, the two model files
+ * bring each compressor's own rules, `@theme` declares every design token,
+ * and the rest is the shell: the page frame, the shared top bar with the
+ * model switch, the resize grip.
+ *
+ * Two looks live side by side. Their tokens are prefixed where they would
+ * collide (`--color-fet-amber` for the 1176, `--color-opto-amber` for the
+ * LA-2A); the rest (`panel-*`, `silver`, `cream` for the 1176; `plate-*`,
+ * `bench-*`, `lamp` for the LA-2A) never overlapped. Each model's root
+ * (`.lab-model--fet`, `.lab-model--opto`) paints its own background and
+ * sets the `--noob-vst-webgui-framework-*` variables the framework's canvas charts
+ * read, so the same chart draws in the 1176's colours under one face and
+ * in the LA-2A's under the other. The framework's unstyled controls are
+ * dressed here by class name; nothing generic dictates a look.
+ */
+@import 'tailwindcss';
+@import './models/fet/fet.css';
+@import './models/opto/opto.css';
+/*
+ * Tailwind scans only this app's sources by default. The shared Vue
+ * components live in the linked `@noob-audio-engineering/noob-vst-webgui-framework` package and
+ * use utility classes too, so their directory is added as a content source.
+ */
+@source '../node_modules/@noob-audio-engineering/noob-vst-webgui-framework/crates/noob-vst-webgui-framework/web/vue';
+
+@theme {
+  /* the shell */
+  --color-lab-950: #0b0c0e;
+  --color-lab-900: #141518;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* the 1176: brushed or anodised panel, black knobs, the cream meter face, its amber */
+  --color-panel-950: #0b0c0e;
+  --color-panel-900: #141518;
+  --color-silver: #c9ccd1;
+  --color-cream: #f2e9d2;
+  --color-fet-amber: #f0b429;
+  --font-panel: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  /* the LA-2A: brushed silver plate, the dark workbench, its amber, the pilot lamp */
+  --color-plate-100: #e3dfd6;
+  --color-plate-200: #cfcac0;
+  --color-plate-300: #b6b0a5;
+  --color-plate-400: #8e887c;
+  --color-plate-900: #2a2724;
+  --color-bench-950: #121110;
+  --color-bench-900: #191715;
+  --color-bench-800: #221f1c;
+  --color-bench-700: #2e2a26;
+  --color-opto-amber: #e9a23b;
+  --color-amber-soft: #f3c778;
+  --color-lamp: #d8342b;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: var(--color-lab-950);
+  color: #e6e3da;
+  /* Knob drags must never scroll or pinch-zoom the page on touch screens. */
+  touch-action: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ frame */
+/*
+ * The page fills the window: the top bar takes its own height, the active
+ * model's view the rest. The shell's accent follows the model, so the top
+ * bar's highlights match the face below without owning a colour of their
+ * own.
+ */
+.lab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 900px;
+  overflow: hidden;
+  --lab-accent: var(--color-fet-amber);
+  --lab-accent-rgb: 240 180 41;
+}
+.lab--opto {
+  --lab-accent: var(--color-opto-amber);
+  --lab-accent-rgb: 233 162 59;
+}
+.lab-model {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.lab__wait {
+  margin: auto;
+  color: rgba(230, 227, 218, 0.5);
+  font-size: 13px;
+}
+/* the framework's resize grip, drawn as three diagonal ridges in the corner */
+.lab-grip {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 0 55%, rgba(230, 227, 218, 0.35) 55% 60%, transparent 60% 70%, rgba(230, 227, 218, 0.35) 70% 75%, transparent 75% 85%, rgba(230, 227, 218, 0.35) 85% 90%, transparent 90%);
+  z-index: 20;
+  touch-action: none;
+}
+.lab-grip:hover,
+.lab-grip.is-dragging {
+  background-color: rgb(var(--lab-accent-rgb) / 0.15);
+}
+
+/* ---------------------------------------------------------------- top bar */
+.labbar {
+  height: 40px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 14px;
+  background: var(--color-lab-900);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.labbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.labbar__name {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.labbar__sub {
+  color: rgba(230, 227, 218, 0.45);
+}
+/* the subtitle goes first when the window is narrow */
+@media (max-width: 1350px) {
+  .labbar__sub {
+    display: none;
+  }
+}
+.labbar .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5c5c;
+}
+.labbar .dot.on {
+  background: #3ddc84;
+  box-shadow: 0 0 6px #3ddc84;
+}
+/* the model switch: the framework's Segmented, dressed as two hardware-style keys */
+.labbar__model.noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--color-lab-950);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.labbar__model .noob-vst-webgui-framework-segment {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.5);
+  font: 700 10px var(--font-sans);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.labbar__model .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--lab-accent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+.labbar__presets {
+  display: flex;
+  gap: 4px;
+  margin: 0 auto;
+}
+.labbar__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.labbar__stat {
+  color: rgba(230, 227, 218, 0.45);
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.labbar__stat b {
+  color: #e6e3da;
+  font-weight: 500;
+}
+@media (max-width: 1150px) {
+  .labbar__stat.echo {
+    display: none;
+  }
+}
+.tb {
+  padding: 4px 9px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e3da;
+  line-height: 1;
+  cursor: pointer;
+}
+.tb:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.tb:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.tb.wide {
+  min-width: 150px;
+  text-align: center;
+}
+.tb .dim {
+  opacity: 0.4;
+  font-weight: 400;
+}
+.tb.on {
+  color: var(--lab-accent);
+  border-color: rgb(var(--lab-accent-rgb) / 0.4);
+  background: rgb(var(--lab-accent-rgb) / 0.14);
+}
+
+/* ---------------------------------------------------- shared workbench */
+/*
+ * The history and transfer panels (`components/HistoryPanel.vue`,
+ * `TransferPanel.vue`) and the row they sit in are identical under both
+ * faces: one chrome, one typography, one grid, one set of chart colours
+ * (the LA-2A's workbench look, now the lab's). The `--noob-vst-webgui-framework-*`
+ * variables the framework's canvas charts read are fixed here, on the
+ * panel, so neither model's root can tint them.
+ */
+.lab-bench {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 12px;
+  padding: 12px;
+}
+.lab-bench.has-t4 {
+  grid-template-columns: 180px 1fr 300px;
+}
+.lab-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: #221f1c;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #e7e2d8;
+  --noob-vst-webgui-framework-accent: #e9a23b;
+  --noob-vst-webgui-framework-text: #e7e2d8;
+  --noob-vst-webgui-framework-track: rgba(255, 255, 255, 0.12);
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(231, 226, 216, 0.45);
+}
+.lab-panel__title {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font: 600 9px var(--font-sans);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(231, 226, 216, 0.45);
+  white-space: nowrap;
+}
+.lab-panel__val {
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: rgba(231, 226, 216, 0.75);
+}
+.lab-panel__canvas {
+  flex: 1;
+  min-height: 0;
+  border-radius: 4px;
+  background: rgb(25 23 21 / 0.6);
+}

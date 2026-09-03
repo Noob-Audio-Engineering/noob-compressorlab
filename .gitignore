@@ -1,0 +1,14 @@
+# Rust
+/target
+
+# Node
+node_modules/
+web/dist/
+*.log
+npm-debug.log*
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

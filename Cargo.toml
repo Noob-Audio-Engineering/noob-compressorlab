@@ -1,0 +1,45 @@
+[package]
+name = "noob-compressorlab"
+description = "Noob CompressorLab, a free plug-in with an 1176-style FET compressor and an LA-2A-style optical compressor behind one model switch, whose editor is the OS web view rendering a Vue + Tailwind SPA over noob-vst-webgui-framework"
+readme = "README.md"
+version = "0.1.0"
+authors = ["Ely Erin Fox"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Noob-Audio-Engineering/noob-compressorlab"
+homepage = "https://github.com/Noob-Audio-Engineering/noob-compressorlab"
+# A plug-in, not a library: nothing here goes to crates.io.
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "noob-compressorlab-standalone"
+path = "src/bin/standalone.rs"
+
+[features]
+default = []
+# Build the real VST3 / CLAP plugin (pulls nih-plug from git and embeds
+# `web/dist`, so run `npm run build` in `web/` first). Without it the crate is
+# just the DSP plus the standalone dev server.
+plugin = ["dep:nih_plug", "dep:noob-vst-webgui-framework-nih", "dep:include_dir"]
+
+[dependencies]
+noob-vst-webgui-framework = { git = "https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework" }
+noob-vst-webgui-framework-nih = { git = "https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework", optional = true }
+nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", optional = true }
+include_dir = { version = "0.7", optional = true }
+log = "0.4"
+env_logger = "0.11"
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# Host-driven editor resizing needs the patched nih-plug the framework is
+# built against; Cargo only honours patches in the root manifest, so every
+# plug-in repository carries this line.
+[patch."https://github.com/robbert-vdh/nih-plug.git"]
+nih_plug = { git = "https://github.com/Noob-Audio-Engineering/nih-plug.git", branch = "host-resize" }

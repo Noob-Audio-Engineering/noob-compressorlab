@@ -1,0 +1,567 @@
+/*
+ * The Distressor page's rules: the single-unit charcoal panel, the ivory
+ * knobs, the lamp columns and the sixteen-lamp bargraph, the bat toggles,
+ * the power rocker and the extras strip. Nothing here is generic; the
+ * framework's unstyled `Segmented` is dressed under `.extrasel8`, and the
+ * charts read the `--noob-vst-webgui-framework-*` variables set on the
+ * model's root (the shared panels pin their own, so only the face is
+ * tinted).
+ *
+ * `.abs`, `.screw` and the shared `.lab-*` chrome come from the 1176's file
+ * and `src/style.css`; both are imported alongside this one.
+ */
+.lab-model--vca {
+  background: #0a0a0c;
+  color: #e6e3da;
+  --noob-vst-webgui-framework-accent: var(--color-el8-amber);
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+}
+
+/* ------------------------------------------------------------- faceplate */
+.faceel8 {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background: #141416;
+  padding: 5px 0;
+}
+.faceel8__ear {
+  width: 22px;
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, #3a3b3f, #2a2b2e 45%, #1d1e21);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 2px 0 0 2px;
+  padding: 4px 0;
+}
+.faceel8__ear.right {
+  background: linear-gradient(270deg, #3a3b3f, #2a2b2e 45%, #1d1e21);
+  border-radius: 0 2px 2px 0;
+}
+.faceel8__ear .screw {
+  width: 8px;
+  height: 8px;
+}
+.faceel8__plate {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+/*
+ * A single rack unit: 19 by 1.75 inches. Everything printed on the panel is
+ * sized in `cqw` (hundredths of the plate width) so it scales with the
+ * window.
+ */
+.faceel8__panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 10.86 / 1;
+  overflow: hidden;
+  border-radius: 0.15cqw;
+  font-family: var(--font-panel);
+  color: #eceae4;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), transparent 13%),
+    linear-gradient(180deg, #34353a, #26272b 55%, #1c1d20);
+  box-shadow:
+    inset 0 0 0 0.12cqw rgba(255, 255, 255, 0.1),
+    inset 0 0.15cqw 0.4cqw rgba(255, 255, 255, 0.06);
+}
+.faceel8__panel > .abs {
+  z-index: 1;
+}
+.faceel8__print {
+  font-size: 0.72cqw;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  color: rgba(236, 234, 228, 0.92);
+}
+.faceel8__print.big {
+  font-size: 1cqw;
+  letter-spacing: 0.2em;
+}
+.faceel8__print.tiny {
+  font-size: 0.85cqw;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+/* the script logo, the signature under it, the initials on the left */
+.faceel8__logo {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  font-size: 1.9cqw;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: #fbf9f4;
+  text-shadow: 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.45);
+}
+.faceel8__sig {
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  line-height: 1;
+  font-size: 0.78cqw;
+  white-space: nowrap;
+  color: rgba(251, 249, 244, 0.65);
+}
+/* the anniversary livery, sampled from the maker's own photograph */
+.faceel8.is-red .faceel8__panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 14%),
+    linear-gradient(180deg, #bd5254, #b2494b 45%, #9c4041);
+  box-shadow:
+    inset 0 0 0 0.12cqw rgba(255, 255, 255, 0.14),
+    inset 0 0.15cqw 0.4cqw rgba(255, 255, 255, 0.08);
+}
+.faceel8.is-red .el8lamp {
+  background: #4b2225;
+}
+.faceel8.is-red .faceel8__eli {
+  background: linear-gradient(180deg, #fbf8f2, #ddd8cf);
+  color: #a8291f;
+}
+.faceel8__eli {
+  width: 2.6cqw;
+  height: 2.6cqw;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #d94a3d, #a8291f);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.2cqw;
+  letter-spacing: -0.04em;
+  box-shadow: inset 0 0.1cqw 0 rgba(255, 255, 255, 0.35);
+}
+.faceel8__badge {
+  font-size: 0.5cqw;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: nowrap;
+  color: rgba(236, 234, 228, 0.75);
+}
+.faceel8__model {
+  font-family: 'Georgia', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.5cqw;
+  white-space: nowrap;
+  color: #f4f2ec;
+}
+.faceel8__brit,
+.faceel8__opto {
+  font-size: 0.68cqw;
+  line-height: 1;
+  font-style: italic;
+  white-space: nowrap;
+  color: rgba(236, 234, 228, 0.55);
+}
+.faceel8__toglabel {
+  font-size: 0.52cqw;
+  line-height: 1.25;
+  font-style: italic;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-el8-yellow);
+}
+
+/* --------------------------------------------------------------- lamps */
+/*
+ * One lamp: dark and glassy when off, lit and glowing when on. The colours
+ * are the hardware's code — green for gentle, amber for working, red for
+ * radical, and the blue one that exists because the designer thought it
+ * looked good.
+ */
+.el8lamp {
+  display: block;
+  width: 0.62cqw;
+  height: 0.62cqw;
+  min-width: 4px;
+  min-height: 4px;
+  border-radius: 50%;
+  background: #24252a;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.7);
+  transition: background 60ms linear;
+}
+.el8lamp.green.on {
+  background: #46e07a;
+  box-shadow: 0 0 0.5cqw rgba(70, 224, 122, 0.75);
+}
+.el8lamp.amber.on {
+  background: var(--color-el8-yellow);
+  box-shadow: 0 0 0.5cqw rgba(240, 196, 60, 0.75);
+}
+.el8lamp.red.on {
+  background: #ff4f42;
+  box-shadow: 0 0 0.5cqw rgba(255, 79, 66, 0.75);
+}
+.el8lamp.blue.on {
+  background: #52b6ff;
+  box-shadow: 0 0 0.5cqw rgba(82, 182, 255, 0.8);
+}
+
+/* ------------------------------------------------------------- bargraph */
+.el8bar {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15cqw;
+  align-items: stretch;
+}
+.el8bar__scale,
+.el8bar__lamps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.el8bar__scale span {
+  flex: 1;
+  text-align: center;
+  font-size: 1cqw;
+  font-weight: 600;
+  line-height: 1.1;
+  color: rgba(255, 253, 248, 0.95);
+}
+.el8bar__lamps {
+  padding: 0 0.1cqw;
+}
+.el8bar__lamps .el8lamp {
+  flex: 0 0 auto;
+  margin: 0 auto;
+}
+.el8bar__lamps > * {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.el8bar__title {
+  align-self: center;
+  text-align: center;
+  font-size: 0.95cqw;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(236, 234, 228, 0.9);
+}
+
+/* ------------------------------------------------- buttons and selectors */
+.faceel8__btn {
+  padding: 0.24cqw 0.5cqw;
+  min-width: 3.2cqw;
+  border-radius: 0.15cqw;
+  border: 0.08cqw solid rgba(0, 0, 0, 0.75);
+  background: linear-gradient(180deg, #2b2c30, #191a1d);
+  color: rgba(245, 243, 238, 0.92);
+  font: 700 0.75cqw/1 var(--font-panel);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow: inset 0 0.08cqw 0 rgba(255, 255, 255, 0.12);
+}
+.faceel8__btn:hover {
+  background: linear-gradient(180deg, #232428, #16171a);
+}
+.faceel8__btn:active {
+  box-shadow: inset 0 0.1cqw 0.2cqw rgba(0, 0, 0, 0.6);
+}
+.faceel8__bypass {
+  width: 2.6cqw;
+  height: 1.5cqw;
+  display: grid;
+  place-items: center;
+  border-radius: 0.15cqw;
+  border: 0.08cqw solid rgba(0, 0, 0, 0.75);
+  background: linear-gradient(180deg, #2c2d31, #1a1b1e);
+  cursor: pointer;
+  box-shadow: inset 0 0.08cqw 0 rgba(255, 255, 255, 0.14);
+}
+.faceel8__lampbtn {
+  display: flex;
+  align-items: center;
+  gap: 0.35cqw;
+  background: none;
+  border: 0;
+  padding: 0.1cqw 0.15cqw;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.faceel8__lampbtn:hover .faceel8__print {
+  color: #fff;
+}
+.faceel8__wave {
+  width: 3cqw;
+  height: 1.4cqw;
+}
+.faceel8__wave path {
+  stroke: rgba(236, 234, 228, 0.8);
+  stroke-width: 1.2;
+}
+.faceel8__wave path.clip {
+  stroke: rgba(236, 234, 228, 0.55);
+}
+
+/* the eight ratios, a lamp over a printed label */
+.faceel8__ratios {
+  display: flex;
+  gap: 0.5cqw;
+  align-items: flex-end;
+}
+.faceel8__ratio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.18cqw;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.faceel8__ratiolabel {
+  font-size: 0.8cqw;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(236, 234, 228, 0.75);
+  white-space: nowrap;
+}
+.faceel8__ratio.on .faceel8__ratiolabel {
+  color: #fff;
+}
+.faceel8__ratiolabel.nuke {
+  font-style: italic;
+  color: #7cc6ff;
+}
+.faceel8__ratio:hover .faceel8__ratiolabel {
+  color: #fff;
+}
+
+/* -------------------------------------------------- toggles and the power */
+.el8tog {
+  display: flex;
+  align-items: center;
+  gap: 0.3cqw;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.el8tog__body {
+  position: relative;
+  width: 0.9cqw;
+  height: 1.7cqw;
+  border-radius: 0.45cqw;
+  background: linear-gradient(180deg, #1a1b1e, #0e0f11);
+  box-shadow: inset 0 0 0 0.08cqw rgba(255, 255, 255, 0.15);
+  display: block;
+}
+.el8tog__bat {
+  position: absolute;
+  left: 50%;
+  width: 0.34cqw;
+  height: 0.95cqw;
+  border-radius: 0.17cqw;
+  background: linear-gradient(180deg, #eceff3, #9aa0a8);
+  transform: translateX(-50%);
+  bottom: 0.15cqw;
+  transition: bottom 90ms ease, top 90ms ease;
+}
+.el8tog.on .el8tog__bat {
+  bottom: auto;
+  top: 0.15cqw;
+}
+.faceel8__power {
+  width: 2.2cqw;
+  height: 3cqw;
+  padding: 0.15cqw;
+  border-radius: 0.2cqw;
+  border: 0.08cqw solid rgba(0, 0, 0, 0.8);
+  background: #141518;
+  cursor: pointer;
+}
+.faceel8__rocker {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.15cqw;
+  background: linear-gradient(180deg, #f0f2f5 0 46%, #b9bec6 46% 54%, #1a1b1e 54%);
+  box-shadow: inset 0 0 0.2cqw rgba(0, 0, 0, 0.5);
+  transition: background 120ms ease;
+}
+.faceel8__power.off .faceel8__rocker {
+  background: linear-gradient(180deg, #1a1b1e 0 46%, #55595f 46% 54%, #e6e9ee 54%);
+}
+
+/* ------------------------------------------------------------------ knob */
+.knobel8 {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.knobel8__dial {
+  width: 100%;
+  display: block;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+}
+.knobel8__dial:focus-visible {
+  filter: drop-shadow(0 0 3px var(--color-el8-yellow));
+}
+.knobel8__marks {
+  font: 600 5.6px var(--font-panel);
+  fill: rgba(236, 234, 228, 0.85);
+}
+.knobel8__marks line {
+  stroke: rgba(236, 234, 228, 0.5);
+  stroke-width: 1;
+}
+.knobel8__ends {
+  font: italic 4.6px 'Georgia', serif;
+  fill: rgba(236, 234, 228, 0.5);
+}
+.knobel8__inner {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.16);
+  stroke-width: 1.2;
+}
+.knobel8__notch {
+  fill: #2b2c30;
+}
+.knobel8__pin {
+  fill: rgba(0, 0, 0, 0.12);
+}
+.knobel8__value {
+  position: absolute;
+  top: 100%;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--color-el8-yellow);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ extras bar */
+.extrasel8 {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 6px 16px;
+  margin: 8px 12px 0;
+  border-radius: 6px;
+  background: #131417;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-panel);
+  flex-wrap: wrap;
+}
+.extrasel8__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extrasel8__item.source {
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrasel8__caption {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(236, 234, 228, 0.45);
+}
+.extrasel8__value {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(236, 234, 228, 0.8);
+  min-width: 42px;
+}
+.extrasel8__hint {
+  font-size: 10px;
+  color: rgba(236, 234, 228, 0.35);
+}
+.extrasel8 .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrasel8 .noob-vst-webgui-framework-segment {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(236, 234, 228, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.extrasel8 .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--color-el8-yellow);
+}
+.extrasel8__finish {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrasel8__finish button {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(236, 234, 228, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.extrasel8__finish button.on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--color-el8-yellow);
+}
+.extrasel8__scope {
+  margin-left: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(236, 234, 228, 0.6);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.extrasel8__scope.on {
+  color: var(--color-el8-yellow);
+  border-color: rgba(240, 196, 60, 0.4);
+  background: rgba(240, 196, 60, 0.12);
+}
+
+/* Below about 1200 px the strip wraps to two rows so the link modes stay readable. */
+@media (max-width: 1200px) {
+  .extrasel8 {
+    gap: 14px;
+  }
+  .extrasel8__hint {
+    display: none;
+  }
+}

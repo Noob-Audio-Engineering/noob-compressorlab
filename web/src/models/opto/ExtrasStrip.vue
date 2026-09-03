@@ -1,10 +1,13 @@
 <script setup>
 /**
- * The modern extras that the original never had, kept off the faceplate:
- * R37 emphasis, the cell speed, stereo link, mix and the side-chain
- * high-pass, plus the standalone's demo source when it is present. Small
- * framework knobs and the unstyled `Segmented` / `Toggle` controls, styled
- * by `style.css` under `.bench`.
+ * The modern extras that the original never had, kept off the faceplate: the
+ * cell speed, stereo link, mix and the side-chain high-pass, plus the
+ * standalone's demo source when it is present. Small framework knobs and the
+ * unstyled `Segmented` / `Toggle` controls, styled by `style.css` under
+ * `.bench`.
+ *
+ * R37 is not here: it is a real screwdriver trim on the front panel, so it
+ * lives on the faceplate where the hardware puts it.
  */
 import { Knob, Segmented, Toggle } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { useOpto } from './useOpto.js';
@@ -15,9 +18,6 @@ const knob = { size: 42, color: '#e9a23b' };
 
 <template>
   <div class="bench flex items-center gap-6 px-4 py-2">
-    <div class="flex flex-col items-center gap-1">
-      <Knob :p="panel.emphasis" v-bind="knob" label="Emphasis" />
-    </div>
     <div class="flex flex-col items-center gap-1">
       <div class="bench-label">Cell</div>
       <Segmented :p="panel.cell" />

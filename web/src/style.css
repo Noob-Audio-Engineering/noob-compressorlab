@@ -18,6 +18,9 @@
 @import 'tailwindcss';
 @import './models/fet/fet.css';
 @import './models/opto/opto.css';
+@import './models/vca/vca.css';
+@import './models/pre6176/pre6176.css';
+@import './models/la3a/la3a.css';
 /*
  * Tailwind scans only this app's sources by default. The shared Vue
  * components live in the linked `@noob-audio-engineering/noob-vst-webgui-framework` package and
@@ -52,6 +55,21 @@
   --color-opto-amber: #e9a23b;
   --color-amber-soft: #f3c778;
   --color-lamp: #d8342b;
+
+  /* the Distressor: charcoal panel, ivory knobs, the yellow of its silkscreen and lamps */
+  --color-el8-amber: #f0b429;
+  --color-el8-yellow: #f0c43c;
+
+  /* the 6176: brushed aluminium with two black inset panels, and the jewel lamp's magenta */
+  --color-alu-100: #e9eaec;
+  --color-alu-200: #d2d4d8;
+  --color-alu-300: #b3b6bb;
+  --color-alu-400: #8d9096;
+  --color-inset: #17181a;
+  --color-jewel: #ff3ea5;
+
+  /* the LA-3A: the same silver family as the LA-2A, with its own accent */
+  --color-la3a-amber: #dda43f;
 }
 
 html,
@@ -92,6 +110,18 @@ body {
 .lab--opto {
   --lab-accent: var(--color-opto-amber);
   --lab-accent-rgb: 233 162 59;
+}
+.lab--la3a {
+  --lab-accent: var(--color-la3a-amber);
+  --lab-accent-rgb: 221 164 63;
+}
+.lab--vca {
+  --lab-accent: var(--color-el8-yellow);
+  --lab-accent-rgb: 240 196 60;
+}
+.lab--pre6176 {
+  --lab-accent: var(--color-jewel);
+  --lab-accent-rgb: 255 62 165;
 }
 .lab-model {
   flex: 1;
@@ -147,9 +177,53 @@ body {
 .labbar__sub {
   color: rgba(230, 227, 218, 0.45);
 }
-/* the subtitle goes first when the window is narrow */
+/*
+ * The bar has to stay usable at the 900 px minimum the plug-in can be dragged
+ * to, so it sheds its content in stages: the subtitle, then the read-outs,
+ * then the transport, then the product name. BYPASS and fullscreen are the
+ * last things standing, because they are the two controls a player reaches
+ * for without opening anything.
+ */
 @media (max-width: 1350px) {
   .labbar__sub {
+    display: none;
+  }
+}
+@media (max-width: 1120px) {
+  .labbar {
+    gap: 10px;
+    padding: 0 10px;
+  }
+  .labbar__stat {
+    margin-left: 4px;
+  }
+  .tb.wide {
+    min-width: 120px;
+  }
+}
+@media (max-width: 1040px) {
+  .labbar__stat {
+    display: none;
+  }
+  .labbar__model .noob-vst-webgui-framework-segment {
+    padding: 4px 7px;
+    letter-spacing: 0.06em;
+  }
+}
+@media (max-width: 980px) {
+  .labbar .tb.hist {
+    display: none;
+  }
+  .tb.wide {
+    min-width: 96px;
+  }
+  .labbar__model .noob-vst-webgui-framework-segment {
+    padding: 4px 5px;
+    letter-spacing: 0.02em;
+  }
+}
+@media (max-width: 900px) {
+  .labbar__name {
     display: none;
   }
 }
@@ -206,7 +280,7 @@ body {
   color: #e6e3da;
   font-weight: 500;
 }
-@media (max-width: 1150px) {
+@media (max-width: 1200px) {
   .labbar__stat.echo {
     display: none;
   }
@@ -252,7 +326,13 @@ body {
  */
 .lab-bench {
   flex: 1;
-  min-height: 0;
+  /*
+   * A chart shorter than this is not worth drawing: the title, the axis
+   * labels and the plot area stop being separable and the y-axis numerals
+   * pile up. The row claims this much before the faceplate above it takes
+   * what it wants, and every face yields to it the same way.
+   */
+  min-height: 172px;
   display: grid;
   grid-template-columns: 1fr 300px;
   gap: 12px;
@@ -260,6 +340,23 @@ body {
 }
 .lab-bench.has-t4 {
   grid-template-columns: 180px 1fr 300px;
+}
+/*
+ * Below about 640 px of window there is not room for two legible charts side
+ * by side once a faceplate has taken its share, so the row shows the history
+ * alone, full width. The panels themselves are untouched and stay identical
+ * across models; only how many of them the row shows changes.
+ */
+@media (max-height: 640px) {
+  .lab-bench,
+  .lab-bench.has-t4 {
+    grid-template-columns: 1fr;
+    min-height: 150px;
+  }
+  .lab-bench .lab-panel--transfer,
+  .lab-bench .lab-panel--t4 {
+    display: none;
+  }
 }
 .lab-panel {
   display: flex;

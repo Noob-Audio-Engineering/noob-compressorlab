@@ -93,3 +93,52 @@
 .bench .noob-vst-webgui-framework-toggle.switch:not(.is-on) .lbl:first-child {
   opacity: 1;
 }
+
+/* ------------------------------------------------ the two front-panel trims */
+/*
+ * R37 beside the Limit / Compress toggle and the meter zero below the meter
+ * are screwdriver pots on the hardware, so they are live here: a slotted head
+ * in a hex bushing, the slot turning with the value.
+ */
+.trimpot {
+  position: relative;
+  display: block;
+}
+.trimpot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+}
+.trimpot svg:focus-visible {
+  filter: drop-shadow(0 0 3px var(--color-opto-amber));
+}
+.trimpot__hex {
+  fill: url(#trimHead);
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 2;
+}
+.trimpot__rim {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 3;
+}
+.trimpot__slot {
+  fill: #2a2724;
+}
+.trimpot__value {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--color-opto-amber);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}

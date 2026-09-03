@@ -38,7 +38,7 @@ const plateMax = computed(() => `${Math.max(600, Math.round((win.height.value - 
   <main class="lab-model lab-model--opto">
     <div class="shrink-0 px-3 pt-3"><div class="w-full mx-auto" :style="{ maxWidth: plateMax }"><Faceplate /></div></div>
     <section class="lab-bench has-t4">
-      <div class="lab-panel"><T4Panel /></div>
+      <div class="lab-panel lab-panel--t4"><T4Panel /></div>
       <HistoryPanel />
       <TransferPanel />
     </section>

@@ -129,6 +129,30 @@ fn bypass_is_transparent_and_the_tube_stage_is_clean() {
 }
 
 #[test]
+fn the_tube_stage_hits_its_two_published_distortion_points() {
+    // research/LA-2A.md 7.2 sets the tube constant from two figures: about
+    // 0.75 % at the +16 dBu equivalent and about 0.3 % at +10 dBu. The
+    // constant's own comment claimed the first; nothing measured either.
+    let at = |dbu: f32| -> f32 {
+        let mut c = Compressor::new(SR);
+        c.configure(settings(0.0));
+        let (_, out) = run_sine(&mut c, amp_vu(dbu - 4.0), 1000.0, 2.0, SR);
+        thd(&out, 1000.0, SR).0 * 100.0
+    };
+    let hot = at(16.0);
+    let nominal = at(10.0);
+    assert!(
+        (0.4..=1.2).contains(&hot),
+        "+16 dBu is published at about 0.75 %, measured {hot:.3} %"
+    );
+    assert!(
+        (0.15..=0.5).contains(&nominal),
+        "+10 dBu is published at about 0.3 %, measured {nominal:.3} %"
+    );
+    assert!(hot > nominal, "and it must rise with level");
+}
+
+#[test]
 fn steady_state_reduction_follows_peak_reduction_and_level() {
     let c = {
         let mut c = Compressor::new(SR);
@@ -457,9 +481,11 @@ fn highs_get_more_reduction_and_r37_shapes_the_lows() {
     );
     let g100e = gr_at(100.0, 0.0);
     let g10ke = gr_at(10_000.0, 0.0);
+    // The research asks for 6 to 12 dB here, not merely "some": R37 wound
+    // fully off is what stops the bottom end from driving the cell.
     assert!(
-        g100 - g100e >= 2.0,
-        "R37 at 0 reduced the 100 Hz reduction by only {:.2} dB",
+        (6.0..=12.0).contains(&(g100 - g100e)),
+        "R37 at 0 should take 6 to 12 dB off the 100 Hz reduction, it took {:.2}",
         g100 - g100e
     );
     assert!(

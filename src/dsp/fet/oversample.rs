@@ -9,7 +9,7 @@
 //! base rate, which the plug-in reports to the host.
 
 /// Filter length (odd, so the group delay is a whole number of samples).
-pub const TAPS: usize = 31;
+pub const TAPS: usize = 63;
 /// Round-trip latency in base-rate samples: `(TAPS − 1) / 2`.
 pub const LATENCY: usize = (TAPS - 1) / 2;
 
@@ -151,5 +151,42 @@ mod tests {
             err = err.max((out[i] - x).abs());
         }
         assert!(err < 0.01, "round-trip error {err}");
+    }
+}
+
+/// A fixed delay of [`LATENCY`] samples: the dry path of any stage that
+/// oversamples has to be held back by the resampler's round trip, or a
+/// mix or bypass would comb-filter itself.
+#[derive(Clone, Copy, Debug)]
+pub struct DryDelay {
+    buf: [f32; LATENCY + 1],
+    pos: usize,
+}
+
+impl DryDelay {
+    pub fn new() -> Self {
+        DryDelay {
+            buf: [0.0; LATENCY + 1],
+            pos: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.buf = [0.0; LATENCY + 1];
+        self.pos = 0;
+    }
+
+    /// Push `x` and return what went in [`LATENCY`] samples ago.
+    #[inline]
+    pub fn process(&mut self, x: f32) -> f32 {
+        self.buf[self.pos] = x;
+        self.pos = (self.pos + 1) % (LATENCY + 1);
+        self.buf[self.pos]
+    }
+}
+
+impl Default for DryDelay {
+    fn default() -> Self {
+        Self::new()
     }
 }

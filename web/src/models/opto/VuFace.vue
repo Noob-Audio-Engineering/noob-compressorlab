@@ -23,13 +23,27 @@ import { useOpto } from './useOpto.js';
 
 const props = defineProps({ width: { type: Number, default: 300 } });
 const panel = useOpto();
-const needle = useNeedle('meter', { index: 5, unit: 'db', mode: 'level', min: -20, max: 3, riseMs: 300, sweep: 78 });
+/*
+ * `meter[5]` is the needle's position, not the level it is chasing: the
+ * standard VU movement runs in the audio thread for every model, at
+ * 13 rad/s and damping 0.80, which is 99 % in 300 ms with about 1.5 %
+ * overshoot. So this draws the field as it arrives and asks the framework's
+ * needle for nothing but a short critically-damped follow, enough to bridge
+ * the gap between frames without adding a second set of ballistics on top of
+ * the engine's.
+ */
+const needle = useNeedle('meter', { index: 5, unit: 'db', mode: 'level', min: -20, max: 3, riseMs: 40, damping: 1, sweep: 78 });
 const height = computed(() => Math.round(props.width * (230 / 395)));
 const marks = needle.marks([-20, -10, -7, -5, -3, -2, -1, 0, 1, 2, 3]);
 const minor = needle.marks([-15, -8, -6, -4, -2.5, -1.5, -0.5, 0.5, 1.5, 2.5]);
-const pct = needle.marks([-20, -10, -7, -5, -3, -1, 0]);
-const pctLabel = { '-20': '0', '-10': '20', '-7': '40', '-5': '60', '-3': '80', '-1': '100', 0: '' };
-const legend = computed(() => ['GAIN REDUCTION', 'OUTPUT +10', 'OUTPUT +4'][panel.meter.index] || '');
+// The percentage row is the same scale read in volts, so 100 % sits on the
+// 0 dB mark and each figure at 20*log10(pct/100).
+const pct = needle.marks([-20, -13.98, -7.96, -4.44, -1.94, 0]);
+const pctLabel = { '-20': '0', '-13.98': '20', '-7.96': '40', '-4.44': '60', '-1.94': '80', 0: '100' };
+// The mode the selector is on is printed on the panel under the meter, not on
+// the face: the real face carries only the small line above the scale and the
+// maker's script below, and a third line here has nowhere legible to go.
+void panel;
 // Face geometry in a 395 x 230 viewBox: the face is the 325 x 144 window
 // at (35, 43); the pivot sits well below it so the 78-degree sweep draws a
 // shallow arc across the face's width, top at y 108, ends at y 158.
@@ -72,7 +86,7 @@ const redArc = arc(R, zeroAngle, 39);
     <polygon points="0,0 35,43 35,187 0,230" fill="#3d3935" />
     <polygon points="395,0 360,43 360,187 395,230" fill="#3d3935" />
     <rect x="35" y="43" width="325" height="144" fill="#ede3c8" />
-    <text x="197.5" y="64" text-anchor="middle" class="tiny">VU LEVEL INDICATOR</text>
+    <text x="197.5" y="63" text-anchor="middle" class="tiny">VU LEVEL INDICATOR</text>
     <text x="55" y="122" text-anchor="middle" class="vu-label">VU</text>
     <text x="340" y="122" text-anchor="middle" class="vu-label red">VU</text>
     <path :d="blackArc" class="arc" />
@@ -85,8 +99,7 @@ const redArc = arc(R, zeroAngle, 39);
       </text>
       <text v-for="m in pct" :key="'p' + m.value" :x="pt(m.angle, R - 22)[0]" :y="pt(m.angle, R - 22)[1]" text-anchor="middle" dominant-baseline="middle" class="pct">{{ pctLabel[m.value] }}</text>
     </g>
-    <text x="197.5" y="168" text-anchor="middle" class="maker">NOOB COMPRESSOR</text>
-    <text x="197.5" y="181" text-anchor="middle" class="legend">{{ legend }}</text>
+    <text x="197.5" y="172" text-anchor="middle" class="maker">NOOB COMPRESSOR</text>
     <g clip-path="url(#vuFaceClip)">
       <g :transform="`rotate(${needle.angle.value} ${CX} ${CY})`">
         <line :x1="CX" :y1="CY - 140" :x2="CX" :y2="CY - R - 4" class="needle" />
@@ -131,7 +144,7 @@ const redArc = arc(R, zeroAngle, 39);
   fill: #3c3833;
 }
 .tiny {
-  font: 600 6.5px 'Inter', sans-serif;
+  font: 600 9px 'Inter', sans-serif;
   fill: #3c3833;
   letter-spacing: 0.12em;
 }
@@ -143,7 +156,7 @@ const redArc = arc(R, zeroAngle, 39);
   fill: #c3352c;
 }
 .maker {
-  font: 900 10.5px 'Inter', sans-serif;
+  font: 900 12px 'Inter', sans-serif;
   fill: #1c1a17;
   letter-spacing: 0.06em;
 }

@@ -33,19 +33,25 @@
  * component).
  */
 import { computed } from 'vue';
-import { attackToRotation, lookOf, markToRotation, releaseToRotation, rotationToAttack, rotationToMark, rotationToRelease, useControls } from './useFet.js';
+import { attackToRotation, lookOf, markToPrinted, markToRotation, releaseToRotation, rotationToAttack, rotationToMark, rotationToRelease, useControls } from './useFet.js';
 import Knob1176 from './Knob1176.vue';
 import VuMeter1176 from './VuMeter1176.vue';
 import RatioButtons from './RatioButtons.vue';
 import MeterButtons from './MeterButtons.vue';
-import PowerSwitch from './PowerSwitch.vue';
 
 const c = useControls();
 const look = computed(() => lookOf(c.revision.index));
-const MARKS = [0, 6, 12, 18, 24, 30, 36, 42, 48].map((v) => ({ value: v, label: String(v) }));
+/*
+ * The printed skirt, clockwise from the stop: ∞, 48, 36, 30, 24, 18, 12, 6,
+ * 0. Those are attenuation figures, so they run down as the level goes up;
+ * the values below are the parameter marks they sit at (see `markToPrinted`).
+ */
+const MARKS = [-6, 0, 12, 18, 24, 30, 36, 42, 48].map((v) => ({ value: v, label: markToPrinted(v) }));
 const ATTACK_MARKS = [{ value: 0, label: 'OFF' }, ...[1, 2, 3, 4, 5, 6, 7].map((v) => ({ value: v, label: String(v) }))];
 const RELEASE_MARKS = [1, 2, 3, 4, 5, 6, 7].map((v) => ({ value: v, label: String(v) }));
-const fmtMark = (v) => String(Math.round(v));
+const fmtMark = (v) => markToPrinted(v);
+/** What the meter selector is pointing at, printed under the meter. */
+const meterLegend = computed(() => ['GAIN REDUCTION', 'OUTPUT +4', 'OUTPUT +8', 'OFF'][c.meter.index] || '');
 const fmtAttack = (v) => (v < 0.5 ? 'OFF' : v.toFixed(1));
 const fmtRelease = (v) => v.toFixed(1);
 
@@ -56,7 +62,7 @@ const box = (x, y, w, h) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `
 </script>
 
 <template>
-  <section class="face1176" :class="look">
+  <section class="face1176" :class="[look, { 'is-off': c.meter.index === 3 }]">
     <div class="face1176__ear left"><span class="screw big"></span><span class="screw big"></span></div>
     <div class="face1176__plate">
       <div class="face1176__panel">
@@ -71,7 +77,8 @@ const box = (x, y, w, h) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `
         <!-- Silverface: the recessed peak-limiter section -->
         <template v-if="look === 'silverface'">
           <div class="face1176__section" :style="box(0.022, 0.06, 0.305, 0.88)"></div>
-          <div class="face1176__print abs" :style="at(0.17, 0.13)">PEAK LIMITER</div>
+          <div class="face1176__print abs" :style="at(0.15, 0.13)">PEAK LIMITER</div>
+          <div class="face1176__print small abs" :style="at(0.268, 0.13)">model 1176 LN</div>
         </template>
 
         <div class="abs" :style="at(0.075, 0.55)">
@@ -87,33 +94,39 @@ const box = (x, y, w, h) => ({ left: `${x * 100}%`, top: `${y * 100}%`, width: `
         <div class="abs" :style="at(0.4, 0.3)">
           <Knob1176 :p="c.attack" :marks="ATTACK_MARKS" :to-rotation="attackToRotation" :from-rotation="rotationToAttack" size="7.6cqw" :body="20" :mark-size="12.5" :sweep="270" :format="fmtAttack" bare />
         </div>
-        <div class="face1176__print abs" :style="at(0.4, 0.53)">RELEASE</div>
-        <div class="abs" :style="at(0.4, 0.77)">
+        <div class="abs" :style="at(0.4, 0.72)">
           <Knob1176 :p="c.release" :marks="RELEASE_MARKS" :to-rotation="releaseToRotation" :from-rotation="rotationToRelease" size="7.6cqw" :body="20" :mark-size="12.5" :sweep="270" :format="fmtRelease" bare />
         </div>
+        <div class="face1176__print abs" :style="at(0.4, 0.95)">RELEASE</div>
 
         <div class="face1176__print abs" :style="at(0.51, 0.08)">RATIO</div>
         <div class="abs" :style="at(0.51, 0.5)"><RatioButtons :p="c.ratio" /></div>
 
         <!-- the maker's badge above the meter (black face), the small round logo (blue stripe) -->
         <div v-if="look === 'blackface'" class="face1176__badge abs" :style="at(0.66, 0.13)"><span>NOOB</span></div>
-        <div v-if="look === 'bluestripe'" class="face1176__badge round abs" :style="at(0.66, 0.13)"><span>N</span></div>
-        <div class="face1176__meter abs" :style="box(0.565, 0.26, 0.19, 0.48)">
+        <div v-if="look === 'bluestripe'" class="face1176__jewel abs" :class="{ off: c.meter.index === 3 }" :style="at(0.66, 0.13)"></div>
+        <div class="face1176__meter abs" :style="box(0.565, 0.26, 0.19, 0.44)">
           <VuMeter1176 :mode="c.meter" />
         </div>
+        <!-- what the meter is showing, printed on the panel where it can be read -->
+        <div class="face1176__print small abs" :style="at(0.66, 0.735)">{{ meterLegend }}</div>
         <div v-if="look !== 'silverface'" class="face1176__nameplate abs" :style="box(0.548, 0.78, 0.224, 0.16)">
-          <b>NOOB 1176{{ look === 'blackface' ? 'LN' : '' }} LIMITING AMPLIFIER</b>
+          <b v-if="look === 'blackface'">NOOB 1176LN PEAK LIMITER</b>
+          <b v-else>NOOB 1176 LIMITING AMPLIFIER</b>
           <span>NOOB AUDIO · A SPOOF</span>
         </div>
 
         <div class="face1176__print abs" :style="at(0.805, 0.08)">METER</div>
         <div class="abs" :style="at(0.805, 0.5)"><MeterButtons :p="c.meter" /></div>
 
-        <template v-if="look === 'silverface'">
-          <div class="face1176__badge abs" :style="at(0.95, 0.3)"><span>NOOB</span></div>
-          <div class="abs" :style="at(0.95, 0.74)"><PowerSwitch :p="c.bypass" /></div>
-        </template>
-        <div v-else class="abs" :style="at(0.95, 0.5)"><PowerSwitch :p="c.bypass" /></div>
+<!--
+          No revision of this unit has a front-panel power switch: the panel
+          carries screws where one would sit, and METER OFF is what powers it
+          down. The silver face keeps its badge here.
+        -->
+        <div v-if="look === 'silverface'" class="face1176__badge abs" :style="at(0.95, 0.3)"><span>NOOB</span></div>
+        <span class="screw small abs" :style="at(0.95, 0.24)"></span>
+        <span class="screw small abs" :style="at(0.95, 0.76)"></span>
       </div>
     </div>
     <div class="face1176__ear right"><span class="screw big"></span><span class="screw big"></span></div>

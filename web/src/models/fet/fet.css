@@ -160,6 +160,35 @@
   height: 0.9cqw;
 }
 
+/*
+ * METER OFF is the unit's power switch: with it selected the meter goes dark
+ * and the panel reads as switched off, and any other meter button brings it
+ * back. There is no separate power control on any revision.
+ */
+.face1176.is-off .face1176__panel {
+  filter: brightness(0.82) saturate(0.85);
+}
+/* the blue stripe's red pilot jewel, above the meter */
+.face1176__jewel {
+  width: 1.6cqw;
+  height: 1.6cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #ff9a8a, #d8342b 55%, #6d120c);
+  box-shadow:
+    0 0 0.7cqw rgba(216, 52, 43, 0.65),
+    inset 0 0 0.2cqw rgba(0, 0, 0, 0.45);
+  border: 0.14cqw solid #8e9299;
+}
+.face1176__jewel.off {
+  background: radial-gradient(circle at 38% 32%, #5a2c28, #2a1512 60%, #170d0b);
+  box-shadow: inset 0 0 0.2cqw rgba(0, 0, 0, 0.6);
+}
+.face1176__print.small {
+  font-size: 0.72cqw;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
 /* ------------------------------------------------------------------ knobs */
 .knob1176 {
   display: flex;
@@ -341,6 +370,7 @@
   font: 600 8px var(--font-panel);
   letter-spacing: 0.18em;
 }
+
 .vu1176__needle {
   stroke: #1a1612;
   stroke-width: 1.6;

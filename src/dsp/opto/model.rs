@@ -79,9 +79,11 @@ pub const K_G: f32 = 1.0 / R_MIN - 1.0 / R_DARK;
 pub const CELL_CUBIC: f32 = 0.6;
 /// Reference amplitude for the photocell cubic.
 pub const CELL_CUBIC_V0: f32 = 0.25;
-/// Tube make-up stage: `tanh(k · x)` drive; 0.2 gives about 0.75 % THD at
-/// the +16 dBu equivalent (−6 dBFS RMS).
-pub const TUBE_K: f32 = 0.2;
+/// The tube stage's softness. Set from the two published distortion
+/// points, about 0.75 % at the +16 dBu equivalent and 0.3 % at +10 dBu,
+/// and now measured at both rather than asserted in a comment: at 0.2 the
+/// stage was half as dirty as the sources say.
+pub const TUBE_K: f32 = 0.30;
 /// Tube stage bias as a fraction of the clip level (second harmonic).
 pub const TUBE_BIAS: f32 = 0.05;
 /// R37 low shelf corner, Hz.
@@ -108,6 +110,12 @@ pub struct CellParams {
     pub capture: f32,
     /// Carrier generation at full light.
     pub k_gen: f32,
+    /// Smoothing of the panel drive, seconds: the phosphor plus whatever
+    /// the driver's output impedance does to it. 1 ms for the LA-2A, whose
+    /// panel hangs off a pentode plate through 10 kΩ; a quarter of that for
+    /// the LA-3A, which drives the same panel from a transistor stage
+    /// through a step-up transformer (`research/LA-3A.md` 7.5).
+    pub tau_u: f32,
 }
 
 impl CellParams {
@@ -120,6 +128,7 @@ impl CellParams {
         k_m: 12.0,
         capture: 1.0 / 0.3,
         k_gen: 7.0,
+        tau_u: 0.001,
     };
 
     /// Scale every time constant (the "cell" parameter: Silver 0.7, Gray
@@ -173,12 +182,16 @@ impl Cell {
 
     pub fn set_sample_rate(&mut self, sr: f32) {
         self.dt = 1.0 / sr;
-        // 1 ms smoothing: phosphor plus the fast part of the cell response.
-        self.a_u = 1.0 - (-self.dt / 0.001).exp();
+        self.a_u = 1.0 - (-self.dt / self.params.tau_u.max(1e-6)).exp();
     }
 
     pub fn set_params(&mut self, params: CellParams) {
+        let retune = params.tau_u != self.params.tau_u;
         self.params = params;
+        if retune {
+            let sr = 1.0 / self.dt;
+            self.set_sample_rate(sr);
+        }
     }
 
     pub fn reset(&mut self) {
@@ -238,6 +251,60 @@ impl Cell {
     #[inline]
     pub fn resistance(&self) -> f32 {
         resistance_for(self.n_f)
+    }
+}
+
+/// The resistive divider the cell sits in. Both optical models use the
+/// same arrangement and the same cell; only the three resistances differ,
+/// and on the LA-3A they differ by a few per cent
+/// (`research/LA-3A.md` 3.3 and 7.5). Parameterising it here is what lets
+/// the LA-3A share this file's [`Cell`] instead of copying it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Divider {
+    /// The series resistor ahead of the cell.
+    pub r_series: f32,
+    /// The pot the cell shunts.
+    pub r_pot: f32,
+    /// The cell's resistance in full light, which sets the maximum
+    /// reduction.
+    pub r_min: f32,
+}
+
+impl Divider {
+    /// The LA-2A's: R1 70.7 kΩ, the 100 kΩ Gain pot, 500 Ω at full light.
+    pub const LA2A: Divider = Divider {
+        r_series: R_SERIES,
+        r_pot: R_POT,
+        r_min: R_MIN,
+    };
+
+    /// Cell resistance for `n_f` free carriers.
+    #[inline]
+    pub fn resistance(&self, n_f: f32) -> f32 {
+        let k_g = 1.0 / self.r_min - 1.0 / R_DARK;
+        let g = 1.0 / R_DARK + k_g * n_f;
+        (1.0 / g).clamp(self.r_min, R_DARK)
+    }
+
+    /// Divider gain with a dark cell: the normalisation.
+    #[inline]
+    pub fn a_dark(&self) -> f32 {
+        let r_p = R_DARK * self.r_pot / (R_DARK + self.r_pot);
+        r_p / (self.r_series + r_p)
+    }
+
+    /// Divider gain for a cell resistance, normalised so a dark cell is
+    /// unity.
+    #[inline]
+    pub fn attenuation(&self, r_cell: f32) -> f32 {
+        let r_p = r_cell * self.r_pot / (r_cell + self.r_pot);
+        (r_p / (self.r_series + r_p)) / self.a_dark()
+    }
+
+    /// Gain reduction in dB (positive) for `n_f` free carriers.
+    #[inline]
+    pub fn gr_db(&self, n_f: f32) -> f32 {
+        -20.0 * self.attenuation(self.resistance(n_f)).log10()
     }
 }
 
@@ -306,6 +373,10 @@ pub struct Settings {
     pub emphasis: f32,
     /// Cell speed variant, index into [`CELL_SPEEDS`].
     pub cell: usize,
+    /// The front-panel meter-zero trim, in dB. A real screw pot that
+    /// drifts about a decibel in the first hour, so the panel has one and
+    /// so does this: it moves the needle, not the audio.
+    pub meter_zero: f32,
     /// Stereo link.
     pub link: bool,
     /// Wet / dry mix, 0..1.
@@ -325,6 +396,7 @@ impl Default for Settings {
             meter: METER_GR,
             emphasis: 1.0,
             cell: 1,
+            meter_zero: 0.0,
             link: true,
             mix: 1.0,
             sc_hpf: 0.0,
@@ -559,10 +631,14 @@ impl Compressor {
             in_peak[0] = in_peak[0].max(x[0].abs());
             in_peak[1] = in_peak[1].max(x[1].abs());
             if s.bypass {
-                // Keep the filters warm so un-bypassing does not click.
+                // Keep the filters and the cell warm, so un-bypassing
+                // resumes from the state the signal would have left rather
+                // than from a stale one.
                 for c in 0..2 {
                     self.ch[c].in_hp.hp(x[c]);
                 }
+                self.cells[0].step(0.0);
+                self.cells[1].step(0.0);
                 out_peak = in_peak;
                 out_abs[0] += x[0].abs();
                 out_abs[1] += x[1].abs();
@@ -580,6 +656,9 @@ impl Compressor {
             };
             let mut v = [0.0f32; 2];
             let mut y = [0.0f32; 2];
+            // One step per sample, not one per channel: this used to sit
+            // inside the channel loop and ran at twice its intended rate.
+            self.makeup_z += self.smooth_a * (self.makeup - self.makeup_z);
             for c in 0..2 {
                 let ch = &mut self.ch[c];
                 let xh = ch.in_hp.hp(x[c]);
@@ -596,7 +675,6 @@ impl Compressor {
                 sc = ch.tilt_hi.process(ch.tilt_lo.process(sc));
                 v[c] = sc;
                 // Make-up, tube, transformer.
-                self.makeup_z += self.smooth_a * (self.makeup - self.makeup_z);
                 let w = att * self.makeup_z;
                 let z = ch.out_lp.lp(tube(w));
                 y[c] = z;
@@ -633,11 +711,14 @@ impl Compressor {
     /// relative to 0 VU, or the negated gain reduction in GR mode).
     pub fn meter_frame(&self) -> [f32; 6] {
         let gr = 0.5 * (self.gr_db[0] + self.gr_db[1]);
+        let zero = self.settings.meter_zero;
         let vu = match self.settings.meter {
             METER_OUT10 => vu_of(0.5 * (self.out_abs[0] + self.out_abs[1]), VU10_REF_AMP),
             METER_OUT4 => vu_of(0.5 * (self.out_abs[0] + self.out_abs[1]), VU_REF_AMP),
             _ => -gr,
         };
+        // The trim moves the needle only.
+        let vu = vu + zero;
         [
             self.in_peak[0],
             self.in_peak[1],

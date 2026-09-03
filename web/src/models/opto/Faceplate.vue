@@ -16,12 +16,13 @@
  * round rack screws each. Every control is a framework handle; every look
  * is this plug-in's.
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useOpto } from './useOpto.js';
 import BigKnob from './BigKnob.vue';
 import VuFace from './VuFace.vue';
 import SelectorKnob from './SelectorKnob.vue';
 import ToggleLever from './ToggleLever.vue';
+import TrimPot from './TrimPot.vue';
 
 const panel = useOpto();
 const root = ref(null);
@@ -54,15 +55,26 @@ const text = (x, y, size = 0.0045, anchor = 'center') => ({
   whiteSpace: 'nowrap',
 });
 
+/** What the meter selector is pointing at, printed under the meter. */
+const meterLegend = computed(() => ['GAIN REDUCTION', 'OUTPUT +10', 'OUTPUT +4'][panel.meter.index] || '');
+
 const KNOB = 0.118; // number circle diameter, about 0.055 of the width in radius
+/*
+ * Measured off `scratchpad/ref/la2a-ref.jpg`. The photograph gives the screws
+ * as fractions of the faceplate between the ears (0.051 and 0.952 along the
+ * top; 0.030, 0.347, 0.656 and 0.974 along the bottom); these are the same
+ * points expressed against the whole plate, which is what `at()` takes, so
+ * each is 0.057 + 0.886 × the panel fraction. The one under the meter is the
+ * bezel screw; it sits clear of the meter frame rather than on it.
+ */
 const panelScrews = [
-  [0.096, 0.067],
-  [0.594, 0.167],
-  [0.904, 0.067],
-  [0.078, 0.933],
-  [0.359, 0.933],
-  [0.641, 0.933],
-  [0.922, 0.933],
+  [0.102, 0.05],
+  [0.617, 0.152],
+  [0.9, 0.05],
+  [0.084, 0.928],
+  [0.364, 0.928],
+  [0.638, 0.928],
+  [0.92, 0.928],
 ];
 const rackScrews = [
   [0.017, 0.29],
@@ -105,10 +117,15 @@ const rackScrews = [
     </svg>
 
     <!-- limit / compress -->
-    <div class="engraved" :style="text(0.108, 0.583)">LIMIT</div>
+    <div class="engraved" :style="text(0.104, 0.583)">LIMIT</div>
     <div :style="at(0.104, 0.673, 0.03, 0.03)"><ToggleLever :p="panel.mode" :size="0.03 * w" /></div>
-    <div class="engraved" :style="text(0.108, 0.813)">COMPRESS</div>
-    <div class="bushing" :style="at(0.155, 0.692, 0.028)"></div>
+    <div class="engraved" :style="text(0.104, 0.813)">COMPRESS</div>
+<!--
+      R37, the limit-response pre-emphasis, is a real screwdriver trim in a hex
+      bushing beside the toggle, so it is the working control here rather than
+      an ornament with the parameter hidden away on a strip.
+    -->
+    <div :style="at(0.155, 0.692, 0.032)"><TrimPot :p="panel.emphasis" :size="0.032 * w" /></div>
 
     <!-- gain -->
     <div :style="at(0.289, 0.606, KNOB)"><BigKnob :p="panel.gain" :size="KNOB * w" label="Gain" /></div>
@@ -116,7 +133,11 @@ const rackScrews = [
 
     <!-- meter -->
     <div :style="at(0.501, 0.404, 0.206, 0.206, 395 / 230)"><VuFace :width="0.206 * w" /></div>
-    <div class="screw" :style="at(0.5, 0.763, 0.011)"></div>
+<!-- the meter zero trim, through its hole below the meter -->
+    <div v-if="panel.meterZero" :style="at(0.5, 0.763, 0.016)"><TrimPot :p="panel.meterZero" :size="0.016 * w" :hex="false" /></div>
+    <div v-else class="screw" :style="at(0.5, 0.763, 0.011)"></div>
+    <!-- what the meter is showing, printed on the panel where it has room to be read -->
+    <div class="engraved" :style="text(0.501, 0.677, 0.0062)">{{ meterLegend }}</div>
 
     <!-- peak reduction -->
     <div :style="at(0.708, 0.606, KNOB)"><BigKnob :p="panel.peakReduction" :size="KNOB * w" label="Peak Reduction" /></div>

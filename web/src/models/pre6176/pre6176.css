@@ -1,0 +1,450 @@
+/*
+ * The 6176 page's rules: brushed aluminium with two black inset panels, the
+ * glossy black knobs, the small bat toggles, the jewel lamp and the extras
+ * strip. The VU meter is the 1176's own component, so its rules come from
+ * `fet.css`; only the bezel around it is set here.
+ *
+ * `.abs`, `.screw` and the shared `.lab-*` chrome come from the 1176's file
+ * and `src/style.css`, both imported alongside this one.
+ */
+.lab-model--pre6176 {
+  background: #0a0b0d;
+  color: #e6e3da;
+  --noob-vst-webgui-framework-accent: #dfe3e8;
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+}
+
+/* ------------------------------------------------------------- faceplate */
+.face6176 {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background: #141518;
+  padding: 6px 0;
+}
+.face6176__ear {
+  width: 24px;
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, #eceef1, #c6c9ce 45%, #9da1a8);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 2px 0 0 2px;
+}
+.face6176__ear.right {
+  background: linear-gradient(270deg, #eceef1, #c6c9ce 45%, #9da1a8);
+  border-radius: 0 2px 2px 0;
+}
+.face6176__plate {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+/* Two rack units: 19 by 3.5 inches. Everything inside is sized in `cqw`. */
+.face6176__panel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5.43 / 1;
+  overflow: hidden;
+  font-family: var(--font-panel);
+  color: #2a2c30;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #eceef1, #cdd0d5 45%, #b6babf);
+}
+.face6176__panel > .abs {
+  z-index: 1;
+}
+/* the two black inset panels, each with the thin light outline the hardware has */
+.face6176__inset {
+  position: absolute;
+  z-index: 0;
+  border-radius: 0.5cqw;
+  background: linear-gradient(180deg, #1e2023, #131416);
+  box-shadow:
+    inset 0 0 0 0.1cqw rgba(255, 255, 255, 0.22),
+    inset 0 0.15cqw 0.4cqw rgba(255, 255, 255, 0.06),
+    0 0.1cqw 0.3cqw rgba(0, 0, 0, 0.4);
+}
+.face6176__print {
+  font-size: 1.1cqw;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  color: #eceef1;
+}
+.face6176__print.small {
+  font-size: 1cqw;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+/*
+ * The two hints that flank each time knob. They sit between neighbouring
+ * knobs, so they are the one thing on this panel that cannot grow: at any
+ * larger size the Fast of one knob runs into the Slow of the next.
+ */
+/*
+ * Slow and Fast flank their caption on the same line, as the panel prints
+ * them, which needs more room between two knobs than a narrow window has.
+ * Below about a thousand pixels of panel they go rather than shrink, and the
+ * numerals 1 to 9 still say which way is which.
+ */
+@container (max-width: 1000px) {
+  .face6176__print.tiny {
+    display: none;
+  }
+}
+.face6176__print.tiny {
+  font-size: 0.62cqw;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-style: italic;
+  color: rgba(236, 238, 241, 0.8);
+}
+
+/* the badge, the jewel lamp and the hidden voicing button on the centre strip */
+.face6176__logo {
+  width: 3.4cqw;
+  height: 2.4cqw;
+  display: grid;
+  place-items: center;
+  border-radius: 0.3cqw;
+  background: linear-gradient(180deg, #23252a, #14161a);
+  color: #eceef1;
+  font-weight: 800;
+  font-size: 1.1cqw;
+  letter-spacing: 0.06em;
+  box-shadow: inset 0 0.08cqw 0 rgba(255, 255, 255, 0.2);
+}
+/* the violet jewel the hardware has; it photographs magenta */
+.face6176__jewel {
+  width: 1.6cqw;
+  height: 1.6cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #f0a8ff, var(--color-jewel) 55%, #6d1080);
+  box-shadow:
+    0 0 0.8cqw rgba(255, 62, 165, 0.7),
+    inset 0 0 0.2cqw rgba(0, 0, 0, 0.4);
+  border: 0.12cqw solid #9aa0a8;
+}
+.face6176__jewel.off {
+  background: radial-gradient(circle at 38% 32%, #5c3348, #2a1a22 60%, #171015);
+  box-shadow: inset 0 0 0.2cqw rgba(0, 0, 0, 0.6);
+}
+.face6176__voice {
+  padding: 0.2cqw 0.45cqw;
+  border-radius: 0.2cqw;
+  border: 0.08cqw solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.35);
+  color: #2a2c30;
+  font: 600 0.8cqw/1 var(--font-panel);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.face6176__voice:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+/* the small lamp beside INPUT */
+.face6176__lamp {
+  display: block;
+  width: 0.5cqw;
+  height: 0.5cqw;
+  min-width: 3px;
+  min-height: 3px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #6a6d73, #2a2c30 70%);
+  box-shadow: inset 0 0 0 0.06cqw rgba(0, 0, 0, 0.6);
+}
+.face6176__jack {
+  width: 1.5cqw;
+  height: 1.5cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #d8b45c, #8c6f2a 60%, #4a3a15);
+  display: grid;
+  place-items: center;
+}
+.face6176__jack span {
+  width: 45%;
+  height: 45%;
+  border-radius: 50%;
+  background: #0a0a0b;
+}
+
+/* the VU meter's bezel */
+.face6176__meter {
+  position: absolute;
+  padding: 0.16cqw;
+  border-radius: 0.3cqw;
+  background: linear-gradient(180deg, #16171a, #0b0c0d);
+  box-shadow: inset 0 0 0 0.08cqw rgba(255, 255, 255, 0.16);
+}
+.face6176__meter .vu1176,
+.face6176__meter .vu1176__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.face6176__nameplate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1cqw;
+  white-space: nowrap;
+  color: #eceef1;
+}
+.face6176__nameplate b {
+  font-size: 1cqw;
+  letter-spacing: 0.2em;
+  font-weight: 600;
+}
+.face6176__nameplate em {
+  font-size: 1.5cqw;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.face6176__nameplate span {
+  font-size: 0.78cqw;
+  letter-spacing: 0.02em;
+  color: rgba(236, 238, 241, 0.72);
+}
+
+/* the ratio rotary, drawn as the row of positions it selects between */
+/* RATIO is a rotary on this unit, so it uses the knob rules above. */
+
+/* ------------------------------------------------------------------ knob */
+.preknob {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.preknob__dial {
+  width: 100%;
+  display: block;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+}
+.preknob__dial:focus-visible {
+  filter: drop-shadow(0 0 3px #dfe3e8);
+}
+.preknob__marks {
+  font-family: var(--font-panel);
+  font-weight: 600;
+  fill: #eceef1;
+}
+.preknob__tick {
+  stroke: rgba(236, 238, 241, 0.55);
+  stroke-width: 1;
+}
+.preknob__dot {
+  fill: rgba(236, 238, 241, 0.45);
+}
+.preknob__ends {
+  font-family: var(--font-panel);
+  font-style: italic;
+  font-size: 9px;
+  fill: rgba(236, 238, 241, 0.8);
+}
+.preknob__rim {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1.2;
+}
+.preknob__ptr {
+  stroke: #f2f4f7;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.preknob__value {
+  position: absolute;
+  top: 100%;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---------------------------------------------------------------- toggle */
+.pretog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pretog__body {
+  position: relative;
+  width: 0.95cqw;
+  height: 2cqw;
+  border-radius: 0.5cqw;
+  border: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #23252a, #101113);
+  box-shadow: inset 0 0 0 0.08cqw rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+.pretog__bat {
+  position: absolute;
+  left: 50%;
+  width: 0.36cqw;
+  height: 1cqw;
+  border-radius: 0.18cqw;
+  background: linear-gradient(180deg, #f2f4f7, #a4a9b1);
+  transform: translateX(-50%);
+  transition: top 90ms ease;
+  top: 50%;
+  margin-top: -0.5cqw;
+}
+.pretog.pos2 .pretog__bat.at0 {
+  top: auto;
+  bottom: 0.14cqw;
+  margin-top: 0;
+}
+.pretog.pos2 .pretog__bat.at1 {
+  top: 0.14cqw;
+  margin-top: 0;
+}
+.pretog.pos3 .pretog__bat.at0 {
+  top: auto;
+  bottom: 0.12cqw;
+  margin-top: 0;
+}
+.pretog.pos3 .pretog__bat.at2 {
+  top: 0.12cqw;
+  margin-top: 0;
+}
+.pretog__leg {
+  position: absolute;
+  font-size: 0.95cqw;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: #eceef1;
+}
+.pretog__leg.up {
+  bottom: 100%;
+  margin-bottom: 0.2cqw;
+}
+.pretog__leg.down {
+  top: 100%;
+  margin-top: 0.2cqw;
+}
+/* the centre strip is bare aluminium, so its two toggles print their legends dark */
+.pretog.on-alu .pretog__leg {
+  color: #2a2c30;
+  font-weight: 600;
+}
+.pretog__leg.mid {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-right: 0.25cqw;
+}
+
+/* ------------------------------------------------------------ extras bar */
+.extras6176 {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 6px 16px;
+  margin: 8px 12px 0;
+  border-radius: 6px;
+  background: #131417;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-panel);
+  flex-wrap: wrap;
+}
+.extras6176__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extras6176__item.source {
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extras6176__caption {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(230, 227, 218, 0.45);
+}
+.extras6176__hint {
+  font-size: 10px;
+  color: rgba(230, 227, 218, 0.35);
+}
+.extras6176 .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extras6176 .noob-vst-webgui-framework-segment {
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.extras6176 .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #f2f4f7, #c9ccd1);
+  color: #16171a;
+}
+.extras6176__scope {
+  margin-left: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(230, 227, 218, 0.6);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.extras6176__scope.on {
+  color: #16171a;
+  border-color: rgba(236, 238, 241, 0.5);
+  background: linear-gradient(180deg, #f2f4f7, #c9ccd1);
+}
+@media (max-width: 1250px) {
+  .extras6176 {
+    gap: 12px;
+  }
+  .extras6176__hint {
+    display: none;
+  }
+}
+/*
+ * This strip carries more than the others, so in a narrow window it wraps to
+ * three rows and starves the workbench below it. The demo source keeps its
+ * selector and loses its two knobs, which is a row.
+ */
+@media (max-width: 1150px) {
+  .extras6176 {
+    gap: 10px;
+    padding: 5px 12px;
+  }
+  .extras6176__item.source .knob1176 {
+    display: none;
+  }
+}

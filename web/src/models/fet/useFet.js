@@ -67,13 +67,26 @@ export const ui = reactive({
 // ---------------------------------------------------------------------------
 
 /**
- * The Input / Output dial: printed marks are attenuation from full
- * clockwise (mark m is m − 48 dB) but the pot is not linear in angle. This
- * table (research/1176.md, 7.2) maps a mark to the fraction of the
- * rotation, so the page draws the marks where the panel prints them and a
- * drag feels like the real pot. Between the entries the mapping is linear.
+ * The Input / Output dial. Two different numbers are in play and it is worth
+ * being explicit about which is which, because getting them the wrong way
+ * round mirrors the panel.
+ *
+ * The **parameter** counts level: 0 is the quietest, 48 the loudest, and
+ * turning clockwise raises it. The **panel** counts attenuation the other
+ * way: it prints ∞, 48, 36, 30, 24, 18, 12, 6, 0 clockwise from the stop, so
+ * the printed figure falls as the level rises (research/1176.md §2, and the
+ * revision photographs). The printed figure is therefore `48 − mark`, and
+ * only the 24 in the middle reads the same either way.
+ *
+ * This table maps a parameter mark to its fraction of the rotation — the pot
+ * is not linear in angle — so the page draws each number where the panel
+ * prints it and a drag feels like the real control. Between the entries the
+ * mapping is linear. The entry below zero is the ∞ legend at the
+ * counter-clockwise stop: the panel prints it, but the parameter cannot go
+ * past its own minimum, so a drag stops at 48 dB of attenuation.
  */
 export const MARK_TAPER = [
+  [-6, 0.0],
   [0, 0.08],
   [6, 0.14],
   [12, 0.2],
@@ -84,6 +97,12 @@ export const MARK_TAPER = [
   [42, 0.86],
   [48, 1.0],
 ];
+
+/**
+ * What the panel prints at a parameter mark: the attenuation, which is what
+ * the hardware's skirt is numbered in.
+ */
+export const markToPrinted = (mark) => (mark < -1 ? '∞' : String(Math.round(48 - mark)));
 
 function interp(table, x, from, to) {
   if (x <= table[0][from]) return table[0][to];

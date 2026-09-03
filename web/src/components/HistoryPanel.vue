@@ -23,7 +23,7 @@ const series = [
 </script>
 
 <template>
-  <div class="lab-panel">
+  <div class="lab-panel lab-panel--history">
     <div class="lab-panel__title">
       <span>Last 8 seconds</span>
       <span class="lab-panel__val">GR {{ gr.toFixed(1) }} dB</span>

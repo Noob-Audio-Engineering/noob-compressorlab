@@ -15,8 +15,8 @@ pub mod filters;
 pub mod model;
 
 pub use model::{
-    CELL_SPEEDS, Cell, CellParams, Compressor, METER_GR, METER_OUT4, METER_OUT10, Settings,
-    VU_REF_DBFS, attenuation_for, gr_db_for, makeup_db, resistance_for,
+    CELL_SPEEDS, Cell, CellParams, Compressor, Divider, METER_GR, METER_OUT4, METER_OUT10,
+    Settings, VU_REF_DBFS, attenuation_for, gr_db_for, makeup_db, resistance_for,
 };
 
 /// Labels of `opto_mode`.

@@ -1,0 +1,411 @@
+/*
+ * The LA-3A page's rules: a flat black half-rack panel with white
+ * lettering, the two cream knobs with their scales printed on the panel,
+ * the two bat toggles and the strip carrying the rear-panel switches. The
+ * VU meter is the 1176's own component, so its rules come from `fet.css`;
+ * only the bezel is set here.
+ *
+ * `.abs`, `.screw` and the shared `.lab-*` chrome come from the 1176's file
+ * and `src/style.css`, both imported alongside this one.
+ */
+.lab-model--la3a {
+  background: #0c0b0a;
+  color: #e6e3da;
+  --noob-vst-webgui-framework-accent: var(--color-la3a-amber);
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-grid: rgba(255, 255, 255, 0.07);
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+}
+
+/* ------------------------------------------------------------- faceplate */
+.facela3a {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  background: #141518;
+  padding: 6px 0;
+}
+.facela3a__ear {
+  width: 24px;
+  flex: 0 0 auto;
+  background: linear-gradient(90deg, #e2e4e8, #b4b8be 45%, #8e9299);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  border-radius: 2px 0 0 2px;
+}
+.facela3a__ear.right {
+  background: linear-gradient(270deg, #e2e4e8, #b4b8be 45%, #8e9299);
+  border-radius: 0 2px 2px 0;
+}
+.facela3a__plate {
+  flex: 1;
+  min-width: 0;
+  container-type: inline-size;
+}
+/*
+ * The SR-3A rack kit: a full 19 by 3.5 inch panel carrying one LA-3A and a
+ * blank plate beside it. The rack panel is the container everything on it is
+ * measured against.
+ */
+.facela3a__rack {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5.43 / 1;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #d8dade, #bfc2c7 45%, #a7abb1);
+}
+.facela3a__rack > .abs {
+  z-index: 1;
+}
+.facela3a__rack .screw.small {
+  width: 1.1cqw;
+  height: 1.1cqw;
+}
+.facela3a__blankmark {
+  position: absolute;
+  right: 3.5%;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: center;
+  font: 600 0.8cqw var(--font-panel);
+  letter-spacing: 0.26em;
+  color: rgba(42, 44, 48, 0.35);
+  white-space: nowrap;
+}
+/* the unit occupies 8.5 of the 19 inches, at the left */
+.facela3a__unit {
+  position: absolute;
+  left: 1.2%;
+  top: 4%;
+  width: 45.5%;
+  height: 92%;
+  container-type: inline-size;
+}
+/*
+ * Half a rack: 8.5 by 3.5 inches. The panel is flat black, no bezel and no
+ * chrome, and the lettering is a plain condensed sans in white.
+ */
+.facela3a__panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 0.4cqw;
+  font-family: var(--font-panel);
+  color: #f2f2ef;
+  background: linear-gradient(180deg, #17171a, #101012 40%, #0b0b0d);
+  box-shadow:
+    inset 0 0 0 0.25cqw rgba(255, 255, 255, 0.07),
+    0 0.4cqw 1.2cqw rgba(0, 0, 0, 0.5);
+}
+.facela3a__panel > .abs {
+  z-index: 1;
+}
+.facela3a__panel .screw.small {
+  width: 1.5cqw;
+  height: 1.5cqw;
+}
+.facela3a__print {
+  line-height: 1;
+  font-size: 2.1cqw;
+  letter-spacing: 0.16em;
+  font-weight: 500;
+  white-space: nowrap;
+  text-align: center;
+  color: #f2f2ef;
+  font-stretch: condensed;
+}
+.facela3a__logo {
+  font-size: 1.05cqw;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+  color: #f2f2ef;
+  border: 0.12cqw solid rgba(242, 242, 239, 0.75);
+  border-radius: 0.15cqw;
+  padding: 0.15cqw 0.5cqw 0.1cqw;
+  line-height: 1;
+}
+.facela3a__legend {
+  font-size: 1.5cqw;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  font-weight: 500;
+  white-space: nowrap;
+  text-align: center;
+  color: rgba(242, 242, 239, 0.8);
+}
+.facela3a__nameplate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqw;
+  white-space: nowrap;
+  text-align: center;
+}
+.facela3a__nameplate span {
+  font-size: 1.7cqw;
+  letter-spacing: 0.14em;
+  color: rgba(242, 242, 239, 0.72);
+}
+.facela3a__nameplate b {
+  font-size: 2cqw;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+}
+/* the gain-reduction zero-set trim, seen through its hole above the P of POWER */
+.facela3a__trim {
+  width: 1.7cqw;
+  height: 1.7cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #4a4b50, #191a1d 70%);
+  box-shadow: inset 0 0 0 0.14cqw rgba(0, 0, 0, 0.8);
+}
+.facela3a__trim::after {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  top: 46%;
+  height: 9%;
+  background: #0a0a0b;
+  transform: rotate(28deg);
+}
+.facela3a__meter {
+  position: absolute;
+  padding: 0.35cqw;
+  border-radius: 0.4cqw;
+  background: #16171a;
+  box-shadow: inset 0 0 0 0.18cqw rgba(255, 255, 255, 0.12);
+}
+/*
+ * The meter is small on a half-rack panel, so its printed lines need to be
+ * far larger in the drawing's own units than they are on the 1176's meter to
+ * come out the same size on screen. Scoped here so that face keeps its own.
+ */
+.facela3a__meter .vu1176__vu {
+  font-size: 19px;
+}
+.facela3a__meter .vu1176__num {
+  font-size: 13px;
+}
+.facela3a__meter .vu1176,
+.facela3a__meter .vu1176__svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ------------------------------------------------------------------ knob */
+.la3aknob {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.la3aknob__dial {
+  width: 100%;
+  display: block;
+  cursor: ns-resize;
+  outline: none;
+  touch-action: none;
+}
+.la3aknob__dial:focus-visible {
+  filter: drop-shadow(0 0 3px var(--color-la3a-amber));
+}
+.la3aknob__marks {
+  font: 500 6.5px var(--font-panel);
+  fill: #f2f2ef;
+}
+.la3aknob__marks circle {
+  fill: rgba(242, 242, 239, 0.6);
+}
+.la3aknob__rim {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 1.2;
+}
+.la3aknob__notch {
+  fill: #2a2724;
+}
+.la3aknob__value {
+  position: absolute;
+  top: 100%;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--color-la3a-amber);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---------------------------------------------------------------- toggle */
+.la3atog {
+  display: flex;
+  align-items: center;
+  gap: 0.8cqw;
+}
+.la3atog__leg {
+  font-size: 1.6cqw;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #f2f2ef;
+}
+.la3atog__body {
+  position: relative;
+  width: 4cqw;
+  height: 2.1cqw;
+  border-radius: 1.05cqw;
+  border: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #23252a, #0e0f11);
+  box-shadow: inset 0 0 0 0.16cqw rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+}
+.la3atog__bat {
+  position: absolute;
+  top: 50%;
+  width: 1.7cqw;
+  height: 1.7cqw;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f2f4f7, #9aa0a8);
+  transform: translateY(-50%);
+  transition: left 90ms ease;
+}
+.la3atog__bat.at0 {
+  left: 0.2cqw;
+}
+.la3atog__bat.at1 {
+  left: calc(100% - 1.9cqw);
+}
+
+/* ------------------------------------------------------------ extras bar */
+.extrasla3a {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 6px 16px;
+  margin: 10px 12px 0;
+  border-radius: 6px;
+  background: #171614;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-panel);
+  flex-wrap: wrap;
+}
+.extrasla3a__rear {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: rgba(221, 164, 63, 0.55);
+  border: 1px solid rgba(221, 164, 63, 0.25);
+  border-radius: 3px;
+  padding: 3px 5px;
+}
+.extrasla3a__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.extrasla3a__item.source {
+  margin-left: auto;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrasla3a__caption {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: rgba(230, 227, 218, 0.45);
+}
+.extrasla3a__hint {
+  font-size: 10px;
+  color: rgba(230, 227, 218, 0.35);
+}
+.extrasla3a .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.extrasla3a .noob-vst-webgui-framework-segment {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.5);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.extrasla3a .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #34373d, #1e2024);
+  color: var(--color-la3a-amber);
+}
+.extrasla3a .noob-vst-webgui-framework-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(230, 227, 218, 0.55);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+.extrasla3a .noob-vst-webgui-framework-toggle.is-on {
+  color: var(--color-la3a-amber);
+  border-color: rgba(221, 164, 63, 0.4);
+  background: rgba(221, 164, 63, 0.12);
+}
+.extrasla3a__scope {
+  margin-left: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(230, 227, 218, 0.6);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+.extrasla3a__scope.on {
+  color: var(--color-la3a-amber);
+  border-color: rgba(221, 164, 63, 0.4);
+  background: rgba(221, 164, 63, 0.12);
+}
+@media (max-width: 1250px) {
+  .extrasla3a {
+    gap: 12px;
+  }
+  .extrasla3a__hint {
+    display: none;
+  }
+}
+/*
+ * In a narrow window the strip would wrap to a second row and starve the
+ * workbench below it, so the two section chips go: what is a rear-panel
+ * control and what is ours is written in the README, and the controls
+ * themselves are what matter here.
+ */
+@media (max-width: 1150px) {
+  .extrasla3a {
+    gap: 9px;
+    padding: 5px 12px;
+  }
+  .extrasla3a__rear {
+    display: none;
+  }
+}

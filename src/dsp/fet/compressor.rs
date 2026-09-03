@@ -48,12 +48,15 @@
 //! | `c_line` | 0.03 (0 for the push-pull stage of F and later) | line-amp second harmonic |
 //! | `tilt_db` | A / B 1.2, C to E and LN 0.8, F 0.5, G / H 0.3 | high shelf at 6 kHz |
 //! | `noise_dbfs` | A −70, B −72, C to E −74, F and LN −78, G / H −80 | output noise floor at Output 24 |
-//! | transformer | 15 Hz Q 0.6 in, 20 Hz Q 0.707 out | second-order high-passes |
+//! | transformer | 10 Hz Q 0.6 in, 14 Hz Q 0.707 out | second-order high-passes; the published −2 dB at 20 Hz is what the **pair** does, and giving each the published corner put the pair 5 dB down |
 //!
-//! Not modelled (deviations from the research): the transformer's
-//! low-frequency core saturation and its ±0.5 dB spectral tilt (both flagged
-//! as estimates to be measured first), and the 40 µs minimum attack of a
-//! hardware stereo link.
+//! The revision tilt is only half of what the research describes: it lifts
+//! the top through `tilt_db` at 6 kHz but does not drop the bottom by
+//! the matching amount, because the transformer high-passes already take
+//! the bottom end down and a second cut there would double-count. Not
+//! modelled at all: the transformer's low-frequency core saturation (an
+//! estimate the research says to measure first) and the 40 µs minimum
+//! attack of a hardware stereo link.
 //!
 //! ## Real-time behaviour
 //!
@@ -135,8 +138,8 @@ const CIRCUIT_A: Circuit = Circuit {
     x_pre: 1.25,
     x_line: X_TANH,
     c_line: -0.03,
-    in_hp: (20.0, 0.6),
-    out_hp: (25.0, 0.7),
+    in_hp: (13.0, 0.6),
+    out_hp: (17.0, 0.7),
     tilt_db: 1.2,
     noise_dbfs: -70.0,
 };
@@ -156,8 +159,8 @@ const CIRCUIT_LN: Circuit = Circuit {
     x_pre: X_TANH,
     x_line: X_TANH,
     c_line: -0.03,
-    in_hp: (15.0, 0.6),
-    out_hp: (20.0, 0.707),
+    in_hp: (10.0, 0.6),
+    out_hp: (14.0, 0.707),
     tilt_db: 0.8,
     noise_dbfs: -74.0,
 };
@@ -165,7 +168,7 @@ const CIRCUIT_LN: Circuit = Circuit {
 const CIRCUIT_F: Circuit = Circuit {
     x_line: 2.2,
     c_line: 0.0,
-    out_hp: (18.0, 0.6),
+    out_hp: (12.0, 0.6),
     tilt_db: 0.5,
     noise_dbfs: -78.0,
     ..CIRCUIT_LN
@@ -310,8 +313,8 @@ impl Channel {
         Channel {
             up: Upsampler::new(),
             down: Downsampler::new(),
-            in_hp: Biquad::highpass(fs, 15.0, 0.6),
-            out_hp: Biquad::highpass(fs_p, 20.0, 0.707),
+            in_hp: Biquad::highpass(fs, 10.0, 0.6),
+            out_hp: Biquad::highpass(fs_p, 14.0, 0.707),
             tilt: Biquad::identity(),
             sc_hp: Biquad::identity(),
             rng: 0x9E37_79B9,
@@ -535,7 +538,8 @@ impl Compressor {
             MeterMode::Gr => self.meter_gr_db,
             MeterMode::Plus4 => vu_db(mean, -18.0),
             MeterMode::Plus8 => vu_db(mean, -14.0),
-            MeterMode::Off => -60.0,
+            // Powered down: the needle rests.
+            MeterMode::Off => crate::dsp::vu::REST_DB,
         }
     }
 
@@ -546,7 +550,13 @@ impl Compressor {
         let a_rel = self.a_rel;
         let a_sag = self.a_sag;
         let link = self.settings.link;
-        let bypass = self.settings.bypass;
+        // The meter switch's OFF position is the unit's power switch: the
+        // manual says OFF "powers the unit off; pressing any other meter
+        // button powers it on", and no revision has a separate power
+        // control. A powered-down unit passes its input through, so this is
+        // a bypass that also parks the meter and the reduction read-out.
+        let powered = self.settings.meter != MeterMode::Off;
+        let bypass = self.settings.bypass || !powered;
         let attack_off = self.attack_off;
         let all = self.all;
         let a2 = self.a2;
@@ -617,7 +627,11 @@ impl Compressor {
                             d.v_slow += a_sag * (d.v - d.v_slow);
                         }
                     }
-                    let v_off_eff = if all { v_off + 0.2 * d.v_slow } else { 0.0 };
+                    // The supply sags under sustained all-buttons drive, so
+                    // the bias offset creeps and the reduction drifts with
+                    // it. The research asks for more than half a decibel of
+                    // drift over the first second; at 0.2 it managed 0.4.
+                    let v_off_eff = if all { v_off + 0.32 * d.v_slow } else { 0.0 };
                     let v_eff = (d.v - v_off_eff).max(0.0);
                     g_db[c] = if attack_off {
                         0.0
@@ -681,8 +695,19 @@ impl Compressor {
             }
             self.meter_n += 2;
         }
-        self.gr_db = last_g_db;
-        self.meter_gr_db = last_meter_db;
+        if powered {
+            self.gr_db = last_g_db;
+            self.meter_gr_db = last_meter_db;
+        } else {
+            self.gr_db = 0.0;
+            self.meter_gr_db = 0.0;
+        }
+    }
+
+    /// `false` when the meter switch is at OFF, which on this unit is the
+    /// power switch.
+    pub fn powered(&self) -> bool {
+        self.settings.meter != MeterMode::Off
     }
 
     /// The static transfer curve at the current settings: output level in

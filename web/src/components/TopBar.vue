@@ -100,10 +100,10 @@ const offline = computed(() => client.offline === true);
       <button class="tb" title="Next preset" @click="step(1)">›</button>
     </div>
     <div class="labbar__tools">
-      <button class="tb" :disabled="!historyState.canUndo" title="Undo (Ctrl+Z)" @click="history.undo()">↶</button>
-      <button class="tb" :disabled="!historyState.canRedo" title="Redo (Ctrl+Shift+Z)" @click="history.redo()">↷</button>
-      <button class="tb" title="Toggle A / B (Ctrl+B)" @click="history.toggleAB()"><b :class="{ dim: historyState.ab !== 'A' }">A</b>/<b :class="{ dim: historyState.ab !== 'B' }">B</b></button>
-      <button class="tb" title="Copy this state to the other slot" @click="history.copyToOther()">⧉</button>
+      <button class="tb hist" :disabled="!historyState.canUndo" title="Undo (Ctrl+Z)" @click="history.undo()">↶</button>
+      <button class="tb hist" :disabled="!historyState.canRedo" title="Redo (Ctrl+Shift+Z)" @click="history.redo()">↷</button>
+      <button class="tb hist" title="Toggle A / B (Ctrl+B)" @click="history.toggleAB()"><b :class="{ dim: historyState.ab !== 'A' }">A</b>/<b :class="{ dim: historyState.ab !== 'B' }">B</b></button>
+      <button class="tb hist" title="Copy this state to the other slot" @click="history.copyToOther()">⧉</button>
       <button class="tb" :class="{ on: lab.bypass.on }" :title="lab.bypass.on ? 'Bypassed: click to put the compressor back in' : 'Bypass the compressor'" @click="toggleBypass">BYPASS</button>
       <button class="tb" :class="{ on: fullscreen }" :title="fullscreen ? 'Leave fullscreen' : 'Fullscreen'" @click="toggleFullscreen()">⛶</button>
       <span class="labbar__stat echo">edit→echo <b>{{ fmt(stats.echoAvgMs) }}</b></span>

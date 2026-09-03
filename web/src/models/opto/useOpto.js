@@ -5,7 +5,7 @@
  * Everything here needs the manifest; call `useOpto()` only once
  * `useNoobVstWebguiFramework().ready` is true.
  */
-import { useLab, useParam } from '../../composables/useLab.js';
+import { hasParam, useLab, useParam } from '../../composables/useLab.js';
 
 let panel = null;
 
@@ -22,6 +22,9 @@ export function useOpto() {
     mode: useParam('opto_mode'),
     meter: useParam('opto_meter'),
     emphasis: useParam('opto_emphasis'),
+    // A real front-panel trim, so the face draws it live as soon as the
+    // engine publishes it; until then the panel keeps its plain screw.
+    meterZero: hasParam('opto_meter_zero') ? useParam('opto_meter_zero') : null,
     cell: useParam('opto_cell'),
     link: lab.link,
     mix: lab.mix,

@@ -27,7 +27,7 @@ const fmt = (v) => (v > -90 ? v.toFixed(1) : '–');
 </script>
 
 <template>
-  <div class="lab-panel">
+  <div class="lab-panel lab-panel--transfer">
     <div class="lab-panel__title">
       <span>Transfer</span>
       <span class="lab-panel__val">in {{ fmt(inPeak) }} · out {{ fmt(outPeak) }} dBFS</span>

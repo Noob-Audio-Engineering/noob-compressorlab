@@ -26,7 +26,7 @@ use nih_plug::prelude::*;
 use noob_vst_webgui_framework::{Assets, AudioHandle, NoobVstWebguiFramework};
 use noob_vst_webgui_framework_nih::{EditorConfig, NoobVstWebguiFrameworkEditor, StoreSlot};
 
-use crate::dsp::{self, Model, Processor, Settings, Shared, fet, opto};
+use crate::dsp::{self, Model, Processor, Settings, Shared, fet, opto, opto3, pre, vca};
 
 static UI: Dir = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
 
@@ -41,6 +41,12 @@ pub enum ModelParam {
     Fet,
     #[name = "LA-2A"]
     Opto,
+    #[name = "LA-3A"]
+    Opto3,
+    #[name = "Distressor"]
+    Vca,
+    #[name = "6176"]
+    Pre6176,
 }
 
 /// The 1176's ratio buttons, as the host sees them.
@@ -122,6 +128,188 @@ pub enum CellParam {
     La2,
 }
 
+/// What the LA-3A's panel meter shows. The hardware toggle has two
+/// positions; `Off` is the plug-in's own, as on Universal Audio's.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum La3aMeterParam {
+    #[name = "Gain Reduction"]
+    GainReduction,
+    Output,
+    Off,
+}
+
+/// The Distressor's ratio switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DistRatioParam {
+    #[name = "1:1"]
+    R1,
+    #[name = "2:1"]
+    R2,
+    #[name = "3:1"]
+    R3,
+    #[name = "4:1"]
+    R4,
+    #[name = "6:1"]
+    R6,
+    #[name = "10:1"]
+    R10,
+    #[name = "20:1"]
+    R20,
+    Nuke,
+}
+
+/// The Distressor's Detector switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DistDetectorParam {
+    Norm,
+    #[name = "HP"]
+    Hp,
+    Band,
+    #[name = "HP+Band"]
+    HpBand,
+}
+
+/// The Distressor's Audio switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DistAudioParam {
+    Norm,
+    #[name = "HP"]
+    Hp,
+    #[name = "Dist 2"]
+    Dist2,
+    #[name = "Dist 3"]
+    Dist3,
+    #[name = "HP+Dist 2"]
+    HpDist2,
+    #[name = "HP+Dist 3"]
+    HpDist3,
+}
+
+/// How the Distressor ties the two channels together.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DistLinkParam {
+    Phase,
+    Image,
+    Both,
+}
+
+/// The 6176's Ratio switch positions that are not ratios.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreRoutingParam {
+    Join,
+    #[name = "BP"]
+    Bypass,
+    #[name = "1:1"]
+    Unity,
+}
+
+/// The 610's stepped Gain switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreGainParam {
+    #[name = "-10"]
+    Minus10,
+    #[name = "-5"]
+    Minus5,
+    #[name = "0"]
+    Zero,
+    #[name = "+5"]
+    Plus5,
+    #[name = "+10"]
+    Plus10,
+}
+
+/// The 610's input select.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreInputParam {
+    Line,
+    #[name = "Mic 500"]
+    Mic500,
+    #[name = "Mic 2.0K"]
+    Mic2k,
+    #[name = "Hi-Z 47K"]
+    HiZ47k,
+    #[name = "Hi-Z 2.2M"]
+    HiZ22m,
+}
+
+/// The 610's low shelf corner.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreLfFreqParam {
+    #[name = "70"]
+    F70,
+    #[name = "100"]
+    F100,
+    #[name = "200"]
+    F200,
+}
+
+/// The 610's high shelf corner.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreHfFreqParam {
+    #[name = "4.5k"]
+    F4k5,
+    #[name = "7k"]
+    F7k,
+    #[name = "10k"]
+    F10k,
+}
+
+/// Either shelf's eleven-position gain switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreShelfGainParam {
+    #[name = "-9"]
+    M9,
+    #[name = "-6"]
+    M6,
+    #[name = "-4.5"]
+    M45,
+    #[name = "-3"]
+    M3,
+    #[name = "-1.5"]
+    M15,
+    #[name = "0"]
+    Zero,
+    #[name = "+1.5"]
+    P15,
+    #[name = "+3"]
+    P3,
+    #[name = "+4.5"]
+    P45,
+    #[name = "+6"]
+    P6,
+    #[name = "+9"]
+    P9,
+}
+
+/// Which 610 the preamp is.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreVoiceParam {
+    #[name = "610B"]
+    B,
+    #[name = "610A"]
+    A,
+}
+
+/// The 1176 section's rear input loading.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreLoadParam {
+    #[name = "15k"]
+    K15,
+    #[name = "600"]
+    R600,
+}
+
+/// What the 6176's meter switch shows.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PreMeterParam {
+    #[name = "PRE"]
+    Pre,
+    #[name = "GR"]
+    Gr,
+    #[name = "COMP"]
+    Comp,
+}
+
 /// Every host parameter. Ids in `param_map` match the standalone and the
 /// page.
 pub struct NoobCompressorLabParams {
@@ -146,6 +334,47 @@ pub struct NoobCompressorLabParams {
     /// LA-2A R37, 0 (10 dB less low-frequency sensitivity) .. 1 (flat).
     pub opto_emphasis: FloatParam,
     pub opto_cell: EnumParam<CellParam>,
+    /// LA-2A meter-zero trim, ±2 dB. Moves the needle, not the audio.
+    pub opto_meter_zero: FloatParam,
+    /// LA-3A make-up gain, 0..100.
+    pub la3a_gain: FloatParam,
+    /// LA-3A sidechain drive, 0..100.
+    pub la3a_peak_reduction: FloatParam,
+    pub la3a_mode: EnumParam<ModeParam>,
+    pub la3a_meter: EnumParam<La3aMeterParam>,
+    /// LA-3A HF Contour, 0 (flat, as the trimmer ships) .. 1.
+    pub la3a_emphasis: FloatParam,
+    /// LA-3A cell age: a depleted T4 compresses far less.
+    pub la3a_cell: EnumParam<CellParam>,
+    /// Distressor knobs, 0..10.5.
+    pub dist_input: FloatParam,
+    pub dist_output: FloatParam,
+    pub dist_attack: FloatParam,
+    pub dist_release: FloatParam,
+    pub dist_ratio: EnumParam<DistRatioParam>,
+    pub dist_detector: EnumParam<DistDetectorParam>,
+    pub dist_audio: EnumParam<DistAudioParam>,
+    pub dist_british: BoolParam,
+    pub dist_link_mode: EnumParam<DistLinkParam>,
+    /// Distressor internal reference level, dB.
+    pub dist_headroom: FloatParam,
+    pub pre_join: EnumParam<PreRoutingParam>,
+    pub pre_gain: EnumParam<PreGainParam>,
+    pub pre_input: EnumParam<PreInputParam>,
+    pub pre_pad: BoolParam,
+    pub pre_polarity: BoolParam,
+    /// 610 Level knob, 0..10.
+    pub pre_level: FloatParam,
+    pub pre_lf_freq: EnumParam<PreLfFreqParam>,
+    pub pre_lf_gain: EnumParam<PreShelfGainParam>,
+    pub pre_hf_freq: EnumParam<PreHfFreqParam>,
+    pub pre_hf_gain: EnumParam<PreShelfGainParam>,
+    pub pre_hpf: BoolParam,
+    pub pre_voice: EnumParam<PreVoiceParam>,
+    pub pre_load: EnumParam<PreLoadParam>,
+    pub pre_meter: EnumParam<PreMeterParam>,
+    /// +48 V. Panel state only; see `pre::Settings::phantom`.
+    pub pre_phantom: BoolParam,
     pub link: BoolParam,
     /// Wet share, %.
     pub mix: FloatParam,
@@ -166,6 +395,17 @@ impl Default for NoobCompressorLabParams {
                 FloatRange::Linear {
                     min: 0.0,
                     max: fet::MARK_MAX,
+                },
+            )
+            .with_step_size(0.1)
+        };
+        let knob = |name: &str| {
+            FloatParam::new(
+                name,
+                5.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: vca::KNOB_MAX,
                 },
             )
             .with_step_size(0.1)
@@ -217,6 +457,71 @@ impl Default for NoobCompressorLabParams {
             )
             .with_step_size(0.01),
             opto_cell: EnumParam::new("Cell", CellParam::Gray).non_automatable(),
+            opto_meter_zero: FloatParam::new(
+                "Meter Zero",
+                0.0,
+                FloatRange::Linear {
+                    min: -2.0,
+                    max: 2.0,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.05)
+            .non_automatable(),
+            la3a_gain: percent("Gain", 32.0),
+            la3a_peak_reduction: percent("Peak Reduction", 40.0),
+            la3a_mode: EnumParam::new("Mode", ModeParam::Compress),
+            la3a_meter: EnumParam::new("Meter", La3aMeterParam::GainReduction).non_automatable(),
+            la3a_emphasis: FloatParam::new(
+                "HF Contour",
+                0.0,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            )
+            .with_step_size(0.01),
+            la3a_cell: EnumParam::new("Cell", CellParam::Silver).non_automatable(),
+            dist_input: knob("Input"),
+            dist_output: knob("Output"),
+            dist_attack: knob("Attack"),
+            dist_release: knob("Release"),
+            dist_ratio: EnumParam::new("Ratio", DistRatioParam::R6),
+            dist_detector: EnumParam::new("Detector", DistDetectorParam::Norm),
+            dist_audio: EnumParam::new("Audio", DistAudioParam::Norm),
+            dist_british: BoolParam::new("British Mode", false),
+            dist_link_mode: EnumParam::new("Link Mode", DistLinkParam::Phase).non_automatable(),
+            dist_headroom: FloatParam::new(
+                "Headroom",
+                vca::HEADROOM_DEFAULT_DB,
+                FloatRange::Linear {
+                    min: vca::HEADROOM_MIN_DB,
+                    max: vca::HEADROOM_MAX_DB,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.5)
+            .non_automatable(),
+            pre_join: EnumParam::new("Routing", PreRoutingParam::Join),
+            pre_gain: EnumParam::new("Gain", PreGainParam::Zero),
+            pre_input: EnumParam::new("Input", PreInputParam::Line).non_automatable(),
+            pre_pad: BoolParam::new("Pad", false),
+            pre_polarity: BoolParam::new("Polarity", false),
+            pre_level: FloatParam::new(
+                "Level",
+                7.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: pre::LEVEL_MAX,
+                },
+            )
+            .with_step_size(0.1),
+            pre_lf_freq: EnumParam::new("Low Freq", PreLfFreqParam::F100),
+            pre_lf_gain: EnumParam::new("Low", PreShelfGainParam::Zero),
+            pre_hf_freq: EnumParam::new("High Freq", PreHfFreqParam::F10k),
+            pre_hf_gain: EnumParam::new("High", PreShelfGainParam::Zero),
+            pre_hpf: BoolParam::new("Low Cut", false),
+            pre_voice: EnumParam::new("Voicing", PreVoiceParam::B).non_automatable(),
+            pre_load: EnumParam::new("Output Load", PreLoadParam::K15).non_automatable(),
+            pre_meter: EnumParam::new("Meter", PreMeterParam::Gr).non_automatable(),
+            pre_phantom: BoolParam::new("+48 V", false),
             link: BoolParam::new("Stereo Link", true),
             mix: percent("Mix", 100.0).with_unit(" %").with_step_size(1.0),
             sc_hpf: FloatParam::new(
@@ -261,6 +566,66 @@ unsafe impl Params for NoobCompressorLabParams {
             (g("opto_meter"), self.opto_meter.as_ptr(), g("LA-2A")),
             (g("opto_emphasis"), self.opto_emphasis.as_ptr(), g("LA-2A")),
             (g("opto_cell"), self.opto_cell.as_ptr(), g("LA-2A")),
+            (
+                g("opto_meter_zero"),
+                self.opto_meter_zero.as_ptr(),
+                g("LA-2A"),
+            ),
+            (g("la3a_gain"), self.la3a_gain.as_ptr(), g("LA-3A")),
+            (
+                g("la3a_peak_reduction"),
+                self.la3a_peak_reduction.as_ptr(),
+                g("LA-3A"),
+            ),
+            (g("la3a_mode"), self.la3a_mode.as_ptr(), g("LA-3A")),
+            (g("la3a_meter"), self.la3a_meter.as_ptr(), g("LA-3A")),
+            (g("la3a_emphasis"), self.la3a_emphasis.as_ptr(), g("LA-3A")),
+            (g("la3a_cell"), self.la3a_cell.as_ptr(), g("LA-3A")),
+            (g("dist_input"), self.dist_input.as_ptr(), g("Distressor")),
+            (g("dist_output"), self.dist_output.as_ptr(), g("Distressor")),
+            (g("dist_attack"), self.dist_attack.as_ptr(), g("Distressor")),
+            (
+                g("dist_release"),
+                self.dist_release.as_ptr(),
+                g("Distressor"),
+            ),
+            (g("dist_ratio"), self.dist_ratio.as_ptr(), g("Distressor")),
+            (
+                g("dist_detector"),
+                self.dist_detector.as_ptr(),
+                g("Distressor"),
+            ),
+            (g("dist_audio"), self.dist_audio.as_ptr(), g("Distressor")),
+            (
+                g("dist_british"),
+                self.dist_british.as_ptr(),
+                g("Distressor"),
+            ),
+            (
+                g("dist_link_mode"),
+                self.dist_link_mode.as_ptr(),
+                g("Distressor"),
+            ),
+            (
+                g("dist_headroom"),
+                self.dist_headroom.as_ptr(),
+                g("Distressor"),
+            ),
+            (g("pre_join"), self.pre_join.as_ptr(), g("6176")),
+            (g("pre_gain"), self.pre_gain.as_ptr(), g("6176")),
+            (g("pre_input"), self.pre_input.as_ptr(), g("6176")),
+            (g("pre_pad"), self.pre_pad.as_ptr(), g("6176")),
+            (g("pre_polarity"), self.pre_polarity.as_ptr(), g("6176")),
+            (g("pre_level"), self.pre_level.as_ptr(), g("6176")),
+            (g("pre_lf_freq"), self.pre_lf_freq.as_ptr(), g("6176")),
+            (g("pre_lf_gain"), self.pre_lf_gain.as_ptr(), g("6176")),
+            (g("pre_hf_freq"), self.pre_hf_freq.as_ptr(), g("6176")),
+            (g("pre_hf_gain"), self.pre_hf_gain.as_ptr(), g("6176")),
+            (g("pre_hpf"), self.pre_hpf.as_ptr(), g("6176")),
+            (g("pre_voice"), self.pre_voice.as_ptr(), g("6176")),
+            (g("pre_load"), self.pre_load.as_ptr(), g("6176")),
+            (g("pre_meter"), self.pre_meter.as_ptr(), g("6176")),
+            (g("pre_phantom"), self.pre_phantom.as_ptr(), g("6176")),
             (g("link"), self.link.as_ptr(), g("extras")),
             (g("mix"), self.mix.as_ptr(), g("extras")),
             (g("sc_hpf"), self.sc_hpf.as_ptr(), g("extras")),
@@ -301,7 +666,48 @@ impl NoobCompressorLabParams {
                 meter: self.opto_meter.value() as usize,
                 emphasis: self.opto_emphasis.value(),
                 cell: self.opto_cell.value() as usize,
+                meter_zero: self.opto_meter_zero.value(),
                 ..opto::Settings::default()
+            },
+            opto3: opto3::Settings {
+                gain: self.la3a_gain.value(),
+                peak_reduction: self.la3a_peak_reduction.value(),
+                limit: self.la3a_mode.value() == ModeParam::Limit,
+                meter: self.la3a_meter.value() as usize,
+                emphasis: self.la3a_emphasis.value(),
+                cell: self.la3a_cell.value() as usize,
+                ..opto3::Settings::default()
+            },
+            vca: vca::Settings {
+                input: self.dist_input.value(),
+                output: self.dist_output.value(),
+                attack: self.dist_attack.value(),
+                release: self.dist_release.value(),
+                ratio: vca::Ratio::from_index(self.dist_ratio.value() as usize),
+                detector: vca::Detector::from_index(self.dist_detector.value() as usize),
+                audio: vca::AudioMode::from_index(self.dist_audio.value() as usize),
+                british: self.dist_british.value(),
+                link_mode: vca::LinkMode::from_index(self.dist_link_mode.value() as usize),
+                headroom_db: self.dist_headroom.value(),
+                ..vca::Settings::default()
+            },
+            pre: pre::Settings {
+                routing: pre::Routing::from_index(self.pre_join.value() as usize),
+                gain: self.pre_gain.value() as usize,
+                input: self.pre_input.value() as usize,
+                pad: self.pre_pad.value(),
+                polarity: self.pre_polarity.value(),
+                level: self.pre_level.value(),
+                lf_freq: self.pre_lf_freq.value() as usize,
+                lf_gain: self.pre_lf_gain.value() as usize,
+                hf_freq: self.pre_hf_freq.value() as usize,
+                hf_gain: self.pre_hf_gain.value() as usize,
+                hpf: self.pre_hpf.value(),
+                voice: self.pre_voice.value() as usize,
+                load: self.pre_load.value() as usize,
+                meter: self.pre_meter.value() as usize,
+                phantom: self.pre_phantom.value(),
+                bypass: false,
             },
         }
         .with_shared(Shared {

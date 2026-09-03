@@ -11,18 +11,20 @@
  * very wide window never pushes the drawer off the bottom.
  */
 import { computed } from 'vue';
-import { useWindow } from '../../composables/useLab.js';
+import { useDebug, useWindow } from '../../composables/useLab.js';
 import { ui } from './usePre.js';
 import HistoryPanel from '../../components/HistoryPanel.vue';
 import TransferPanel from '../../components/TransferPanel.vue';
 import Faceplate from './Faceplate.vue';
 import ExtrasBar from './ExtrasBar.vue';
+import DebugPanel from '../../components/DebugPanel.vue';
 
 const win = useWindow();
 /* The top bar, the paddings, the extras strip and the workbench's minimum. */
 const CHROME_PX = 355;
 const PLATE_ASPECT = 19 / 3.5;
 const plateMax = computed(() => `${Math.max(700, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
+const debug = useDebug();
 </script>
 
 <template>
@@ -33,5 +35,6 @@ const plateMax = computed(() => `${Math.max(700, Math.round((win.height.value - 
       <HistoryPanel />
       <TransferPanel />
     </section>
+    <DebugPanel v-if="debug.shown.value" v-model:open="debug.open.value" />
   </main>
 </template>

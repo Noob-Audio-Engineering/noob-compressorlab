@@ -11,9 +11,9 @@
  *
  * Window: every view scales with the window in both dimensions; the grip
  * in the bottom-right corner lets the user resize the plug-in window from
- * 900 × 520 up, and the top bar's fullscreen button asks the host for the
- * monitor's work area (both through the one `useWindowSize` instance in
- * `useLab.js`).
+ * 900 × 520 up (through the one `useWindowSize` instance in `useLab.js`).
+ * There is no fullscreen control: the framework supports it and this page
+ * chooses not to offer it.
  */
 import { computed } from 'vue';
 import { ResizeGrip } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';

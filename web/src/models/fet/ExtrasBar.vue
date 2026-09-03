@@ -9,6 +9,7 @@
  */
 import { Segmented, Toggle } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { REVISIONS, ui, useControls } from './useFet.js';
+import BarGlobals from '../../components/BarGlobals.vue';
 import Knob1176 from './Knob1176.vue';
 
 const c = useControls();
@@ -28,25 +29,7 @@ const fmtFreq = (v) => (v >= 1000 ? `${(v / 1000).toFixed(2)} kHz` : `${Math.rou
         <span class="extras1176__hint">{{ (REVISIONS[c.revision.index] || REVISIONS[8]).hint }}</span>
       </div>
     </div>
-    <div class="lab-bar__globals">
-      <span class="lab-bar__tag" title="Ours, not the hardware's: every model carries these.">LAB</span>
-    <div class="extras1176__item">
-      <Knob1176 :p="c.mix" :size="46" label="MIX" :format="fmtPct" />
-    </div>
-    <div class="extras1176__item">
-      <Knob1176 :p="c.scHpf" :size="46" label="SC HPF" :format="fmtHpf" />
-    </div>
-    <div class="extras1176__item">
-      <span class="extras1176__caption">STEREO</span>
-      <Toggle :p="c.link" :labels="['DUAL', 'LINK']" variant="rocker" />
-    </div>
-    <div v-if="c.source" class="extras1176__item source">
-      <span class="extras1176__caption">DEMO SOURCE</span>
-      <Segmented :p="c.source.kind" :labels="['VOCAL', 'BASS', 'DRUMS', 'PINK', 'WHITE', 'SAW', 'SINE']" />
-      <Knob1176 :p="c.source.level" :size="42" label="LEVEL" :format="fmtLevel" :to-rotation="(v) => v" :from-rotation="(r) => r" />
-      <Knob1176 :p="c.source.freq" :size="42" label="PITCH" :format="fmtFreq" :to-rotation="(v) => Math.log(v / 20) / Math.log(1000)" :from-rotation="(r) => 20 * Math.pow(1000, r)" />
-    </div>
-    <button class="extras1176__scope" :class="{ on: ui.scope }" title="Show or hide the analysis drawer" @click="ui.scope = !ui.scope">SCOPE</button>
-    </div>
+    <BarGlobals v-model:scope="ui.scope" />
+  
   </div>
 </template>

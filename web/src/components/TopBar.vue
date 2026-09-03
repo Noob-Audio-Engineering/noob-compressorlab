@@ -4,7 +4,7 @@
  * `model` parameter, so the choice is per instance and saved with the
  * project), the active model's presets (previous / next, a menu with the
  * factory and user presets, Save As, Delete), undo / redo / A-B from the
- * framework's `History`, bypass, fullscreen, and the read-outs (edit→echo
+ * framework's `History`, bypass, and the read-outs (edit→echo
  * round trip, reported latency, connection).
  *
  * Presets are per model: loading one touches only that model's parameters
@@ -18,7 +18,10 @@ import { FACTORY_PRESETS, loadUserPresets, onUserPresetsChange, saveUserPresets 
 
 const { history, historyState, connected, stats, status, modified, client } = useNoobVstWebguiFramework();
 const lab = useLab();
-const { fullscreen, toggleFullscreen } = useWindow();
+// The window handle is still created here so the page has exactly one; the
+// framework's fullscreen support is untouched, this page simply has no
+// control for it.
+useWindow();
 const key = lab.key;
 const active = lab.active;
 const version = ref(0);
@@ -114,7 +117,6 @@ const offline = computed(() => client.offline === true);
       <button class="tb hist" title="Toggle A / B (Ctrl+B)" @click="history.toggleAB()"><b :class="{ dim: historyState.ab !== 'A' }">A</b>/<b :class="{ dim: historyState.ab !== 'B' }">B</b></button>
       <button class="tb hist" title="Copy this state to the other slot" @click="history.copyToOther()">⧉</button>
       <button class="tb" :class="{ on: lab.bypass.on }" :title="lab.bypass.on ? 'Bypassed: click to put the compressor back in' : 'Bypass the compressor'" @click="toggleBypass">BYPASS</button>
-      <button class="tb" :class="{ on: fullscreen }" :title="fullscreen ? 'Leave fullscreen' : 'Fullscreen'" @click="toggleFullscreen()">⛶</button>
       <span class="labbar__stat echo">edit→echo <b>{{ fmt(stats.echoAvgMs) }}</b></span>
       <span class="labbar__stat">latency <b>{{ latency }}</b></span>
     </div>

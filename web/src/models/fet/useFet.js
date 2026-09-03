@@ -35,7 +35,7 @@ let controls = null;
 
 /**
  * The parameter handles of the panel, resolved once.
- * @returns {{ input, output, attack, release, ratio, meter, revision, link, mix, scHpf, bypass, source: { kind, freq, level } | null }}
+ * @returns {{ input, output, attack, release, ratio, meter, revision, link, mix, scHpf, bypass }}
  */
 export function useControls() {
   if (controls) return controls;
@@ -52,7 +52,6 @@ export function useControls() {
     mix: lab.mix,
     scHpf: lab.scHpf,
     bypass: lab.bypass,
-    source: lab.source,
   };
   return controls;
 }

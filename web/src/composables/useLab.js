@@ -17,10 +17,46 @@ import {
   stateToJson as stateToJsonGeneric,
   useParam,
   useNoobVstWebguiFramework,
+  useStoredRef,
   useWindowSize,
 } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 
-export { getClient, hasParam, useParam, useNoobVstWebguiFramework };
+export { getClient, hasParam, useParam, useNoobVstWebguiFramework, useStoredRef };
+
+/**
+ * Whether the development panel is shown, and whether it is expanded.
+ *
+ * It is meant to be there where debugging and demonstrating happen and
+ * absent from a shipped plug-in, so it defaults on in offline design mode,
+ * on the Vite dev server and under the standalone, and off inside a host.
+ * The toggle beside SCOPE overrides that either way, and the choice lives
+ * in the UI store, so it travels with the plug-in state and survives
+ * reopening the editor.
+ *
+ * @returns {{ shown: import('vue').WritableComputedRef<boolean>, open: import('vue').WritableComputedRef<boolean>, byDefault: boolean }}
+ */
+export function useDebug() {
+  if (debugState) return debugState;
+  const stored = useStoredRef('debug.shown', null);
+  const open = useStoredRef('debug.open', true);
+  const byDefault = () => {
+    const c = getClient();
+    if (!c) return false;
+    if (c.offline) return true;
+    if (c.manifest && c.manifest.meta && c.manifest.meta.standalone) return true;
+    return !!(import.meta && import.meta.env && import.meta.env.DEV);
+  };
+  debugState = {
+    byDefault,
+    shown: computed({
+      get: () => (stored.value === null || stored.value === undefined ? byDefault() : !!stored.value),
+      set: (v) => (stored.value = !!v),
+    }),
+    open: computed({ get: () => open.value !== false, set: (v) => (open.value = !!v) }),
+  };
+  return debugState;
+}
+let debugState = null;
 
 /**
  * The models, in the order of the `model` parameter's steps. `key` names the

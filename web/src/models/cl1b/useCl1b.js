@@ -64,7 +64,7 @@ function makePower() {
 let controls = null;
 
 /**
- * @returns {{ gain, ratio, threshold, attack, release, mode, meter, bus, link, mix, scHpf, bypass, power, source }}
+ * @returns {{ gain, ratio, threshold, attack, release, mode, meter, bus, link, mix, scHpf, bypass, power }}
  */
 export function useControls() {
   if (controls) return controls;
@@ -83,7 +83,6 @@ export function useControls() {
     scHpf: lab.scHpf,
     bypass: lab.bypass,
     power: makePower(),
-    source: lab.source,
   };
   return controls;
 }

@@ -56,7 +56,6 @@ export function useControls() {
     mix: lab.mix,
     scHpf: lab.scHpf,
     bypass: lab.bypass,
-    source: lab.source,
   };
   return controls;
 }

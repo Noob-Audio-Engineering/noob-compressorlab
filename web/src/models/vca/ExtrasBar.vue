@@ -16,6 +16,7 @@
  */
 import { Segmented, Toggle } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { FINISHES, ui, useControls, useFinish } from './useVca.js';
+import BarGlobals from '../../components/BarGlobals.vue';
 import KnobEL8 from './KnobEL8.vue';
 
 const c = useControls();
@@ -43,27 +44,7 @@ const fmtHpf = (v) => (v < 5 ? 'OFF' : `${Math.round(v)} Hz`);
       <span class="extrasel8__caption">HEADROOM</span>
     </div>
     </div>
-    <div class="lab-bar__globals">
-      <span class="lab-bar__tag" title="Ours, not the hardware's: every model carries these.">LAB</span>
-    <div class="extrasel8__item">
-      <KnobEL8 :p="c.mix" size="46px" label="Mix" :sweep="270" />
-      <span class="extrasel8__value">{{ Math.round(c.mix.plain) }} %</span>
-      <span class="extrasel8__caption">MIX</span>
-    </div>
-    <div class="extrasel8__item">
-      <KnobEL8 :p="c.scHpf" size="46px" label="Side-chain high-pass" :sweep="270" />
-      <span class="extrasel8__value">{{ fmtHpf(c.scHpf.plain) }}</span>
-      <span class="extrasel8__caption">SC HPF</span>
-    </div>
-    <div class="extrasel8__item">
-      <span class="extrasel8__caption">STEREO</span>
-      <Toggle :p="c.link" :labels="['', 'stereo']" />
-    </div>
-    <div v-if="c.source" class="extrasel8__item source">
-      <span class="extrasel8__caption">DEMO SOURCE</span>
-      <Segmented :p="c.source.kind" :labels="['VOCAL', 'BASS', 'DRUMS', 'PINK', 'WHITE', 'SAW', 'SINE']" />
-    </div>
-    <button class="extrasel8__scope" :class="{ on: ui.scope }" title="Show or hide the analysis drawer" @click="ui.scope = !ui.scope">SCOPE</button>
-    </div>
+    <BarGlobals v-model:scope="ui.scope" />
+  
   </div>
 </template>

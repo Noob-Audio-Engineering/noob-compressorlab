@@ -11,6 +11,7 @@
  */
 import { Knob, Segmented, Toggle } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { ui, useOpto } from './useOpto.js';
+import BarGlobals from '../../components/BarGlobals.vue';
 
 const panel = useOpto();
 const knob = { size: 42, color: '#e9a23b' };
@@ -24,27 +25,7 @@ const knob = { size: 42, color: '#e9a23b' };
         <Segmented :p="panel.cell" />
       </div>
     </div>
-    <div class="lab-bar__globals">
-      <span class="lab-bar__tag" title="Ours, not the hardware's: every model carries these.">LAB</span>
-      <div class="flex flex-col items-center gap-1">
-        <Knob :p="panel.mix" v-bind="knob" label="Mix" />
-      </div>
-      <div class="flex flex-col items-center gap-1">
-        <Knob :p="panel.scHpf" v-bind="knob" label="SC HPF" />
-      </div>
-      <div class="flex flex-col items-center gap-1">
-        <div class="bench-label">Stereo</div>
-        <Toggle :p="panel.link" :labels="['', 'stereo']" />
-      </div>
-      <template v-if="panel.source">
-        <div class="flex flex-col items-center gap-1">
-          <div class="bench-label">Demo source</div>
-          <Segmented :p="panel.source.kind" />
-        </div>
-        <Knob :p="panel.source.level" :size="36" color="#7cc6ff" label="Level" />
-        <Knob :p="panel.source.freq" :size="36" color="#7cc6ff" label="Pitch" />
-      </template>
-      <button class="bench-scope" :class="{ on: ui.scope }" title="Show or hide the analysis drawer" @click="ui.scope = !ui.scope">SCOPE</button>
-    </div>
+    <BarGlobals v-model:scope="ui.scope" />
+  
   </div>
 </template>

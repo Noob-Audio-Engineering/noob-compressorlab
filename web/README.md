@@ -22,7 +22,7 @@ supplies behaviour only: parameter handles, knob gestures in rotation space
 (`useKnobGesture` with the `rotation` option, so a printed taper stays under
 the pointer), the needle's ballistics and scale maths, the history and
 transfer charts, presets in the plug-in-persisted store, undo / redo / A-B,
-window resizing and fullscreen intent.
+window resizing.
 
 ## Dev workflow
 
@@ -65,7 +65,7 @@ the range anyway, so this only makes design mode match it.
 ```
 App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y / Ctrl+B
 └── components/LabPage.vue      the shell: top bar, the active model's view (re-mounted on switch), the framework's ResizeGrip (`.lab-grip`)
-    ├── components/TopBar.vue   model switch (framework Segmented on `model`), presets of the active model, undo / redo / A-B, BYPASS, fullscreen, edit→echo and latency
+    ├── components/TopBar.vue   the compressor button (opens the browse view), presets of the active model, undo / redo / A-B, BYPASS, fullscreen, edit→echo and latency
     ├── components/HistoryPanel.vue   "Last 8 seconds": framework Timeline over `meter` (in, out, gain reduction), identical under every model
     ├── components/TransferPanel.vue  the transfer curve: framework LinePlot over the sticky `transfer` stream with the live operating point, identical under every model
     ├── models/fet/FetView.vue        the 1176: faceplate, extras bar, and the scope drawer (the two shared panels)
@@ -75,7 +75,7 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
     │   │   ├── MeterButtons.vue      the METER column, GR / +8 / +4 / OFF
     │   │   ├── VuMeter1176.vue       the cream VU face and needle (useNeedle on meter[5])
     │   │   └── PowerSwitch.vue       the power toggle (the inverse of `bypass`)
-    │   └── ExtrasBar.vue             REVISION (A to H, LN), STEREO, MIX, SC HPF, the demo source (standalone only), SCOPE
+    │   └── ExtrasBar.vue             REVISION (A to H, LN), then the shared globals group (`BarGlobals.vue`)
     └── models/opto/OptoView.vue      the LA-2A: faceplate, the workbench (T4 panel and the two shared panels), extras strip
         ├── Faceplate.vue             the 19 : 5.25 panel: rack ears, screws, logotype and captions placed by fractions measured from a photograph
         │   ├── BigKnob.vue           Gain and Peak Reduction: printed 0..100 scale, black body, white pointer (useKnobGesture)
@@ -83,7 +83,7 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
         │   ├── SelectorKnob.vue      the meter selector, three positions (useKnobGesture, click steps)
         │   └── ToggleLever.vue       bat-handle toggles for Limit / Compress and Power
     │   ├── T4Panel.vue               light, free and trapped carriers from the `cell` stream
-    │   └── ExtrasStrip.vue           emphasis, cell, link, mix, side-chain HPF, the demo source
+    │   └── ExtrasStrip.vue           emphasis and cell, then the shared globals group
     ├── models/la3a/La3aView.vue      the LA-3A: the half-rack faceplate, the rear-panel strip, the drawer
     │   ├── Faceplate.vue             the SR-3A rack: a 19 : 3.5 panel with the black half-rack unit and a blank plate
     │   ├── La3aKnob.vue              Gain and Peak Reduction: cream body, the 0..10 scale printed on the panel
@@ -94,7 +94,7 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
     │   ├── KnobEL8.vue               the four ivory knobs, 0..10 printed on the panel around them
     │   ├── GrBargraph.vue            the sixteen-lamp gain-reduction bargraph, 1 to 26 dB
     │   ├── MiniToggle.vue            the two toggles the EL8-X adds between the knobs
-    │   └── ExtrasBar.vue             finish, link mode, headroom, mix, side-chain HPF, the demo source, SCOPE
+    │   └── ExtrasBar.vue             finish, link mode and headroom, then the shared globals group
     ├── models/pre6176/Pre6176View.vue  the 6176: the two-unit faceplate, the extras bar, the drawer
     │   ├── Faceplate.vue             the 19 : 3.5 aluminium panel with two black insets; reuses the 1176's VU
     │   ├── PreKnob.vue               the glossy black knobs, continuous and stepped alike
@@ -107,14 +107,14 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
         ├── Cl1bToggle.vue            the IN switch, which is the shared bypass wearing the hardware's legend
         ├── Cl1bPower.vue             the mains switch
         ├── VuFaceCl1b.vue            its own VU: two arcs, dB over percentage, maker's script, VU lower right
-        └── ExtrasStrip.vue           mix, side-chain HPF, link, the demo source, SCOPE
+        └── ExtrasStrip.vue           the shared globals group
 ```
 
 Composables and data:
 
 | file | contents |
 |---|---|
-| `composables/useLab.js` | the facade over `@noob-audio-engineering/noob-vst-webgui-framework/vue`: `MODELS`, `useLab()` (the model switch and the shared handles: link, mix, side-chain HPF, bypass, demo source), `useWindow()` (the page's one `useWindowSize`), the per-model preset helpers (`presetSkip`, `stateToJson`, `loadState`) and the `ui` state |
+| `composables/useLab.js` | the facade over `@noob-audio-engineering/noob-vst-webgui-framework/vue`: `MODELS`, `useLab()` (the model switch and the shared handles: link, mix, side-chain HPF, bypass, and the demo source when the build has one), `useWindow()` (the page's one `useWindowSize`), the per-model preset helpers (`presetSkip`, `stateToJson`, `loadState`) and the `ui` state |
 | `models/fet/useFet.js` | the 1176's handles (`useControls()`, ids `fet_*`), the revisions and their looks, the dial tapers |
 | `models/opto/useOpto.js` | the LA-2A's handles (`useOpto()`, ids `opto_*`) |
 | `models/la3a/useLa3a.js` | the LA-3A's handles (`useControls()`, ids `la3a_*`) and its drawer state |
@@ -193,7 +193,7 @@ switch again.
 | METER (6176) | `pre_meter` | PRE / GR / COMP |
 | LO CUT, voicing, input loading | `pre_hpf`, `pre_voice`, `pre_load` | the centre strip and the extras bar |
 | STEREO / LINK, MIX, SC HPF | `link`, `mix`, `sc_hpf` | shared by both models |
-| DEMO SOURCE | `src_kind`, `src_level`, `src_freq` | standalone only (`hasParam`) |
+| DEMO SOURCE | `src_kind`, `src_level`, `src_freq` | not in the bench bar: it lives in the development panel, and it exists only in the standalone (`hasParam`) |
 | every needle | stream `meter[5]` | **where the needle already is**, in dB against the meter's zero. The VU movement runs in the audio thread for all five models (13 rad/s, damping 0.80: 99 % in 300 ms, about 1.5 % overshoot), so a face draws this field rather than smoothing it again; the framework needle is asked for nothing but a short critically-damped follow to bridge the gap between frames |
 | LAST 8 SECONDS | stream `meter[0, 2, 4]` | in and out peaks (dBFS), gain reduction (dB, at most 0) |
 | TRANSFER | stream `transfer`, marker from `meter[0, 2]` | sticky curve, republished on change |
@@ -257,7 +257,47 @@ of `fet.css` draws it:
 | `blackface` | C, D, E, F, G, LN | black anodised plate, light lettering, silver-capped knobs with light skirt scales, the badge above the meter, the model lettering under it |
 | `silverface` | H | silver plate with the recessed left section and "PEAK LIMITER", silver caps, the blue badge at the right |
 
-## Window size and fullscreen
+## The development panel
+
+Below the workbench sits a panel that is **not part of any of these units**:
+a diagnostic window onto the bridge, for building and demonstrating the
+plug-in. It shows what nothing else on the page does.
+
+| section | what it shows |
+|---|---|
+| Bridge | connection state, url, protocol version, whether the page is offline or live, the sample rate, and the framework's own statistics: edit-to-echo, frames per second, bytes and frames in |
+| Model | the active engine's label, key, family, the id prefixes it owns, and the reported latency |
+| Demo source | the standalone's test-signal generator, controls and state together: which generator is running, its level in both raw and dBFS, its pitch and whether that generator uses pitch at all, and what is actually arriving at the input measured off the meter stream. In a host it says plainly that the generator is not in the build and the host is the input |
+| Streams | every declared stream with its kind, sequence number, how recently it arrived, its length against its capacity, and its current values named by the `layout` in its meta; a curve shows its endpoints instead of 128 numbers |
+| Parameters | the active model's parameters plus the shared ones, each with its raw normalised value beside its plain value and the text the page shows. The pair is the point: those two disagreeing is the fault an audit of this plug-in kept finding |
+
+**When it appears.** It defaults on in offline design mode, on the Vite dev
+server and under the standalone, and off inside a host. The DEBUG button in
+the bar's global group overrides that either way, including in a host when
+someone wants to demonstrate the bridge, and the choice is kept in the UI
+store so it survives reopening the editor.
+
+**Why the demo source is in here.** It used to sit in the bench bar. It is a
+test-signal generator: not automatable, meaningless where a host is feeding
+the input, and compiled into the standalone only, so `plugin.rs` never
+registers `src_kind`, `src_level` or `src_freq` and the bar's controls for it
+never appeared in a host in the first place. Moving it changes nothing about
+the plug-in, and it leaves the bench bar holding only controls that change
+real audio. Its knobs are live where they exist, regardless of whether the
+panel defaults on.
+
+Adding `?nosource` to the dev server's URL drops those three parameters from
+the design manifest, which is the parameter set a host publishes. It exists so
+the panel's host presentation can be checked without loading the plug-in into
+one.
+
+**What it costs.** Nothing when it is not on screen. The values are polled
+four times a second while the panel is shown *and* expanded; collapsing it
+or switching it off clears the timer, so a hidden panel does no work. Four
+times a second is deliberate: these are diagnostics rather than meters, and
+numbers that change every frame cannot be read.
+
+## Window size
 
 Every view scales with the window in both dimensions, from 900 × 520 up
 (`WINDOW_MIN` in `useLab.js`, the same limits `src/plugin.rs` gives the
@@ -283,7 +323,7 @@ carries controls.
 
 The top bar sheds its content in stages as the window narrows so that it
 never wraps and never overflows: the subtitle first, then the read-outs,
-then the transport, then the product name, leaving BYPASS and fullscreen
+then the transport, then the product name, leaving BYPASS
 standing longest. The workbench row keeps a minimum height and, below about
 640 px of window, shows the history panel alone at full width rather than
 two charts too short to read. Nothing scrolls.
@@ -297,10 +337,9 @@ Two framework pieces drive the host window, both through the one
   sends coalesced `resize` messages; the adapter resizes the host window
   and web view, remembers the size under the `window` store key and reopens
   at it. In a browser tab (the standalone) the grip renders nothing.
-* **Fullscreen**: the ⛶ button in the top bar calls `toggleFullscreen()`
-  and lights up while fullscreen. In a host the adapter sizes the editor to
-  the monitor's work area and restores the previous size afterwards; in a
-  tab the browser's Fullscreen API does the same for the tab.
+* **No fullscreen control**: the framework's `useWindowSize` supports
+  fullscreen and this page chooses not to offer it, so the top bar has no
+  such button. The capability is untouched for any page that wants one.
 
 ## Adding a control
 

@@ -21,6 +21,7 @@
  */
 import { Knob, Segmented, Toggle } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { ui, useControls } from './useLa3a.js';
+import BarGlobals from '../../components/BarGlobals.vue';
 
 const c = useControls();
 const knob = { size: 42, color: '#dda43f' };
@@ -45,19 +46,7 @@ const knob = { size: 42, color: '#dda43f' };
       <Segmented :p="c.meter" :labels="['GR', 'OUT', 'OFF']" />
     </div>
     </div>
-    <div class="lab-bar__globals">
-      <span class="lab-bar__tag" title="Ours, not the hardware's: every model carries these.">LAB</span>
-    <div class="extrasla3a__item"><Knob :p="c.mix" v-bind="knob" label="Mix" /></div>
-    <div class="extrasla3a__item"><Knob :p="c.scHpf" v-bind="knob" label="SC HPF" /></div>
-    <div class="extrasla3a__item">
-      <span class="extrasla3a__caption">STEREO</span>
-      <Toggle :p="c.link" :labels="['', 'stereo']" />
-    </div>
-    <div v-if="c.source" class="extrasla3a__item source">
-      <span class="extrasla3a__caption">DEMO SOURCE</span>
-      <Segmented :p="c.source.kind" :labels="['VOCAL', 'BASS', 'DRUMS', 'PINK', 'WHITE', 'SAW', 'SINE']" />
-    </div>
-    <button class="extrasla3a__scope" :class="{ on: ui.scope }" title="Show or hide the analysis drawer" @click="ui.scope = !ui.scope">SCOPE</button>
-    </div>
+    <BarGlobals v-model:scope="ui.scope" />
+  
   </div>
 </template>

@@ -13,12 +13,13 @@
  * charts stay legible and the panel yields, not the other way round.
  */
 import { computed } from 'vue';
-import { useWindow } from '../../composables/useLab.js';
+import { useDebug, useWindow } from '../../composables/useLab.js';
 import { ui } from './useCl1b.js';
 import HistoryPanel from '../../components/HistoryPanel.vue';
 import TransferPanel from '../../components/TransferPanel.vue';
 import Faceplate from './Faceplate.vue';
 import ExtrasStrip from './ExtrasStrip.vue';
+import DebugPanel from '../../components/DebugPanel.vue';
 
 const win = useWindow();
 /** The top bar, the paddings, the extras strip and the workbench's own minimum. */
@@ -26,6 +27,7 @@ const CHROME_PX = 283;
 /** 483 by 131 mm: a 19 inch panel three units tall (section 2.1). */
 const PLATE_ASPECT = 483 / 131;
 const plateMax = computed(() => `${Math.max(760, Math.min(2600, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT)))}px`);
+const debug = useDebug();
 </script>
 
 <template>
@@ -36,5 +38,6 @@ const plateMax = computed(() => `${Math.max(760, Math.min(2600, Math.round((win.
       <HistoryPanel />
       <TransferPanel />
     </section>
+    <DebugPanel v-if="debug.shown.value" v-model:open="debug.open.value" />
   </main>
 </template>

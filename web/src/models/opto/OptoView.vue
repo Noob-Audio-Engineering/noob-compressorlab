@@ -14,13 +14,14 @@
  * extras strip is a fixed band.
  */
 import { computed } from 'vue';
-import { useWindow } from '../../composables/useLab.js';
+import { useDebug, useWindow } from '../../composables/useLab.js';
 import HistoryPanel from '../../components/HistoryPanel.vue';
 import TransferPanel from '../../components/TransferPanel.vue';
 import Faceplate from './Faceplate.vue';
 import T4Panel from './T4Panel.vue';
 import { ui } from './useOpto.js';
 import ExtrasStrip from './ExtrasStrip.vue';
+import DebugPanel from '../../components/DebugPanel.vue';
 
 const win = useWindow();
 
@@ -33,6 +34,7 @@ const win = useWindow();
 const CHROME_PX = 331;
 const PLATE_ASPECT = 19 / 5.25;
 const plateMax = computed(() => `${Math.max(600, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
+const debug = useDebug();
 </script>
 
 <template>
@@ -44,5 +46,6 @@ const plateMax = computed(() => `${Math.max(600, Math.round((win.height.value - 
       <HistoryPanel />
       <TransferPanel />
     </section>
+    <DebugPanel v-if="debug.shown.value" v-model:open="debug.open.value" />
   </main>
 </template>

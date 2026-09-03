@@ -158,30 +158,30 @@
   gap: 16px;
 }
 .browse__title {
-  margin: 0 0 3px;
-  font: 800 13px var(--font-sans);
+  margin: 0 0 4px;
+  font: 800 15px var(--font-sans);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--lab-accent);
 }
 .browse__lede {
   margin: 0;
-  max-width: 68ch;
-  font-size: 11px;
+  max-width: 78ch;
+  font-size: 12.5px;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.55);
 }
 .browse__close {
   margin-left: auto;
   flex: 0 0 auto;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: 5px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.05);
   color: inherit;
   cursor: pointer;
-  font: 700 10px var(--font-sans);
-  letter-spacing: 0.1em;
+  font: 700 12px var(--font-sans);
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 .browse__close:hover {
@@ -210,23 +210,24 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .browse__familyname {
-  font: 800 9px var(--font-sans);
-  letter-spacing: 0.2em;
+  font: 800 11px var(--font-sans);
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--lab-accent);
 }
 .browse__familynote {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 /*
- * `auto-fit`, not `auto-fill`: empty tracks collapse, so a family with one
- * model gives that model the whole row instead of leaving three quarters of
- * the width blank at 1900 px.
+ * One compressor per row, whichever family it belongs to. The view is then
+ * the same shape all the way down, so the panel, the name and the
+ * description sit in the same place on every entry and the eye does not
+ * have to re-find them between families.
  */
 .browse__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 /*
@@ -332,11 +333,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 700 12px var(--font-sans);
-  letter-spacing: 0.04em;
+  font: 700 16px var(--font-sans);
+  letter-spacing: 0.03em;
 }
 .browse__badge {
-  font: 800 7px var(--font-sans);
+  font: 800 9px var(--font-sans);
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--lab-accent);
@@ -345,18 +346,23 @@
   padding: 2px 4px;
 }
 .browse__sub {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.58);
 }
 .browse__blurb {
-  font-size: 10.5px;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.74);
 }
 /*
  * The lede carries the promise that settings are kept, which is the reason
  * someone dares to shop around, so it stays at every size. At short windows
  * it tightens rather than disappearing.
+ */
+/*
+ * Short windows tighten the spacing, never the reading sizes: small text is
+ * the fault this project has rejected most often. If anything has to give
+ * at the minimum it is the length of the lede, not its size.
  */
 @media (max-height: 560px) {
   .browse {
@@ -364,13 +370,222 @@
     padding: 8px 12px;
   }
   .browse__lede {
-    font-size: 10px;
-    line-height: 1.3;
     max-width: none;
   }
-  .browse__title {
-    font-size: 11px;
-  }
+}
+
+/* ------------------------------------------------ the development panel */
+/*
+ * Plain, dense and legible: it is a developer's table, not a panel from any
+ * of these units, so it takes the shell's colours and none of the models'.
+ * Identical on all six, like the rest of what is ours.
+ */
+.dbg {
+  flex: 0 0 auto;
+  margin: 0 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: #0e1013;
+  overflow: hidden;
+}
+.dbg__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 12px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.dbg__bar:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.dbg__bar:focus-visible {
+  outline: 2px solid var(--color-lab-accent, #e9a23b);
+  outline-offset: -2px;
+}
+.dbg__caret {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.dbg__title {
+  font: 800 10px var(--font-sans);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #e9a23b;
+}
+.dbg__hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+.dbg__body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 460px;
+  overflow-y: auto;
+}
+.dbg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.dbg__card {
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.dbg__card h4 {
+  margin: 0 0 6px;
+  font: 700 11px var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.66);
+}
+.dbg__card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  font: 400 12px var(--font-mono, ui-monospace, "Cascadia Mono", Consolas, monospace);
+}
+.dbg__card dt {
+  color: rgba(255, 255, 255, 0.45);
+}
+.dbg__card dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+.dbg__card dd.wrap {
+  word-break: break-all;
+}
+.dbg__table {
+  width: 100%;
+  border-collapse: collapse;
+  font: 400 12px var(--font-mono, ui-monospace, "Cascadia Mono", Consolas, monospace);
+}
+.dbg__table th {
+  text-align: left;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 2px 10px 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.dbg__table td {
+  padding: 3px 10px 3px 0;
+  color: rgba(255, 255, 255, 0.85);
+  vertical-align: top;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.dbg__table td.dim {
+  color: rgba(255, 255, 255, 0.45);
+}
+.dbg__val {
+  display: inline-block;
+  margin-right: 12px;
+  white-space: nowrap;
+}
+.dbg__val i {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.4);
+  margin-right: 4px;
+}
+.dbg .dim {
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+/*
+ * The demo source's controls, in the panel rather than the bench bar.
+ *
+ * The segmented control had the same fault the knobs had: it was styled six
+ * times over, once in each model's stylesheet, scoped to that model's own bar
+ * class. The looks had drifted — two different backgrounds, three paddings,
+ * two type sizes, and each model's own amber for the selected step — so the
+ * source selector looked different on every model, and the moment it moved
+ * out of those six selectors it fell back to bare browser buttons. One rule
+ * here, on the shared components, is the fix; the models keep styling the
+ * controls that really are theirs, like the 1176's REVISION.
+ */
+.dbg {
+  --noob-vst-webgui-framework-accent: #e9a23b;
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+  --lab-accent: #e9a23b;
+  --lab-accent-rgb: 233 162 59;
+}
+.lab-bar__globals .noob-vst-webgui-framework-segmented,
+.dbg .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b0c0e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.lab-bar__globals .noob-vst-webgui-framework-segment,
+.dbg .noob-vst-webgui-framework-segment {
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(230, 227, 218, 0.55);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.dbg .noob-vst-webgui-framework-segment:hover {
+  color: rgba(230, 227, 218, 0.85);
+}
+.dbg .noob-vst-webgui-framework-segment:focus-visible {
+  outline: 1px solid var(--lab-accent);
+  outline-offset: 1px;
+}
+
+.dbg__srcrow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.dbg__srcstate {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  font: 400 12px var(--font-mono, ui-monospace, "Cascadia Mono", Consolas, monospace);
+}
+.dbg__srcstate dt {
+  color: rgba(255, 255, 255, 0.45);
+}
+.dbg__srcstate dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+.dbg__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+}
+.dbg__foot {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .lab-bar__left {
@@ -386,6 +601,91 @@
   flex-wrap: wrap;
   gap: 4px 18px;
   margin-left: auto;
+  /*
+   * One accent for the controls that are ours, whichever compressor is
+   * loaded. Each model root sets its own accent for its own face, and the
+   * shared knobs, chips and buttons used to inherit it, so MIX and SC HPF
+   * glowed a slightly different amber on five models and silver on the
+   * 6176. The model's colour still governs the model's half of the bar and
+   * the whole faceplate: what is ours looks the same everywhere, what is
+   * theirs looks like itself.
+   */
+  --noob-vst-webgui-framework-accent: #e9a23b;
+  /* the pointer and value text take this, and each model root sets a slightly
+   * different near-white, so pin it as well: identical, not merely similar */
+  --noob-vst-webgui-framework-text: #e6e3da;
+  --noob-vst-webgui-framework-text-dim: rgba(230, 227, 218, 0.45);
+  --lab-accent: #e9a23b;
+  --lab-accent-rgb: 233 162 59;
+}
+/*
+ * The models colour these controls directly in their own stylesheets, so a
+ * variable alone would not reach them. These rules sit here, after the model
+ * files are imported, and pin the group at equal specificity.
+ */
+.lab-bar__globals .noob-vst-webgui-framework-segment.is-on,
+.dbg .noob-vst-webgui-framework-segment.is-on,
+.lab-bar__globals .noob-vst-webgui-framework-toggle .pos.is-on {
+  background: var(--lab-accent);
+  color: #17130a;
+  box-shadow: none;
+}
+.lab-bar__globals .noob-vst-webgui-framework-toggle.is-on,
+.lab-bar__globals .noob-vst-webgui-framework-toggle.switch.is-on .lbl:last-child {
+  color: var(--lab-accent);
+}
+.lab-bar__globals .noob-vst-webgui-framework-toggle.switch.is-on .track {
+  background: rgba(var(--lab-accent-rgb), 0.55);
+  border-color: rgba(var(--lab-accent-rgb), 0.7);
+}
+.lab-bar__globals .extras1176__scope,
+.lab-bar__globals .extrasla3a__scope,
+.lab-bar__globals .extrasel8__scope,
+.lab-bar__globals .extras6176__scope,
+.lab-bar__globals .extrascl1b__scope,
+.lab-bar__globals .bench-scope {
+  border-color: rgba(var(--lab-accent-rgb), 0.35);
+  color: rgba(255, 255, 255, 0.6);
+  background: transparent;
+}
+.lab-bar__globals .extras1176__scope.on,
+.lab-bar__globals .extrasla3a__scope.on,
+.lab-bar__globals .extrasel8__scope.on,
+.lab-bar__globals .extras6176__scope.on,
+.lab-bar__globals .extrascl1b__scope.on,
+.lab-bar__globals .bench-scope.on {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #17130a;
+}
+.lab-bar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lab-bar__caption {
+  font: 700 9px var(--font-sans);
+  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.45);
+}
+.lab-bar__scope {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--lab-accent-rgb), 0.35);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font: 700 9px var(--font-sans);
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+.lab-bar__scope.on {
+  background: var(--lab-accent);
+  border-color: var(--lab-accent);
+  color: #17130a;
+}
+.lab-bar__globals .lab-bar__tag {
+  color: rgba(var(--lab-accent-rgb), 0.75);
+  border-color: rgba(var(--lab-accent-rgb), 0.35);
 }
 /* The chip that says the group beside it is ours rather than the hardware's. */
 /*
@@ -530,7 +830,7 @@ body {
 /*
  * The bar has to stay usable at the 900 px minimum the plug-in can be dragged
  * to, so it sheds its content in stages: the subtitle, then the read-outs,
- * then the transport, then the product name. BYPASS and fullscreen are the
+ * then the transport, then the product name. BYPASS is the
  * last things standing, because they are the two controls a player reaches
  * for without opening anything.
  */

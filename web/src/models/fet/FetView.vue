@@ -7,12 +7,13 @@
  * the rest. Mounted by `LabPage.vue` while the model switch says 1176.
  */
 import { computed } from 'vue';
-import { useWindow } from '../../composables/useLab.js';
+import { useDebug, useWindow } from '../../composables/useLab.js';
 import { ui } from './useFet.js';
 import HistoryPanel from '../../components/HistoryPanel.vue';
 import TransferPanel from '../../components/TransferPanel.vue';
 import Faceplate from './Faceplate.vue';
 import ExtrasBar from './ExtrasBar.vue';
+import DebugPanel from '../../components/DebugPanel.vue';
 
 
 /*
@@ -27,6 +28,7 @@ const CHROME_PX = 384;
 /** Two units in a full rack: the 1176's plate is 5.2 to 1. */
 const PLATE_ASPECT = 5.2;
 const plateMax = computed(() => `${Math.max(640, Math.round((win.height.value - CHROME_PX) * PLATE_ASPECT))}px`);
+const debug = useDebug();
 </script>
 
 <template>
@@ -37,5 +39,6 @@ const plateMax = computed(() => `${Math.max(640, Math.round((win.height.value - 
       <HistoryPanel />
       <TransferPanel />
     </section>
+    <DebugPanel v-if="debug.shown.value" v-model:open="debug.open.value" />
   </div>
 </template>

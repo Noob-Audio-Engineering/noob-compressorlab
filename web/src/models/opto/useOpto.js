@@ -12,7 +12,7 @@ let panel = null;
 
 /**
  * The panel's handles, resolved once and shared.
- * @returns {{ gain, peakReduction, mode, meter, emphasis, cell, link, mix, scHpf, bypass, source: null | { kind, level, freq } }}
+ * @returns {{ gain, peakReduction, mode, meter, emphasis, cell, link, mix, scHpf, bypass }}
  */
 export function useOpto() {
   if (panel) return panel;
@@ -31,7 +31,6 @@ export function useOpto() {
     mix: lab.mix,
     scHpf: lab.scHpf,
     bypass: lab.bypass,
-    source: lab.source,
   };
   return panel;
 }

@@ -28,6 +28,12 @@ function plain(id, fallback = 0) {
   }
 }
 const db = (a) => (a > 0 ? 20 * Math.log10(a) : -120);
+
+/** With `?nosource`, the parameter set a host would publish. */
+function dropSource(list) {
+  const off = typeof location !== 'undefined' && new URLSearchParams(location.search).has('nosource');
+  return off ? list.filter((p) => p.group !== 'source') : list;
+}
 /** The VU reference: +4 dBu reads 0 VU at −18 dBFS. */
 const VU_REF_DBFS = -18;
 /** The model switch as a key, in the order of the `model` parameter's steps. */
@@ -63,7 +69,11 @@ const stepped = (list) => list.map((p) => (p.labels && p.max == null ? { min: 0,
 export const offline = {
   name: 'noob-compressorlab',
   meta: { vendor: 'Noob Audio Engineering', version: 'dev', sample_rate: 48000, vu_ref_dbfs: VU_REF_DBFS, transfer_points: 128, standalone: true },
-  params: stepped([
+  // `?nosource` drops the three demo-source parameters, reproducing what a
+  // host sees: `plugin.rs` never registers them, so the development panel's
+  // source card has to say the host is the input rather than offer controls.
+  // It exists so that presentation can be checked without a host.
+  params: dropSource(stepped([
     { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B'], default: 0, group: 'lab', automatable: false },
 
     { id: 'fet_input', name: 'Input', min: 0, max: 48, default: 24, group: '1176' },
@@ -136,7 +146,7 @@ export const offline = {
     { id: 'src_kind', name: 'Source', labels: ['Vocal', 'Bass', 'Drums', 'Pink noise', 'White noise', 'Saw', 'Sine'], default: 0, group: 'source', automatable: false },
     { id: 'src_level', name: 'Source Level', min: 0, max: 1, default: 0.4, group: 'source', automatable: false },
     { id: 'src_freq', name: 'Source Frequency', min: 20, max: 20000, default: 110, taper: 'log', unit: 'Hz', group: 'source', automatable: false },
-  ]),
+  ])),
   streams: [
     // `meter_vu` is where the needle already is: the VU movement's ballistics
     // (13 rad/s, damping 0.80) run in the audio thread, so a page draws the

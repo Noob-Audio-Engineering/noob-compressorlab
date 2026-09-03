@@ -21,7 +21,7 @@ export const ui = reactive({
 let controls = null;
 
 /**
- * @returns {{ gain, peakReduction, mode, meter, emphasis, cell, link, mix, scHpf, bypass, source }}
+ * @returns {{ gain, peakReduction, mode, meter, emphasis, cell, link, mix, scHpf, bypass }}
  */
 export function useControls() {
   if (controls) return controls;
@@ -37,7 +37,6 @@ export function useControls() {
     mix: lab.mix,
     scHpf: lab.scHpf,
     bypass: lab.bypass,
-    source: lab.source,
   };
   return controls;
 }

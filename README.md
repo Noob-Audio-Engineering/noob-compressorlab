@@ -41,7 +41,7 @@ browser client, gestures, needle ballistics and charts) comes from noob-vst-webg
 | `src/plugin.rs` | the nih-plug VST3 / CLAP plug-in (feature `plugin`) |
 | `src/bin/standalone.rs` | the dev server with a fake audio thread |
 | `web/` | the Vue + Tailwind page, one view per model ([its README](web/README.md)) |
-| `research/` | how the originals work and how they are simulated |
+| `research/` | how the originals work and how they are simulated, and [`SURVEY.md`](research/SURVEY.md) for what to model next and why |
 
 ```mermaid
 flowchart LR

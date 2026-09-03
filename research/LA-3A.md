@@ -889,6 +889,38 @@ figure is the number to beat, and it argues that the framework's trap-state memo
 | **Softube Opto Compressor** | "An iconic early 1960s T4 opto cell tube compressor/limiter" plus a Time control | An LA-2A, not an LA-3A; listed so the reader does not mistake it for one | [60] |
 | **IK Multimedia T-RackS White 2A** | "No electronic circuitry involved with the compression itself. It's just a tube amp with photo-resistors, lighted by a fluorescent panel driven by the output signal" | Also an LA-2A. **I could not find an LA-3A model in the T-RackS range**, and I would rather say so than invent one | [61] |
 
+**What each one gets right and wrong.** Only one public test puts the plug-ins next to the hardware [12], so
+this is a short list rather than a confident ranking, and every negative below traces to that test or to the
+product's own documentation rather than to my ears.
+
+- **UA Teletronix LA-3A.** Right: it is modelled from a real unit, it is the only emulation that documents the
+  ratio pair and the frequency dependence in the same breath ("nonlinear and frequency dependent, so these
+  figures are not absolute" [4]), and it exposes the HF Emphasis trimmer, which most owners of the hardware
+  never touch and most emulations never offer. Wrong: the harmonic series. The null test found "too much 3rd
+  harmonic, no 2nd, and too much 4th" [12] — a model producing no second harmonic at all is a structural
+  choice, not a tuning error, and it is why section 7.4 puts a small even-order term in the output stage.
+  Ambiguous: its HF control rotates the opposite way to the hardware manual's description (section 4.5).
+- **Waves CLA-3A.** Right: it is the only product that publishes its calibration (−18 dBFS = +4 dBu = 0 VU
+  [8]), the only one that documents the T4 depletion problem honestly, and the only one that admits the Peak
+  Reduction taper is deliberately non-linear "to conform to the exact scaling of the modeled unit" [8]. Its
+  HiFreq description is also the most precise account anyone publishes of what the trimmer does electrically:
+  it "increases voltage amplifier gain in the peak reduction circuit, for frequencies above 1 kHz, leaving
+  lower frequencies unaffected" [8], which is exactly the emitter network of section 3.5. Wrong: harmonics
+  again, "only seem to add the 3rd harmonic, and not nearly enough" [12]; and modelling one named engineer's
+  unit means inheriting that unit's cell.
+- **Black Rooster VLA-3A.** Right: the most complete public statement of what a component-level LA-3A model
+  contains — transformers, discrete sidechain, audio amplifier, the HF contour network and a T4B with
+  "level-dependent, self-adjusting behaviour" [10] — and it is the only one to name the contour filter as part
+  of the circuit rather than as a bonus feature. Wrong: same harmonic shortfall as Waves [12], and its dating
+  ("the early 1970s") is a year or two late against the 1969 AES debut [4] [5].
+- **All three, together.** The two failures they share are the ones worth designing against. Harmonics: none
+  matched the hardware's four overtones [12]. Extremes: "The plugins do not attack and release like the real
+  thing, especially from 0 to extreme gain reduction levels", and on a loud kick they "choke/hard-limit even on
+  'compress' mode" where the real unit "is all over the place after the initial hit" [12]. Both are failures at
+  the ends of the range, which is where a feedback opto is hardest and where a static level-to-gain table fitted
+  in the middle will always let go. That is the argument for keeping the physical cell and the real loop rather
+  than fitting a curve, and it is what tests 15 and 16 are for.
+
 Hardware clones describe the same ingredients from the other direction: Serpent Audio's SA-3A, LaZ Electronics'
 LA3A and its 500-series version, Golden Age's Comp-3A, AudioScape's V3A and Anthony DeMaria's ADL 1600 all
 centre on a T4B, an autotransformer-fed panel driver and a discrete line amp, and the DIY community's shopping
@@ -937,8 +969,9 @@ to catch that drift.
 
 ### 7.2 Block diagram in words, per channel per sample
 
-1. **Input pad**: `x_pad = x · pad`, where `pad` is 1.0 in the 50 dB position and 0.1 (−20 dB) in the 30 dB
-   position. The pad is ahead of everything on the real unit, so it moves the threshold with it.
+1. **Input**: no pad. The rear 50/30 dB switch is **not** a parameter; the model is fixed in the **50 dB
+   position**, pad out. That is the studio setting, and it is the position UREI's −30 dBm threshold figure
+   refers to. Section 7.3 says what was dropped and why.
 2. **Input transformer**: first-order high-pass at 7 Hz. (Wider than the LA-2A's 12 Hz; see section 7.5.)
 3. **Attenuator**: `y_att = x_hp · A(R_cell)`, the divider of section 3.3, with the cell state from the previous
    sample.
@@ -949,12 +982,14 @@ to catch that drift.
 7. **Peak Reduction**: `v = g_pr(pr) · tap`.
 8. **C6, the low-frequency deafness**: first-order high-pass at 100 Hz.
 9. **The autoformer's low-frequency limit**: a second first-order high-pass at 30 Hz.
-10. **HF Contour**: first-order high shelf, corner 2 kHz, `+10·(1 − hf)` dB, where `hf = 1` is flat.
+10. **HF Contour**: first-order high shelf, corner 2 kHz, `+10·emphasis` dB, where `emphasis = 0` is flat and
+    `emphasis = 1` is the full 10 dB. This is the **opposite sense to the LA-2A's `opto_emphasis`**, where 1 is
+    flat; section 7.3 explains the reversal.
 11. **Fixed residual tilt**: a gentle high shelf, +3 dB above 3 kHz, present whatever the trimmer does.
 12. **Driver saturation**: `v = V_sat · tanh(v / V_sat)`. **Last** in the chain, unlike the LA-2A model, because
     on the LA-3A the driver is the final stage before the transformer.
 13. **Cell**: `cell.step(v)` — the shared `Cell`, with a shorter panel smoothing time constant.
-14. **Make-up**: Gain knob, `−24 dB` if MOD is on.
+14. **Make-up**: the Gain knob alone, reaching +50 dB. The MOD switch is not modelled (section 7.3).
 15. **Output amplifier**: a solid-state soft clipper with a small crossover deadband, replacing `tube()`.
 16. **Output transformer**: first-order low-pass at 50 kHz.
 17. **Mix / bypass / meter / stereo link**, all shared with the LA-2A path.
@@ -967,18 +1002,42 @@ stable API, so this is a decision to make once, before release.
 
 | id | Label | Range / labels | Taper | Default | Notes |
 |---|---|---|---|---|---|
-| `la3a_gain` | Gain | 0.0 to 10.0 | audio (log), see `gain_db` in 7.4 | **5.0** | Unity at **4.1** (Waves' 4.08 [8]); +50 dB at 10 with the pad out. Make-up only. |
+| `la3a_gain` | Gain | 0.0 to 10.0 | audio (log), see `gain_db` in 7.4 | **5.0** | Unity at **4.1** (Waves' 4.08 [8]); +50 dB at 10. Make-up only, never affects compression [1] [4]. |
 | `la3a_peak_reduction` | Peak Reduction | 0.0 to 10.0 | linear knob, exponential sidechain gain | **4.0** | Waves' initial value [8]. Sets threshold and depth together. At 0 there is no compression at any level. |
 | `la3a_mode` | Mode | Compress, Limit | switch | **Compress** | "Most users leave the LA-3A in COMPRESS mode." [1] |
 | `la3a_meter` | Meter | Gain Reduction, Output, Off | switch, not automatable | **Gain Reduction** | Output: 0 VU = +4 dBm [1]. Off dims the meter and bypasses, as the UA plug-in does [4]. |
-| `la3a_hf` | HF Contour | 0.0 to 1.0 | linear | **1.0** (flat) | 1 = flat, 0 = +10 dB at 15 kHz in the sidechain. Same sense as `opto_emphasis`. See 4.5 for the direction dispute. |
-| `la3a_range` | Gain Range | 30 dB, 50 dB | switch | **50 dB** | The rear pad. 30 dB inserts 20 dB of attenuation and raises the threshold from −30 dBu to −10 dBu [2]. |
-| `la3a_mod` | MOD | off, on | toggle | **on** | UA's suggested default is MOD and 30/50 both up [1]. Drops make-up by 24 dB and forces the pad out. |
+| `la3a_emphasis` | HF Contour | 0.0 to 1.0 | linear | **0.0** (flat) | **0 = flat, 1 = the full +10 dB at 15 kHz** in the sidechain. This is the **opposite sense to the LA-2A's `opto_emphasis`**, where 1 is flat. See 4.5 for the rotation dispute and the note below for the reversal. |
 | `la3a_cell` | Cell | Fresh, Used, Tired | switch, not automatable | **Fresh** | Scales `k_gen` to 1.0 / 0.6 / 0.2, after Waves' "up to 80 % less compression" from a depleted T4 [8]. Default Fresh because real LA-3As null against each other [12]. |
 | `link` | Stereo Link | toggle | — | on | Shared with the other models. |
 | `mix` | Mix | 0 to 100 % | linear | 100 % | Not on the hardware; UA added the same control [4]. |
 | `sc_hpf` | Side-chain HPF | 0 (off) to 300 Hz | linear | 0 | Shared extra. Stacks on top of the built-in 100 Hz roll-off; builders add external side-chain inputs to real units for the same reason [28]. |
 | `bypass` | Bypass | toggle | — | off | Shared. |
+
+**Two hardware controls are deliberately absent, and one has its sense flipped.**
+
+- **The rear 50/30 dB pad is not a parameter.** The model is fixed in the 50 dB position, pad out. The pad is a
+  20 dB attenuator ahead of everything (section 3.2), so in a plug-in it does nothing that the host's own gain
+  staging does not already do, while costing a control that would confuse anyone who did not read the manual.
+  Fixing it also removes an ambiguity from the calibration: UREI's two published thresholds, −10 dBm and
+  −30 dBm, differ by exactly the pad [2], and pinning the 50 dB position pins the model to the −30 dBm figure
+  with nothing left to interpret.
+- **The MOD switch is not a parameter either.** With the pad fixed out, MOD's only remaining effect is a 24 dB
+  cut in make-up (section 3.4), which is the Gain knob's job. Its interesting half, forcing the pad out and so
+  lowering the threshold, is already the model's permanent state. Keeping a toggle whose whole function is
+  "turn the output down" would be a joke with no punchline.
+- **`la3a_emphasis` runs 0 = flat to 1 = full, the opposite way round to `opto_emphasis`.** On the LA-2A the
+  control is R37, whose factory setting is fully clockwise and whose panel legend reads as a trim you back
+  *off*, so 1 = flat reads correctly there. On the LA-3A the control is a rear-panel HF Contour with **FLAT**
+  silkscreened at one end (section 2.2) and the manuals describe it as a boost you *add*: "a high frequency
+  **boost** of the signal feeding the gain reduction circuit" [1], "as much as 10 dB **increase** in gain
+  reduction at 15 kHz" [2]. A parameter called emphasis should therefore read 0 for none and 1 for all of it.
+  Note that neither shipping plug-in numbers it this way round: UA puts flat at fully clockwise and Waves puts
+  flat at 100 [4] [8], so both count downwards from flat. I follow the hardware's legend and the name, not
+  their numbering. The default is 0 because the factory setting is flat and so is every owner's [13] [14],
+  and because the modification list that treats the control as a feature still calls its other end the
+  maximum [29]. **This is the
+  single most likely thing to get wrong when copying code from the LA-2A engine**, so section 8's test 7
+  asserts the sense explicitly.
 
 ### 7.4 Equations per block
 
@@ -989,12 +1048,10 @@ Let `fs` be the sample rate and `T = 1/fs`. A first-order section with time cons
 (`VU_REF_DBFS`) and the one Waves publishes for the CLA-3A [8]. Sine peak amplitude at 0 VU is
 `VU_REF_AMP = 10^(−18/20)·√2`.
 
-**Input pad and transformer.**
+**Input transformer.** The pad is out and stays out (section 7.3), so there is nothing to switch:
 
 ```
-pad     = if range_50 || mod { 1.0 } else { 0.1 }      // −20 dB in the 30 dB position
-x_pad   = x * pad
-x_hp    = HighPass(x_pad; 7 Hz, first order)           // T1, B11178
+x_hp = HighPass(x; 7 Hz, first order)                  // T1, B11178
 ```
 
 **Attenuator** (section 3.3; the same code path as the LA-2A with different constants):
@@ -1027,7 +1084,7 @@ s   = UserScHpf(tap)
 v   = g_pr(pr) * s
 v   = HighPass(v; 100 Hz, first order)           // C6, 4.7 nF        <-- new
 v   = HighPass(v; 30 Hz,  first order)           // autoformer        <-- new
-v   = HighShelf(v; 2 kHz, +10 * (1 - hf) dB)     // HF Contour
+v   = HighShelf(v; 2 kHz, +10 * emphasis dB)     // HF Contour, 0 = flat
 v   = HighShelf(v; 3 kHz, +3 dB)                 // fixed residual tilt
 v   = V_sat * tanh(v / V_sat)                    // driver clipping, last
 cell.step(v)
@@ -1052,14 +1109,15 @@ that as *the input level at which limiting begins with the sidechain at full dri
 UREI does not say at what Peak Reduction setting), and I solve `G0` so that
 
 ```
-with pr = 10, mode = Compress, hf = 1, range = 50 dB:
+with pr = 10, mode = Compress, emphasis = 0 (flat):
     1 dB of gain reduction occurs at a 1 kHz sine of −30 dBu   ( = −34 dB re 0 VU = −52 dBFS RMS )
 ```
 
-The 30 dB position then falls out for free: inserting the 20 dB pad moves the same point to **−10 dBu**, which
-is UREI's other number, so the specification is self-consistent and the model reproduces both figures from one
-calibration constant. That is a much stronger anchor than anything available for the LA-2A, and section 8's
-test 3 asserts it.
+UREI's other number is then a consistency check rather than a second calibration. Inserting the 20 dB pad would
+move the same point to **−10 dBu**, which is exactly the published 30 dB figure, so the two thresholds differ
+by precisely the pad and one constant fixes both. Because the model is fixed in the 50 dB position (section
+7.3), only the −30 dBu figure is exposed, and section 8's test 3 asserts it. That is still a much stronger
+anchor than anything available for the LA-2A, where no absolute threshold was ever published.
 
 The same bisection routine the LA-2A model already uses (`Compressor::calibrate`) does the work: bisect on the
 cell's free carriers for 1 dB of reduction, invert the electroluminescent law for the drive that produces that
@@ -1085,7 +1143,6 @@ manufacturers mean by "depending on program material" [1] [2].
 
 ```
 gain_db(p) = 50.0 * (1.0 + 2.583 * log10(max(p / 10.0, 1e-5)))    // +50 dB at 10, 0 dB at 4.1
-if mod { gain_db -= 24.0 }                                         // [1], derived as 22 dB in 3.4
 w = y_att * 10^(gain_db / 20)
 ```
 
@@ -1154,13 +1211,12 @@ values are given alongside so a reviewer can see at a glance what actually chang
 | `V_SAT_OVER_ONSET` | 10.0 | 14.0 | more drive headroom before the driver clips — estimate |
 | sidechain HP 1 (C6) | none | **100 Hz, first order** | 4.7 nF coupling [3]; "roll off in the side chain below 100 Hz" [17] — estimate within a derived 40-350 Hz bracket |
 | sidechain HP 2 (autoformer) | none | **30 Hz, first order** | transformer coupling [3] — estimate |
-| HF Contour shelf | 1 kHz, −10 dB low shelf | **2 kHz, +10 dB high shelf** | "10 dB at 15 kHz vs below 1 kHz" [1] [2]; corner from R29/C7 (derived, 2.9 kHz) |
+| HF Contour shelf | 1 kHz, −10 dB low shelf, 1 = flat | **2 kHz, +10 dB high shelf, 0 = flat** | "10 dB at 15 kHz vs below 1 kHz" [1] [2]; corner from R29/C7 (derived, 2.9 kHz). Note the reversed sense (7.3) |
 | fixed sidechain tilt | −4 dB @ 300 Hz, +3 dB @ 3 kHz | **+3 dB @ 3 kHz only** | the low end is now a real high-pass, not a shelf |
 | input transformer HP | 12 Hz | **7 Hz** | ±1 dB at 20 Hz [2] (derived) |
 | output transformer LP | 40 kHz | **50 kHz** | ±1 dB at 20 kHz [2] (derived) |
 | make-up law | 40 dB, unity at 0.32 | **50 dB, unity at 4.1** | 50 dB ±1 dB [2]; Waves' unity 4.08 [8] |
-| MOD make-up offset | — | **−24 dB** | [1]; derived independently as 22 dB from the R14 mod [29] |
-| pad | — | **−20 dB** | 20 dB T-pad [1] [3] (derived from 510/510/130) |
+| pad, MOD switch | — | **not modelled** | fixed 50 dB position, pad out (7.3); the hardware values are −20 dB [1] [3] and −24 dB [1] [29] should they ever be wanted |
 | `V_CLIP`, `N` | `tanh`, k = 0.2 | ceiling at the +27 dBm equivalent, `N = 5` | 0.35 % THD at +24 dBm [1]; +27 dBm peaks [2] — estimate |
 | `XOVER`, `XOVER_SOFT` | — | ≈ 1 mV referred to output, 0.5 | class-AB crossover [3] — estimate |
 | `ASYM` | bias 0.05 (tube) | small, second harmonic ≈ −70 dBc at 0 VU | four overtones observed [12] — estimate |
@@ -1199,9 +1255,10 @@ compression" [1] without needing to know which lug of the switch is the common (
 The framework stays headless and uncoloured; every face and colour belongs to the example
 ([[feedback-framework-vs-plugin]]). For this model the face is: a **black half-rack panel**, two cream knobs
 with panel-printed 0-10 scales, a cream VU meter with two warm lamps behind it, a `GR / OUTPUT` toggle, a
-`POWER / ON` toggle, and the `LEVELING AMPLIFIER` / model-name block between them (section 2.1). The rear-panel
-controls (`Comp/Limit`, `30/50`, `MOD`, `HF Contour`) belong on a flip-around back panel or a drawer, because
-that is where they are on the real thing and finding them is half the joke. The existing `cell` stream
+`POWER / ON` toggle, and the `LEVELING AMPLIFIER` / model-name block between them (section 2.1). The two rear-panel
+controls the model keeps, `Comp/Limit` and `HF Contour`, belong on a flip-around back panel or a drawer,
+because that is where they are on the real thing and finding them is half the joke. The 50/30 dB and MOD
+switches can be painted on and left dead: they are part of the picture, not part of the model (section 7.3). The existing `cell` stream
 (`[light, free_carriers, trapped_carriers]`) already exists and should be reused so the "inside the T4" display
 works for both optical models; the difference the viewer will see is that the LA-3A's light spikes far faster.
 
@@ -1213,8 +1270,8 @@ Each test drives the DSP core offline at 44.1, 48 and 96 kHz and asserts against
 the LA-3A against its own published behaviour; **tests 16 to 22 run the LA-2A and LA-3A engines on identical
 input and assert that they differ in the documented directions**, which is the part that stops the second model
 from quietly becoming a re-badged copy of the first. Where a hardware figure exists it is cited; where the
-expected value is mine it says so. Unless stated, settings are Compress, HF Contour flat, 50 dB range, MOD on,
-`mix` 100 %, `sc_hpf` off, and levels are referred to 0 VU = −18 dBFS RMS = +4 dBu.
+expected value is mine it says so. Unless stated, settings are Compress, HF Contour flat
+(`la3a_emphasis` 0), `mix` 100 %, `sc_hpf` off, and levels are referred to 0 VU = −18 dBFS RMS = +4 dBu.
 
 **Static behaviour**
 
@@ -1224,9 +1281,9 @@ expected value is mine it says so. Unless stated, settings are Compress, HF Cont
    [4].
 2. **Frequency response.** Peak Reduction 0, 20 Hz to 20 kHz: response within **±1 dB** [2], and within ±0.5 dB
    from 40 Hz to 15 kHz. Assert the −3 dB points lie below 10 Hz and above 40 kHz.
-3. **Threshold of limiting.** Peak Reduction 10, 1 kHz sine: 1 dB of gain reduction occurs at **−30 dBu ±1.5 dB**
-   in the 50 dB range and at **−10 dBu ±1.5 dB** in the 30 dB range [2]. This is the model's primary
-   calibration and it must be asserted at all three sample rates.
+3. **Threshold of limiting.** Peak Reduction 10, `la3a_emphasis` 0, 1 kHz sine: 1 dB of gain reduction occurs
+   at **−30 dBu ±1.5 dB**, UREI's figure for the 50 dB position, which is the position the model is fixed in
+   [2]. This is the model's primary calibration and it must be asserted at all three sample rates.
 4. **Recommended operating point.** Peak Reduction 4.0, a 1 kHz sine at +6 dBu: gain reduction lands in the
    **3 to 5 dB** window UA recommends [1] (±1.5 dB tolerance on the window edges).
 5. **Static curve, monotonicity and knee.** 1 kHz sines from −50 to +20 dBu at Peak Reduction
@@ -1238,10 +1295,13 @@ expected value is mine it says so. Unless stated, settings are Compress, HF Cont
    difference in these two modes is only present when the LA-3A is in deep compression" [1]). At the input level
    that gives 20 dB of reduction in Compress, Limit gives **at least 8 dB more**, and the local slope of the
    Limit curve in the 20-35 dB region exceeds **20:1** ("approaching 50:1" [2], "approximately 100:1" [8]).
-7. **The pad and the MOD switch.** Switching the range from 50 dB to 30 dB raises the whole gain-reduction
-   curve's threshold by **20.0 ±0.5 dB** and drops the output by 20 dB at a fixed Gain setting [1] [3].
-   Enabling MOD drops the output by **24 ±1 dB** and lowers the threshold by 20 dB relative to (pad in, MOD off)
-   [1] [29].
+7. **Control senses and defaults.** With every parameter at its default the model must be in the state the
+   hardware ships in: Compress, HF Contour flat, meter reading Gain Reduction, and 3 to 5 dB of reduction on
+   test 4's signal. Then assert the emphasis sense explicitly: **`la3a_emphasis = 0` gives a flat sidechain
+   response** (400 Hz and 15 kHz sines at equal level produce gain reductions within 4 dB of each other) and
+   **`la3a_emphasis = 1` gives the full 10 dB** of extra sensitivity at 15 kHz. This test exists because the
+   control runs the opposite way round to the LA-2A's `opto_emphasis` (section 7.3), and a copy-paste from that
+   engine would invert it silently while every other test still passed.
 
 **Dynamics**
 

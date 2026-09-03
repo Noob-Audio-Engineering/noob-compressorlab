@@ -12,14 +12,13 @@
  * / `presets.user.opto` in the UI store. Emits: nothing.
  */
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { ContextMenu, Segmented } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
-import { MODELS, loadState, stateToJson, ui, useLab, useNoobVstWebguiFramework, useWindow } from '../composables/useLab.js';
+import { ContextMenu } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
+import { loadState, stateToJson, ui, useLab, useNoobVstWebguiFramework, useWindow } from '../composables/useLab.js';
 import { FACTORY_PRESETS, loadUserPresets, onUserPresetsChange, saveUserPresets } from '../presets.js';
 
 const { history, historyState, connected, stats, status, modified, client } = useNoobVstWebguiFramework();
 const lab = useLab();
 const { fullscreen, toggleFullscreen } = useWindow();
-const MODEL_LABELS = MODELS.map((m) => m.label);
 const key = lab.key;
 const active = lab.active;
 const version = ref(0);
@@ -84,6 +83,7 @@ function toggleBypass() {
 const fmt = (ms) => (Number.isNaN(ms) || ms == null ? '–' : ms < 1 ? `${(ms * 1000).toFixed(0)} µs` : `${ms.toFixed(2)} ms`);
 const latency = computed(() => (status.value?.latency_ms != null ? `${status.value.latency_ms.toFixed(2)} ms` : '–'));
 const offline = computed(() => client.offline === true);
+
 </script>
 
 <template>
@@ -91,7 +91,16 @@ const offline = computed(() => client.offline === true);
     <div class="labbar__brand">
       <span class="dot" :class="{ on: connected }" :title="connected ? 'connected' : offline ? 'design mode: no plug-in connected' : 'connecting'"></span>
       <span class="labbar__name">NOOB COMPRESSORLAB</span>
-      <Segmented :p="lab.model" :labels="MODEL_LABELS" class="labbar__model" title="Which compressor this instance is" />
+      <button
+      class="labbar__model"
+      type="button"
+      :aria-pressed="ui.browsing"
+      title="Change compressor: browse by family without disturbing what is playing"
+      @click="ui.browsing = !ui.browsing"
+    >
+      <span class="labbar__modelname">{{ active.label }}</span>
+      <span class="labbar__modelcue">{{ ui.browsing ? 'browsing' : 'change' }}</span>
+    </button>
       <span class="labbar__sub">{{ active.sub }} · an affectionate spoof</span>
     </div>
     <div class="labbar__presets">
@@ -110,5 +119,6 @@ const offline = computed(() => client.offline === true);
       <span class="labbar__stat">latency <b>{{ latency }}</b></span>
     </div>
     <ContextMenu :open="menu.open" :x="menu.x" :y="menu.y" :items="menu.items" @close="menu.open = false" />
+
   </header>
 </template>

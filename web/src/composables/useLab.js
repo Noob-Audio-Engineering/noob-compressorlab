@@ -29,15 +29,32 @@ export { getClient, hasParam, useParam, useNoobVstWebguiFramework };
  * view setting a preset leaves alone). The 6176 owns two prefixes: its own
  * 610 section and the 1176 half it drives, which is why ownership is a list
  * and not the key.
- * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', label: string, name: string, sub: string, owns: string[], meter: string | null, initPreset: string }[]}
+ * `family` groups them in the picker by the kind of compressor they are, and
+ * `blurb` is the sentence that helps someone choose between them. Both are
+ * declared here rather than inferred from `sub`, so a new model says what it
+ * is instead of being parsed.
+ * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', label: string, name: string, sub: string, family: string, blurb: string, owns: string[], meter: string | null, initPreset: string }[]}
  */
 export const MODELS = [
-  { key: 'fet', label: '1176', name: 'NOOB 1176', sub: 'FET limiting amplifier', owns: ['fet_'], meter: 'fet_meter', initPreset: 'Default' },
-  { key: 'opto', label: 'LA-2A', name: 'NOOB LA-2A', sub: 'optical leveling amplifier', owns: ['opto_'], meter: 'opto_meter', initPreset: 'Init' },
-  { key: 'la3a', label: 'LA-3A', name: 'NOOB LA-3A', sub: 'solid-state optical leveler', owns: ['la3a_'], meter: 'la3a_meter', initPreset: 'Init' },
-  { key: 'vca', label: 'Distressor', name: 'NOOB DISTRESSOR', sub: 'feedback VCA compressor', owns: ['dist_'], meter: null, initPreset: '5 5 5 5' },
-  { key: 'pre6176', label: '6176', name: 'NOOB 6176', sub: 'tube preamp into the FET limiter', owns: ['pre_', 'fet_'], meter: 'pre_meter', initPreset: 'Unity' },
-  { key: 'cl1b', label: 'CL-1B', name: 'NOOB CL 1B', sub: 'optical tube compressor', owns: ['cl1b_'], meter: 'cl1b_meter', initPreset: 'Vocal' },
+  { key: 'fet', label: '1176', name: 'NOOB 1176', sub: 'FET limiting amplifier', family: 'fet', blurb: 'Fast, forward and unmistakably aggressive. Ratio buttons, the all-buttons mode, and every revision from the blue stripe to the LN.', owns: ['fet_'], meter: 'fet_meter', initPreset: 'Default' },
+  { key: 'opto', label: 'LA-2A', name: 'NOOB LA-2A', sub: 'optical leveling amplifier', family: 'optical', blurb: 'Slow, gentle and famously hard to misuse. One knob sets the amount and the T4 cell decides the rest.', owns: ['opto_'], meter: 'opto_meter', initPreset: 'Init' },
+  { key: 'la3a', label: 'LA-3A', name: 'NOOB LA-3A', sub: 'solid-state optical leveler', family: 'optical', blurb: "The LA-2A's solid-state cousin: the same cell lit harder, quicker to grab and brighter with it.", owns: ['la3a_'], meter: 'la3a_meter', initPreset: 'Init' },
+  { key: 'vca', label: 'Distressor', name: 'NOOB DISTRESSOR', sub: 'feedback VCA compressor', family: 'vca', blurb: 'Eight ratios from gentle to Nuke, two distortion modes, and a British setting that borrows the 1176 trick.', owns: ['dist_'], meter: null, initPreset: '5 5 5 5' },
+  { key: 'pre6176', label: '6176', name: 'NOOB 6176', sub: 'tube preamp into the FET limiter', family: 'strip', blurb: 'A 610 tube preamp in front of the 1176, so the colour arrives before the compression does.', owns: ['pre_', 'fet_'], meter: 'pre_meter', initPreset: 'Unity' },
+  { key: 'cl1b', label: 'CL-1B', name: 'NOOB CL 1B', sub: 'optical tube compressor', family: 'optical', blurb: 'The vocal one. Slow optical levelling with fixed or manual timing, and a ratio that rises as you push it.', owns: ['cl1b_'], meter: 'cl1b_meter', initPreset: 'Vocal' },
+];
+
+/**
+ * The families the picker groups by, in the order it shows them. A model
+ * names its family; this names the family itself, so adding a seventh model
+ * needs an entry in `MODELS` and nothing here unless it is a new kind.
+ * @type {{ id: string, label: string, note: string }[]}
+ */
+export const FAMILIES = [
+  { id: 'fet', label: 'FET', note: 'A field-effect transistor as the gain element: the fastest attack of the lot.' },
+  { id: 'optical', label: 'Optical', note: 'A lamp and a photocell: slow, programme-dependent, and forgiving.' },
+  { id: 'vca', label: 'VCA', note: 'A voltage-controlled amplifier: whatever ratio and timing you ask for.' },
+  { id: 'strip', label: 'Channel strip', note: 'A preamp and a compressor in one box, in that order.' },
 ];
 
 /** Smallest window the page lays out well in, `[width, height]` CSS pixels; `src/plugin.rs` clamps to the same. */
@@ -72,6 +89,14 @@ export function useLab() {
 /** Page-only state (not parameters): the preset name shown in the top bar, per model. */
 export const ui = reactive({
   preset: Object.fromEntries(MODELS.map((m) => [m.key, m.initPreset])),
+  /*
+   * Whether the page is showing the browse view instead of the loaded
+   * compressor. It is page state and not a parameter on purpose: browsing
+   * must not touch the instance, so the engine never hears about it and the
+   * compressor that is loaded keeps processing with its settings the whole
+   * time the browser is up.
+   */
+  browsing: false,
 });
 
 let win = null;

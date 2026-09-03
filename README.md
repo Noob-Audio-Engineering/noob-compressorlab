@@ -172,7 +172,7 @@ The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever e
 | `la3a_emphasis` | 0 (flat, as it ships)..1 (full HF Contour) | 0 | LA-3A | yes |
 | `la3a_cell` | Fresh, Used, Tired | Fresh | LA-3A | no |
 | `cl1b_gain` | −80 to +30 dB, the pot's own log law | 0 dB | CL 1B | yes |
-| `cl1b_ratio` | 0..1 travel; the panel's 2:1 and 10:1 are labels, not slopes | 0.375 | CL 1B | yes |
+| `cl1b_ratio` | 0 to 100 % of travel between the two printed stops | 37.5 % | CL 1B | yes |
 | `cl1b_threshold` | +11.6 down to −40 dBu, the same log law mirrored | −19.2 dBu | CL 1B | yes |
 | `cl1b_attack` | 0.5 to 300 ms, log | 60.6 ms | CL 1B | yes |
 | `cl1b_release` | 0.05 to 10 s, **linear** | 2.54 s | CL 1B | yes |
@@ -456,9 +456,16 @@ straight from the manifest. The normalised value stays linear in pot travel, whi
 turns by and what the panel's measured scale dots are fractions of. The point of doing it this way
 is that each law exists exactly once, in the engine: the alternative was reimplementing four tapers
 in JavaScript, and two copies of one law is how the equaliser next door came to draw a curve that
-disagreed with its own audio by nearly two decibels. Ratio is the exception and keeps its travel,
-because the research is explicit that its printed 2:1 and 10:1 are labels rather than slopes, so a
-plain value there would be a number the machine does not have.
+disagreed with its own audio by nearly two decibels. Ratio is the exception and publishes travel,
+because the research is explicit that its printed 2:1 and 10:1 are labels rather than slopes and the
+real behaviour is a ratio that rises with depth, so an interpolated plain value would be a number
+the machine does not have. It carries a unit all the same, so a host's automation lane shows a
+percentage between two named stops rather than a bare fraction.
+
+Every model's parameters now render as its panel is marked when a host lists them: the 1176's skirt
+is printed in attenuation, so the figure shown is 48 minus the parameter, and the two optical panels
+are marked 0 to 10 where their parameters run 0 to 100. Those are display forms only. The stored
+values and ranges are untouched, so nothing a project already saved has moved.
 
 There is deliberately **no cell-age control**, unlike the LA-2A's and the LA-3A's. Lydkraft claim no
 long-term degradation of the element, owners report units are all alike, and nobody has published a

@@ -476,8 +476,13 @@ impl Default for NoobCompressorLabParams {
         };
         NoobCompressorLabParams {
             model: EnumParam::new("Model", ModelParam::Fet).non_automatable(),
-            fet_input: mark("Input"),
-            fet_output: mark("Output"),
+            // The 1176's skirt is marked in attenuation, so the figure
+            // beside the pointer is 48 minus the parameter. Display only;
+            // the stored value and the range are untouched, so no saved
+            // project moves.
+            fet_input: mark("Input").with_value_to_string(Arc::new(|v| format!("{:.0}", 48.0 - v))),
+            fet_output: mark("Output")
+                .with_value_to_string(Arc::new(|v| format!("{:.0}", 48.0 - v))),
             fet_attack: FloatParam::new(
                 "Attack",
                 4.0,
@@ -499,8 +504,13 @@ impl Default for NoobCompressorLabParams {
             fet_ratio: EnumParam::new("Ratio", RatioParam::R4),
             fet_meter: EnumParam::new("Meter", FetMeterParam::Gr).non_automatable(),
             fet_revision: EnumParam::new("Revision", RevisionParam::Ln).non_automatable(),
-            opto_gain: percent("Gain", 32.0),
-            opto_peak_reduction: percent("Peak Reduction", 40.0),
+            // The LA-2A's and LA-3A's knobs are marked 0 to 10 where the
+            // parameters run 0 to 100, so the host would otherwise show a
+            // figure ten times the panel's. Display only.
+            opto_gain: percent("Gain", 32.0)
+                .with_value_to_string(Arc::new(|v| format!("{:.1}", v * 0.1))),
+            opto_peak_reduction: percent("Peak Reduction", 40.0)
+                .with_value_to_string(Arc::new(|v| format!("{:.1}", v * 0.1))),
             opto_mode: EnumParam::new("Mode", ModeParam::Compress),
             opto_meter: EnumParam::new("Meter", OptoMeterParam::GainReduction).non_automatable(),
             opto_emphasis: FloatParam::new(
@@ -521,8 +531,10 @@ impl Default for NoobCompressorLabParams {
             .with_unit(" dB")
             .with_step_size(0.05)
             .non_automatable(),
-            la3a_gain: percent("Gain", 32.0),
-            la3a_peak_reduction: percent("Peak Reduction", 40.0),
+            la3a_gain: percent("Gain", 32.0)
+                .with_value_to_string(Arc::new(|v| format!("{:.1}", v * 0.1))),
+            la3a_peak_reduction: percent("Peak Reduction", 40.0)
+                .with_value_to_string(Arc::new(|v| format!("{:.1}", v * 0.1))),
             la3a_mode: EnumParam::new("Mode", ModeParam::Compress),
             la3a_meter: EnumParam::new("Meter", La3aMeterParam::GainReduction).non_automatable(),
             la3a_emphasis: FloatParam::new(
@@ -543,7 +555,19 @@ impl Default for NoobCompressorLabParams {
                     format!("{db:.1} dB")
                 }
             })),
-            cl1b_ratio: unit_knob("Ratio", 0.375),
+            // The panel has two marks and nothing between them, so the
+            // stops are named and the position between them is a
+            // percentage of travel. Inventing an interpolated ratio would
+            // claim a precision the control does not have.
+            cl1b_ratio: unit_knob("Ratio", 0.375).with_value_to_string(Arc::new(|p| {
+                if p <= 0.001 {
+                    "2:1".to_string()
+                } else if p >= 0.999 {
+                    "10:1".to_string()
+                } else {
+                    format!("{:.0} % (2:1 to 10:1)", p * 100.0)
+                }
+            })),
             cl1b_threshold: unit_knob("Threshold", 0.5).with_value_to_string(Arc::new(|p| {
                 format!("{:.1} dBu", opto1b::engine::threshold_dbu(p))
             })),

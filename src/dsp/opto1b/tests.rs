@@ -1317,6 +1317,15 @@ fn the_published_tables_round_trip_to_the_same_pot_position() {
         }
     }
 
+    // Ratio is travel between its two printed stops, expressed as a
+    // percentage. It has no table, because the research is explicit that
+    // its printed 2:1 and 10:1 are labels rather than slopes, but it must
+    // still carry a unit so a host's automation lane shows something
+    // meaningful rather than a bare fraction.
+    let ratio = by_id("cl1b_ratio");
+    assert_eq!(ratio.unit, "%");
+    assert!((ratio.normalize(ratio.default) - 0.375).abs() < 1e-4);
+
     // The units the panel is marked in, so a read-out cannot silently
     // become a travel fraction again.
     assert_eq!(by_id("cl1b_gain").unit, "dB");

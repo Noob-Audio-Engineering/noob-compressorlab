@@ -494,13 +494,19 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
             .default(opto1b::engine::gain_db(0.265))
             .unit("dB")
             .group("CL-1B"),
-        // Ratio keeps its travel. The panel prints 2:1 and 10:1 with
-        // nothing between, and the research is explicit that the printed
-        // ratio "is a label, not a slope", so publishing a 2-to-10 plain
-        // value would be inventing a number the machine does not have.
+        // Ratio publishes **travel between its two printed stops**, not a
+        // ratio. The panel prints 2:1 and 10:1 with nothing between, and
+        // the research is explicit that the printed ratio "is a label, not
+        // a slope" and that the real behaviour is a ratio that rises with
+        // depth, so a 2-to-10 plain value would be a number the machine
+        // does not have. A percentage of travel is what the control
+        // actually is, and it gives a host's parameter list and automation
+        // lane something meaningful instead of a bare fraction; the two
+        // stops are named in the value string the plug-in hands the host.
         ParamSpec::new("cl1b_ratio", "Ratio")
-            .range(0.0, 1.0)
-            .default(0.375)
+            .range(0.0, 100.0)
+            .default(37.5)
+            .unit("%")
             .group("CL-1B"),
         ParamSpec::new("cl1b_threshold", "Threshold")
             .range(

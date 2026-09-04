@@ -1016,6 +1016,19 @@ for the meter, for a gain-range test, or for anything that reasons about gain di
 own curve, where it is a clean exponential, rather than from the derivative of this fit. Test 6 in section
 11.1 asserts GE's figures for exactly this reason and would fail on eq. 1's derivative.
 
+> **The build follows the first half of this and declines the second, and the reason is worth
+> keeping.** Using the equation for current is right, and the refit at the head of this section makes
+> its slope right with it, because a law fitted to current across the working range carries that
+> range's slope. Taking transconductance from GE's tabulated figures instead cannot be done the
+> obvious way: the two class-A1 points sit at 100 V of plate between −1.92 and −16 V of grid, while
+> this stage runs at 216 to 230 V of plate and −22 to −70 V of grid, entirely outside that interval.
+> Anchoring an exponential on them and extrapolating at 2.28 dB per volt gives about 110 dB of
+> control authority where the unit has 20 — not a small error but a model that could not work.
+>
+> So the build takes gain from the refitted current law and **records test 6 as a miss**: 26.4 dB of
+> control range against GE's 32 ± 3. The gap is printed rather than closed, because closing it with
+> a two-point extrapolation would have been a constant chosen to make a test pass.
+
 **Where it is silent.** The fit is to a family of static curves between roughly 0 and −55 V of grid and 100
 to 300 V of plate. Outside that box it is an extrapolation of an eight-parameter empirical function and it
 will do whatever it likes. In particular `(p3 − p4·Vgk)` goes to zero at `Vgk = +5 V`, so the expression
@@ -1792,12 +1805,12 @@ against a superimposed grid; the working image is
 6. **The DC threshold really does change the shape and not just the position.** Curves 4 and 5 have the AC
    threshold in the same place, fully clockwise, and differ only in the DC threshold — and they plateau
    14 dB apart, at 0 dBm and +10 dBm out. That is the internal trimmer doing exactly what Overloud say it
-
-> **Corrected by the build: 10.2 dB, not 14.** This paragraph's own transcribed table of the same
-> chart gives the two plateaux at 0.0 and +10.2 dBm out. The table is a reading and the prose is an
-> arithmetic slip on two numbers printed three lines above it, so the test asserts **10.2 dB**.
-> Asserting 14 would have meant asserting a figure this document's own data contradicts.
    does [40].
+
+   > **Corrected by the build: 10.2 dB, not 14.** This paragraph's own transcribed table of the same
+   > chart gives the two plateaux at 0.0 and +10.2 dBm out. The table is a reading and the prose is
+   > an arithmetic slip on two numbers printed three lines above it, so the test asserts **10.2 dB**.
+   > Asserting 14 would have meant asserting a figure this document's own data contradicts.
 
 ### 7.3 What has never been measured
 
@@ -2553,18 +2566,19 @@ oversampling, run at 44.1, 48 and 96 kHz.
     hard-coded the test is worthless and this is the test the whole design exists to pass.
 
 13. **Position 6 is fast and slow.** `fc_time` = 6. (a) A single 50 ms burst producing 10 dB of gain
-    reduction must release to 0.75 dB in **0.3 s ± 40 %**.
+    reduction must release to 0.75 dB in **0.3 s ± 40 %**. (b) Thirty seconds of continuous
+    material holding 10 dB of gain reduction, then silence: release to 0.75 dB must take **at least
+    8 seconds**, and the model must still be more than 1 dB down after **6 seconds**.
 
-    > **The 50 ms stimulus cannot produce the figure it checks.** Fifty milliseconds is already long
+    > **The 50 ms stimulus in (a) cannot produce the figure it checks.** Fifty milliseconds is already long
     > against the 0.8 s charging constant of the first slow leg, so the network is well into its
     > multiple-peaks state by then and reads about 1.6 s, where the figure under test is 0.3 s. An
     > individual peak in programme material is a few milliseconds. The build uses **2 ms** and gets
     > 0.32 s, and records the 50 ms reading in the test's own comment. The same trap sits in test
     > 12's proposed two-second hold: harmless at positions 1 to 4, where nothing depends on history
     > and that is the point of those positions, but the wrong stimulus at 5 and 6. The build uses one
-    > second there. (b) Thirty seconds of continuous material holding
-    10 dB of gain reduction, then silence: release to 0.75 dB must take **at least 8 seconds**, and the
-    model must still be more than 1 dB down after **6 seconds**.
+    > second there.
+
     *Figures:* "Position 6: Automatic function of program material: .3 seconds for individual peaks, 10
     seconds for multiple peaks, 25 seconds for consistently high program level" [1]. The (b) bound is stated
     as "at least 8 s" against a published 10 s because my derivation lands 40 % low on the sustained cases

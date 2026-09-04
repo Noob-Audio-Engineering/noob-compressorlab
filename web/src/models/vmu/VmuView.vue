@@ -35,11 +35,11 @@ const c = useControls();
  * paddings and gaps, and the extras strip, which carries two rows of
  * controls on this model. Measured at the 900 px minimum.
  */
-const CHROME_PX = 178;
+const CHROME_PX = 156;
 /** The least drawer worth showing; below this it closes instead. */
-const BENCH_PX = 190;
+const BENCH_PX = 214;
 /** The panel is never drawn narrower than this, whatever the window does. */
-const PLATE_MIN = 520;
+const PLATE_MIN = 430;
 
 const aspect = computed(() => (c.unit && c.unit.index === 0 ? 19 / 7 : 19 / 14));
 const room = computed(() => Math.max(120, win.height.value - CHROME_PX));

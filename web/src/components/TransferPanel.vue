@@ -12,6 +12,21 @@
  * (`.lab-panel` in `style.css`), typography, ranges and colours (amber
  * curve, dim dashed unity). Nothing here comes from the model. Props:
  * none. Emits: nothing.
+ *
+ * **The two axes carry the same range, and the plot is square.** They used
+ * not to: x ran over sixty decibels and y over seventy-two, in a box that
+ * was 300 px wide and as tall as the row, so the curve stretched vertically
+ * without limit as the window grew and the unity line was not at 45
+ * degrees. A transfer plot whose unity line is not diagonal is misreading
+ * the thing it exists to show. Both axes are now `[-60, 12]`, which keeps
+ * the make-up headroom the y-axis already showed and admits the input above
+ * 0 dBFS that a hot source really produces; squashing both to `[-60, 0]`
+ * instead would have hidden output these models make.
+ *
+ * The square itself is the containers' business, not this file's, because
+ * the panel has to stay identical under every face: `style.css` sizes it in
+ * `.lab-bench` for the nine landscape models and `gbus.css` in
+ * `.gbus-stage__bench` for the one portrait one.
  */
 import { computed } from 'vue';
 import { LinePlot, useStreamValue } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
@@ -21,7 +36,8 @@ const outPeak = useStreamValue('meter', { index: 2, unit: 'linear', initial: -20
 const marker = computed(() => (inPeak.value > -90 ? [inPeak.value - 3.01, outPeak.value - 3.01] : null));
 const series = [
   { stream: 'transfer', color: '#e9a23b', width: 2, label: 'transfer' },
-  { xy: [[-60, -60], [0, 0]], color: 'rgba(231, 226, 216, 0.18)', dash: [4, 4], label: 'unity' },
+  // Corner to corner, so it reads as the diagonal it is.
+  { xy: [[-60, -60], [12, 12]], color: 'rgba(231, 226, 216, 0.18)', dash: [4, 4], label: 'unity' },
 ];
 const fmt = (v) => (v > -90 ? v.toFixed(1) : '–');
 </script>
@@ -33,7 +49,7 @@ const fmt = (v) => (v > -90 ? v.toFixed(1) : '–');
       <span class="lab-panel__val">in {{ fmt(inPeak) }} · out {{ fmt(outPeak) }} dBFS</span>
     </div>
     <div class="lab-panel__canvas">
-      <LinePlot :series="series" :x-range="[-60, 0]" :y-range="[-60, 12]" :x-step="12" :y-step="24" x-label="in dBFS" y-label="out dBFS" :marker="marker" />
+      <LinePlot :series="series" :x-range="[-60, 12]" :y-range="[-60, 12]" :x-step="24" :y-step="24" x-label="in dBFS" y-label="out dBFS" :marker="marker" />
     </div>
   </div>
 </template>

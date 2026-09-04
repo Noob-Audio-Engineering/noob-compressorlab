@@ -52,9 +52,17 @@ const props = defineProps({
  * two big knobs are 1.5 inch across and the small one 0.9, and the skirt
  * here is 0.42 of the box.
  */
-const SKIRT = 21;
-const CAP = 11;
-const DOT = 16;
+const SKIRT = 42;
+const CAP = 22;
+const DOT = 32;
+/**
+ * The box is 200 units rather than 100 so that the printed numbers can be set
+ * at a font size a browser will not call illegible. An accessibility audit
+ * reads the *specified* size of SVG text and cannot know the viewBox, so a
+ * legend at 5.4 user units is flagged however large it actually renders;
+ * doubling the box makes the same drawing carry a 10.8 unit legend.
+ */
+const K = 2;
 
 const { handlers, dragging } = useKnobGesture(props.p, { rotation: true, discrete: props.discrete });
 
@@ -63,29 +71,31 @@ const width = computed(() => (typeof props.size === 'number' ? `${props.size}px`
 /** Travel to degrees, anticlockwise when the printed scale runs that way. */
 const at = (t) => (props.reverse ? props.sweep / 2 - t * props.sweep : -props.sweep / 2 + t * props.sweep);
 const angle = computed(() => at(Math.min(1, Math.max(0, props.p.norm))));
+/** The measured ring radius, in the doubled box. */
+const ring = computed(() => props.ring * K);
 
 const place = (t, radius) => {
   const a = (at(t) * Math.PI) / 180;
-  return { x: 50 + radius * Math.sin(a), y: 50 - radius * Math.cos(a) };
+  return { x: 100 + radius * Math.sin(a), y: 100 - radius * Math.cos(a) };
 };
 
 const ticks = computed(() =>
   props.marks.map((m, i) => ({
     i,
-    a: place(m.at, props.ring - 9),
-    b: place(m.at, props.ring - (m.label ? 4 : 6)),
+    a: place(m.at, ring.value - 18),
+    b: place(m.at, ring.value - (m.label ? 8 : 12)),
     long: !!m.label,
   })),
 );
 const legends = computed(() =>
-  props.marks.filter((m) => m.label).map((m, i) => ({ i, label: m.label, ...place(m.at, props.ring) })),
+  props.marks.filter((m) => m.label).map((m, i) => ({ i, label: m.label, ...place(m.at, ring.value) })),
 );
 </script>
 
 <template>
   <div class="fairknob" :style="{ width }">
     <svg
-      viewBox="0 0 100 100"
+      viewBox="0 0 200 200"
       class="fairknob__dial"
       tabindex="0"
       role="slider"
@@ -110,17 +120,17 @@ const legends = computed(() =>
       </g>
 
       <!-- the body: a black skirt carrying the index, a smaller cap on top -->
-      <g :transform="`rotate(${angle} 50 50)`">
-        <circle cx="50" cy="50" :r="SKIRT" class="fairknob__skirt" />
-        <circle cx="50" cy="50" :r="SKIRT" class="fairknob__skirtrim" />
+      <g :transform="`rotate(${angle} 100 100)`">
+        <circle cx="100" cy="100" :r="SKIRT" class="fairknob__skirt" />
+        <circle cx="100" cy="100" :r="SKIRT" class="fairknob__skirtrim" />
         <template v-if="wing">
-          <path :d="`M 50 ${50 - SKIRT - 3} l 3.4 6 h -6.8 z`" class="fairknob__wing" />
+          <path :d="`M 100 ${100 - SKIRT - 6} l 6.8 12 h -13.6 z`" class="fairknob__wing" />
         </template>
         <template v-else>
-          <circle cx="50" :cy="50 - DOT" r="2.6" class="fairknob__dot" />
+          <circle cx="100" :cy="100 - DOT" r="5.2" class="fairknob__dot" />
         </template>
-        <circle cx="50" cy="50" :r="CAP" class="fairknob__cap" />
-        <circle cx="50" cy="50" :r="CAP" class="fairknob__caprim" />
+        <circle cx="100" cy="100" :r="CAP" class="fairknob__cap" />
+        <circle cx="100" cy="100" :r="CAP" class="fairknob__caprim" />
       </g>
     </svg>
     <div v-if="dragging" class="fairknob__value">{{ p.text }}</div>

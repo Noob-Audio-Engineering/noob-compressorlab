@@ -21,6 +21,7 @@
 //! | [`vca`] | the Distressor: a feedback VCA compressor in the dB domain, its eight curves, its distortion modes and British mode |
 //! | [`pre`] | the 610 tube preamp, which with the 1176 engine behind it makes the 6176 channel |
 //! | [`rms`] | the dbx 160: a Blackmer cell fed forward from a true-RMS log-domain detector |
+//! | [`vmu`] | the Fairchild 660 and 670: a push-pull pair of remote-cutoff triodes that are the amplifier and the gain element at once, with the six-position timing network and the lateral-vertical matrix |
 //! | [`source`] | the standalone's demo signals |
 //! | this file | [`Model`], [`Settings`], parameter ids and specs, streams, the bridge builder, the [`Processor`] |
 //!
@@ -80,6 +81,17 @@
 //! | `dbx_tau` | 20..60 ms (ours; the one number the box is made of) | 35.32 | dbx 160 |
 //! | `dbx_lookahead` | 0..10 ms (ours; dbx documented the trick in 1995) | 0 | dbx 160 |
 //! | `dbx_headroom` | 4..28 dB | 22 | dbx 160 |
+//! | `fc_model` | 660, 670 | 670 | 670 |
+//! | `fc_input_gain_l`, `fc_input_gain_r` | 0..20 dB of attenuation, 21 detents | 10 | 670 |
+//! | `fc_threshold_l`, `fc_threshold_r` | 0..10, the panel's own scale and **not decibels** | 10 | 670 |
+//! | `fc_time_l`, `fc_time_r` | positions 1..6 | 3 | 670 |
+//! | `fc_dc_threshold_l`, `fc_dc_threshold_r` | 0..1, the trimmer inside the chassis | 0.20 | 670 |
+//! | `fc_zero_l`, `fc_zero_r` | −12..−3 V of standing grid bias | −7.2 | 670 |
+//! | `fc_balance_l`, `fc_balance_r` | −1..1 | 0 | 670 |
+//! | `fc_meter_l`, `fc_meter_r` | Bal Push / Zero / Bal Pull | Zero | 670 |
+//! | `fc_agc` | Left/Right, Lat/Vert | Left/Right | 670 |
+//! | `fc_tube` | GE 6386, JJ 6386 LGP (ours) | GE | 670 |
+//! | `fc_oversample` | 4x, 8x, 16x (ours) | 8x | 670 |
 //! | `link` | toggle | on | extras |
 //! | `mix` | 0..100 % | 100 | extras |
 //! | `sc_hpf` | 0 (off)..300 Hz | 0 | extras |

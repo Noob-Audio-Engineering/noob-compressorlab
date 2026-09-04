@@ -29,7 +29,7 @@
 //! misses, the miss is reported with its number; the tolerance is never
 //! widened to make a row pass, and no row is dropped for failing.
 
-use noob_compressorlab::dsp::{bridge, fet, gbus, opto, opto1b, opto3, pre, rms, tg, vca};
+use noob_compressorlab::dsp::{bridge, fet, gbus, opto, opto1b, opto3, pre, rms, tg, vca, vmu};
 use std::f32::consts::PI;
 use std::fmt::Write as _;
 
@@ -4335,6 +4335,513 @@ fn bench_tg() -> Section {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The Fairchild 660 and 670
+// ---------------------------------------------------------------------------
+
+/// Settle a sine at `in_dbm` and return the output level in dBm.
+fn vmu_out_dbm(s: vmu::Settings, in_dbm: f32, secs: f32) -> f32 {
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(s);
+    let amp = vmu::engine::dbm_amp(in_dbm);
+    let n = (secs * SR) as usize;
+    let mut ph = 0.0f32;
+    let step = std::f32::consts::TAU * 1000.0 / SR;
+    let mut l = vec![0.0f32; BLOCK];
+    let mut r = vec![0.0f32; BLOCK];
+    let mut peak = 0.0f32;
+    let mut done = 0;
+    while done < n {
+        for i in 0..BLOCK {
+            l[i] = amp * ph.sin();
+            ph += step;
+            if ph > std::f32::consts::TAU {
+                ph -= std::f32::consts::TAU;
+            }
+            r[i] = l[i];
+        }
+        c.process_block(&mut l, &mut r);
+        if done + BLOCK > n.saturating_sub(SR as usize / 20) {
+            for &v in l.iter() {
+                peak = peak.max(v.abs());
+            }
+        }
+        done += BLOCK;
+    }
+    vmu::engine::amp_dbm(peak)
+}
+
+/// Seconds for the gain reduction to fall to 0.75 dB, which is what section
+/// 5.4 establishes Fairchild's "release time from 10 db of limiting" meant.
+fn vmu_release_s(pos: usize, hold_s: f32, cap_s: f32) -> f32 {
+    let s = vmu::Settings {
+        time: [pos; 2],
+        oversample: 0,
+        ..vmu::Settings::default()
+    };
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(s);
+    // The level that gives ten decibels of steady reduction.
+    let (mut lo, mut hi) = (-20.0f32, 45.0f32);
+    for _ in 0..40 {
+        let m = 0.5 * (lo + hi);
+        if c.static_gr_db(vmu::engine::dbm_amp(m)) < 10.0 {
+            lo = m;
+        } else {
+            hi = m;
+        }
+    }
+    let hot = vmu::engine::dbm_amp(0.5 * (lo + hi));
+    let quiet = vmu::engine::dbm_amp(-10.0);
+    let step = std::f32::consts::TAU * 1000.0 / SR;
+    let mut ph = 0.0f32;
+    let mut l = vec![0.0f32; BLOCK];
+    let mut r = vec![0.0f32; BLOCK];
+    let mut drive = |c: &mut vmu::Compressor, amp: f32, secs: f32, ph: &mut f32| {
+        let n = ((secs * SR) as usize).max(1);
+        let mut done = 0;
+        while done < n {
+            for i in 0..BLOCK {
+                l[i] = amp * ph.sin();
+                *ph += step;
+                if *ph > std::f32::consts::TAU {
+                    *ph -= std::f32::consts::TAU;
+                }
+                r[i] = l[i];
+            }
+            c.process_block(&mut l, &mut r);
+            done += BLOCK;
+            if amp == quiet && c.gain_reduction_db(0) <= 0.75 {
+                return done as f32 / SR;
+            }
+        }
+        f32::INFINITY
+    };
+    drive(&mut c, hot, hold_s, &mut ph);
+    drive(&mut c, quiet, cap_s, &mut ph)
+}
+
+/// Seconds for the gain reduction to reach 63 % of a ten decibel step, with
+/// the oversampler's own input delay taken off.
+fn vmu_attack_s(pos: usize) -> f32 {
+    let s = vmu::Settings {
+        time: [pos; 2],
+        ..vmu::Settings::default()
+    };
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(s);
+    let (mut lo, mut hi) = (-20.0f32, 45.0f32);
+    for _ in 0..40 {
+        let m = 0.5 * (lo + hi);
+        if c.static_gr_db(vmu::engine::dbm_amp(m)) < 10.0 {
+            lo = m;
+        } else {
+            hi = m;
+        }
+    }
+    let amp = vmu::engine::dbm_amp(0.5 * (lo + hi));
+    let pre = c.latency() as f32 / 2.0 / SR;
+    // A ten kilohertz tone started at its own peak, so the input is a step
+    // rather than a quarter period of ramp.
+    let step = std::f32::consts::TAU * 10_000.0 / SR;
+    let mut ph = std::f32::consts::FRAC_PI_2;
+    let mut l = [0.0f32; 1];
+    let mut r = [0.0f32; 1];
+    for k in 0..(0.05 * SR) as usize {
+        l[0] = amp * ph.sin();
+        ph += step;
+        if ph > std::f32::consts::TAU {
+            ph -= std::f32::consts::TAU;
+        }
+        r[0] = l[0];
+        c.process_block(&mut l, &mut r);
+        if c.gain_reduction_db(0) >= 6.3 {
+            return ((k + 1) as f32 / SR - pre).max(0.0);
+        }
+    }
+    f32::INFINITY
+}
+
+/// Settle the unit, then capture 4800 samples: a tenth of a second at
+/// 48 kHz, so every tone in these rows lands exactly on a bin.
+fn vmu_capture(c: &mut vmu::Compressor, tones: &[(f32, f32)], warm: f32) -> Vec<f32> {
+    let mut ph = vec![0.0f32; tones.len()];
+    let mut l = vec![0.0f32; BLOCK];
+    let mut r = vec![0.0f32; BLOCK];
+    let mut out = Vec::with_capacity(4800 + BLOCK);
+    let total = (warm * SR) as usize + 4800;
+    let mut done = 0;
+    while done < total {
+        for i in 0..BLOCK {
+            let mut v = 0.0;
+            for (t, (f, a)) in tones.iter().enumerate() {
+                v += a * ph[t].sin();
+                ph[t] += std::f32::consts::TAU * f / SR;
+                if ph[t] > std::f32::consts::TAU {
+                    ph[t] -= std::f32::consts::TAU;
+                }
+            }
+            l[i] = v;
+            r[i] = v;
+        }
+        c.process_block(&mut l, &mut r);
+        if done >= (warm * SR) as usize {
+            out.extend_from_slice(&l);
+        }
+        done += BLOCK;
+    }
+    out.truncate(4800);
+    out
+}
+
+/// Total harmonic distortion of a settled 1 kHz tone, per cent.
+fn vmu_thd(c: &mut vmu::Compressor, amp: f32) -> f32 {
+    thd_pct(&vmu_capture(c, &[(1000.0, amp)], 0.4), 1000.0, SR)
+}
+
+/// SMPTE intermodulation, per cent: 60 Hz and 7 kHz mixed 4:1, measured as
+/// the sidebands about the carrier, which is the condition the chart names.
+fn vmu_smpte_im(c: &mut vmu::Compressor, composite_peak: f32) -> f32 {
+    let x = vmu_capture(
+        c,
+        &[(60.0, composite_peak * 0.8), (7000.0, composite_peak * 0.2)],
+        0.4,
+    );
+    let carrier = goertzel(&x, 7000.0, SR);
+    let sb: f32 = [6940.0f32, 7060.0, 6880.0, 7120.0]
+        .iter()
+        .map(|&f| goertzel(&x, f, SR).powi(2))
+        .sum::<f32>()
+        .sqrt();
+    100.0 * sb / carrier.max(1e-12)
+}
+
+/// The threshold and input level that put the unit at `want_gr` decibels of
+/// reduction with `out` dBm at the output, which is the condition both of
+/// Fairchild's distortion figures are quoted at.
+fn vmu_hold_out(base: vmu::Settings, want_gr: f32, out: f32) -> (vmu::Settings, f32) {
+    let level = |s: vmu::Settings| {
+        let mut c = vmu::Compressor::new(SR);
+        c.configure(s);
+        let (mut lo, mut hi) = (-20.0f32, 45.0f32);
+        for _ in 0..40 {
+            let m = 0.5 * (lo + hi);
+            if c.static_gr_db(vmu::engine::dbm_amp(m)) < want_gr {
+                lo = m;
+            } else {
+                hi = m;
+            }
+        }
+        0.5 * (lo + hi)
+    };
+    let (mut lo, mut hi) = (0.0f32, 10.0);
+    let mut s = base;
+    let mut inp = 0.0;
+    for _ in 0..24 {
+        let t = 0.5 * (lo + hi);
+        s = vmu::Settings {
+            threshold: [t; 2],
+            time: [0; 2],
+            ..base
+        };
+        inp = level(s);
+        if inp + vmu::engine::REST_GAIN_DB - want_gr > out {
+            lo = t;
+        } else {
+            hi = t;
+        }
+    }
+    (s, inp)
+}
+
+/// Response at `hz` relative to 1 kHz, in dB.
+fn vmu_response_db(s: vmu::Settings, hz: f32) -> f32 {
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(s);
+    let amp = vmu::engine::dbm_amp(4.0);
+    let a = goertzel(&vmu_capture(&mut c, &[(hz, amp)], 0.4), hz, SR);
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(s);
+    let b = goertzel(&vmu_capture(&mut c, &[(1000.0, amp)], 0.4), 1000.0, SR);
+    20.0 * (a / b).log10()
+}
+
+fn bench_vmu() -> Section {
+    let mut rows = Vec::new();
+    let base = vmu::Settings::default();
+
+    // -- the static curves, which are two manufacturer measurements -------
+    let linear = vmu::Settings {
+        threshold: [0.0; 2],
+        ..base
+    };
+    rows.push(Row::within(
+        "straight amplifier: gain at 0 dBm in, threshold fully CCW",
+        2.0,
+        0.5,
+        "dBm",
+        vmu_out_dbm(linear, 0.0, 0.5),
+        "research/Fairchild-670.md §7.2, curve 1 of the December 1959 input/output chart (M, \
+         manufacturer measurement)",
+    ));
+    for (in_dbm, want) in [
+        (0.0f32, 2.0f32),
+        (5.0, 4.3),
+        (10.0, 5.3),
+        (15.0, 5.7),
+        (20.0, 5.9),
+    ] {
+        rows.push(Row::within(
+            &format!("factory curve at {in_dbm:+.0} dBm in"),
+            want,
+            1.0,
+            "dBm out",
+            vmu_out_dbm(base, in_dbm, 1.0),
+            "research/Fairchild-670.md §7.2, curve 3 \"factory-adjusted condition\" (M, \
+             manufacturer measurement, read to ±0.5 dB)",
+        ));
+    }
+    rows.push(Row::within(
+        "progressive ratio, +2 to +12 dBm in",
+        3.3,
+        1.0,
+        "dB out",
+        vmu_out_dbm(base, 12.0, 1.0) - vmu_out_dbm(base, 2.0, 0.6),
+        "research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels",
+    ));
+    rows.push(Row::within(
+        "progressive ratio, +10 to +20 dBm in",
+        0.6,
+        0.6,
+        "dB out",
+        vmu_out_dbm(base, 20.0, 1.0) - vmu_out_dbm(base, 10.0, 1.0),
+        "research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels",
+    ));
+
+    // -- the tube, which is the only component-manufacturer figure here ---
+    let t = vmu::triode::RemoteCutoffTriode::ge_6386();
+    rows.push(
+        Row::within(
+            "6386 gain-control range, class-A1 point to −16 V",
+            32.0,
+            3.0,
+            "dB",
+            20.0 * (t.transconductance(-1.92, 100.0) / t.transconductance(-16.0, 100.0)).log10(),
+            "research/Fairchild-670.md §4.2, GE datasheet ET-T1113: 4000 µmhos at the operating \
+             point and 100 µmhos at −16 V (D from two printed rows)",
+        )
+        .because(
+            "Raffensperger's fitted law is the only published model of this tube and it \
+             reproduces the datasheet's *transfer characteristics* to within the width of the \
+             printed curve (next three rows). What it does not reproduce is the slope at the \
+             shallow, low-plate-voltage corner GE's table quotes: at Eb = 100 V it is about 30 % \
+             flat near Vgk = 0. Refitting would mean substituting my own numbers for a sourced \
+             one, so the constants stay and this is recorded. It is also the root of the \
+             distortion miss below",
+        ),
+    );
+    for (vgk, want) in [(-10.0f32, 19.9f32), (-30.0, 4.15), (-50.0, 0.56)] {
+        rows.push(Row::within(
+            &format!("6386 plate current at 250 V, {vgk:.0} V grid"),
+            want,
+            0.25 * want,
+            "mA",
+            t.anode_current(vgk, 250.0) * 1e3,
+            "research/Fairchild-670.md §4.3, GE ET-T1113 average transfer characteristics (D, \
+             read off a 1953 graph, ±25 %)",
+        ));
+    }
+
+    // -- distortion, which is the family's whole point --------------------
+    let quiet = vmu::Settings {
+        threshold: [0.0; 2],
+        time: [0; 2],
+        ..base
+    };
+    for (out, want) in [(12.0f32, 0.25f32), (16.0, 0.6), (20.0, 1.65), (24.0, 3.9)] {
+        let mut c = vmu::Compressor::new(SR);
+        c.configure(quiet);
+        rows.push(Row::within(
+            &format!("SMPTE IM at {out:+.0} dBm out, no limiting"),
+            want,
+            0.5,
+            "%",
+            vmu_smpte_im(
+                &mut c,
+                vmu::engine::dbm_amp(out - vmu::engine::REST_GAIN_DB),
+            ),
+            "research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 \
+             (M, manufacturer measurement, read to ±0.5 points)",
+        ));
+    }
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(quiet);
+    rows.push(Row::ranged(
+        "harmonic distortion at +18 dBm out, no limiting",
+        0.0,
+        1.0,
+        "%",
+        vmu_thd(
+            &mut c,
+            vmu::engine::dbm_amp(18.0 - vmu::engine::REST_GAIN_DB),
+        ),
+        "research/Fairchild-670.md §7.1, \"less than 1 % at any level up to +18 dbm output (no \
+         limiting)\" (M)",
+    ));
+    let (deep, deep_in) = vmu_hold_out(base, 10.0, 12.0);
+    let mut c = vmu::Compressor::new(SR);
+    c.configure(deep);
+    rows.push(
+        Row::ranged(
+            "harmonic distortion at +12 dBm out and 10 dB of limiting",
+            0.0,
+            1.0,
+            "%",
+            vmu_thd(&mut c, vmu::engine::dbm_amp(deep_in)),
+            "research/Fairchild-670.md §7.1, \"less than 1 % at 10 db limiting and +12 dbm \
+             output\" (M)",
+        )
+        .because(
+            "Holding the output while taking ten decibels of reduction means driving the grids \
+             ten decibels harder — that is the identity this engine exists to express and no \
+             model of this circuit can avoid it. What decides the cost is the shape of the \
+             tube's curve at the bias the control voltage has moved to, and the fitted law \
+             steepens faster below −35 V than the hardware evidently does. Same cause as the \
+             gain-range row above",
+        ),
+    );
+
+    // -- the timing network, from the factory drawing ---------------------
+    for (pos, want) in [(0usize, 0.3f32), (1, 0.8), (2, 2.0), (3, 5.0)] {
+        rows.push(Row::within(
+            &format!("release, position {}", pos + 1),
+            want,
+            0.3 * want,
+            "s",
+            vmu_release_s(pos, 1.0, 12.0),
+            "research/Fairchild-670.md §7.1, \"RELEASE TIME (from 10 db of limiting)\" (M); the \
+             model is given the fourteen component values and nothing else",
+        ));
+    }
+    rows.push(Row::within(
+        "release, position 6, individual peak (2 ms)",
+        0.3,
+        0.4 * 0.3,
+        "s",
+        vmu_release_s(5, 0.002, 3.0),
+        "research/Fairchild-670.md §7.1, position 6 \".3 seconds for individual peaks\" (M)",
+    ));
+    rows.push(Row::within(
+        "release, position 6, multiple peaks (0.3 s of limiting)",
+        10.0,
+        4.0,
+        "s",
+        vmu_release_s(5, 0.3, 30.0),
+        "research/Fairchild-670.md §7.1, position 6 \"10 seconds for multiple peaks\" (M)",
+    ));
+    rows.push(Row::within(
+        "release, position 6, sustained (3 s of limiting)",
+        25.0,
+        10.0,
+        "s",
+        vmu_release_s(5, 3.0, 45.0),
+        "research/Fairchild-670.md §7.1, position 6 \"25 seconds for consistently high program \
+         level\" (M); nobody has quantified these three before",
+    ));
+    rows.push(
+        Row::within(
+            "release, position 5, individual peak (2 ms)",
+            2.0,
+            0.35 * 2.0,
+            "s",
+            vmu_release_s(4, 0.002, 20.0),
+            "research/Fairchild-670.md §7.1, position 5 \"2 seconds for individual peaks\" (M)",
+        )
+        .because(
+            "The dossier contradicts itself here and the network settles it. Its §5.4 derives \
+             this figure from R_T·C_T alone, treating the uncharged slow leg as not yet loading \
+             the node; its §5.5 requires the opposite to reach position 6's 0.3 s, and admits \
+             that no single simple reading gives both. Built from the drawing, the mechanism \
+             works at position 6, where the node's own 0.44 s is fast against the legs' 0.8 and \
+             2.0 s, and fails at position 5, where the node's 0.88 s is slower than its one \
+             leg's 0.8 s — so that leg's 8 µF joins the node immediately whatever the stimulus. \
+             The multiple-peaks figure below is met",
+        ),
+    );
+    rows.push(Row::within(
+        "release, position 5, multiple peaks (1 s of limiting)",
+        10.0,
+        4.0,
+        "s",
+        vmu_release_s(4, 1.0, 25.0),
+        "research/Fairchild-670.md §7.1, position 5 \"10 seconds for multiple peaks\" (M)",
+    ));
+    for (pos, want) in [
+        (0usize, 0.2f32),
+        (1, 0.2),
+        (2, 0.4),
+        (3, 0.8),
+        (4, 0.4),
+        (5, 0.2),
+    ] {
+        rows.push(Row::within(
+            &format!("attack, position {}", pos + 1),
+            want,
+            0.4 * want,
+            "ms",
+            vmu_attack_s(pos) * 1e3,
+            "research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the \
+             circuit); measured at 63 % of a ten decibel step, because Fairchild publish no \
+             criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8",
+        ));
+    }
+
+    // -- response, and the one figure that is specified without a condition
+    rows.push(Row::within(
+        "response at 40 Hz, no limiting",
+        0.0,
+        1.0,
+        "dB",
+        vmu_response_db(linear, 40.0),
+        "research/Fairchild-670.md §7.1, \"40 cycles to 15 kc ± 1 db\" (M)",
+    ));
+    rows.push(Row::within(
+        "response at 15 kHz, no limiting",
+        0.0,
+        1.0,
+        "dB",
+        vmu_response_db(linear, 15_000.0),
+        "research/Fairchild-670.md §7.1, \"40 cycles to 15 kc ± 1 db\" (M)",
+    ));
+
+    // -- the 660, about which no specification exists ---------------------
+    rows.push(Row::unanchored(
+        "660 against 670: small-signal gain at 0 dBm in",
+        format!(
+            "{:+.2} dB",
+            vmu_out_dbm(
+                vmu::Settings {
+                    model: vmu::MODEL_660,
+                    ..linear
+                },
+                0.0,
+                0.5
+            ) - vmu_out_dbm(linear, 0.0, 0.5)
+        ),
+        "the dossier holds **no 660 specification sheet** and says so, so nothing about the 660's \
+         static curve or its distortion is asserted. What is modelled is the one difference it \
+         trusts: 1800 Ω of cathode resistor against the 670's 680, which is a deeper standing \
+         bias and therefore less transconductance and less gain",
+    ));
+
+    Section {
+        model: "670",
+        unit: "Fairchild 660 and 670 variable-mu limiting amplifiers",
+        dossier: "research/Fairchild-670.md",
+        rows,
+    }
+}
+
 fn main() {
     eprintln!(
         "driving the engines; this takes a few minutes at {} kHz",
@@ -4351,6 +4858,7 @@ fn main() {
         bench_rms(),
         bench_gbus(),
         bench_tg(),
+        bench_vmu(),
     ];
 
     for s in &sections {

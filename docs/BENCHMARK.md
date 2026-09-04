@@ -34,7 +34,8 @@ Every measurement drives the real engine offline with generated signal and reads
 | 160 | dbx 160, with the 160A's OverEasy and Infinity+ | 39 | 4 | 2 |
 | 4000 G | SSL 4000 G bus compressor, the 500-series module drawn with the console's values | 33 | 2 | 3 |
 | TG12413 | EMI TG12413 | 15 | 0 | 6 |
-| **all** | | **162** | **12** | **22** |
+| 670 | Fairchild 660 and 670 variable-mu limiting amplifiers | 32 | 3 | 1 |
+| **all** | | **194** | **15** | **23** |
 
 The misses are the honest part of this table, and none of them is a widened tolerance. Five of them match the README's own list of figures these models do not reach; the other three do not appear there, and the section below says which and what to do about it.
 
@@ -407,6 +408,56 @@ Notes:
 - **attack time**: R41 plus R47 into the store gives 47 ms, which is far too slow for a limiter, so the charge path is almost certainly current-driven by VT17 and the RC figure is an upper bound. Chandler say only "Attack: Fixed". §12.6 of the dossier refuses to test it and this report does the same
 - **threshold in dBu**: there is no threshold control and the reference is three germanium diodes whose drop at their working current nobody has measured. Where the model starts working is a documented choice, not a figure
 - **distortion at any level**: no spectrum, no THD figure and no noise figure has ever been published for this unit. The element's drive is fitted to the two ends of the THD scale Chandler print on the TG1's input knob, which is a figure about a licensed recreation with its own added stages
+
+## 670 — Fairchild 660 and 670 variable-mu limiting amplifiers
+
+Figures from [`research/Fairchild-670.md`](../research/Fairchild-670.md).
+
+| quantity | published | measured | verdict | source |
+|---|---|---|---|---|
+| straight amplifier: gain at 0 dBm in, threshold fully CCW | 2 ± 0.5 dBm | 2.000 dBm | meets | research/Fairchild-670.md §7.2, curve 1 of the December 1959 input/output chart (M, manufacturer measurement) |
+| factory curve at +0 dBm in | 2 ± 1 dBm out | 1.817 dBm out | meets | research/Fairchild-670.md §7.2, curve 3 "factory-adjusted condition" (M, manufacturer measurement, read to ±0.5 dB) |
+| factory curve at +5 dBm in | 4.3 ± 1 dBm out | 4.118 dBm out | meets | research/Fairchild-670.md §7.2, curve 3 "factory-adjusted condition" (M, manufacturer measurement, read to ±0.5 dB) |
+| factory curve at +10 dBm in | 5.3 ± 1 dBm out | 5.387 dBm out | meets | research/Fairchild-670.md §7.2, curve 3 "factory-adjusted condition" (M, manufacturer measurement, read to ±0.5 dB) |
+| factory curve at +15 dBm in | 5.7 ± 1 dBm out | 5.832 dBm out | meets | research/Fairchild-670.md §7.2, curve 3 "factory-adjusted condition" (M, manufacturer measurement, read to ±0.5 dB) |
+| factory curve at +20 dBm in | 5.9 ± 1 dBm out | 6.071 dBm out | meets | research/Fairchild-670.md §7.2, curve 3 "factory-adjusted condition" (M, manufacturer measurement, read to ±0.5 dB) |
+| progressive ratio, +2 to +12 dBm in | 3.3 ± 1 dB out | 2.583 dB out | meets | research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels |
+| progressive ratio, +10 to +20 dBm in | 0.6 ± 0.6 dB out | 0.684 dB out | meets | research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels |
+| 6386 gain-control range, class-A1 point to −16 V | 32 ± 3 dB | 26.115 dB | **misses** | research/Fairchild-670.md §4.2, GE datasheet ET-T1113: 4000 µmhos at the operating point and 100 µmhos at −16 V (D from two printed rows) |
+| 6386 plate current at 250 V, -10 V grid | 19.9 ± 4.975 mA | 19.861 mA | meets | research/Fairchild-670.md §4.3, GE ET-T1113 average transfer characteristics (D, read off a 1953 graph, ±25 %) |
+| 6386 plate current at 250 V, -30 V grid | 4.15 ± 1.0375 mA | 4.141 mA | meets | research/Fairchild-670.md §4.3, GE ET-T1113 average transfer characteristics (D, read off a 1953 graph, ±25 %) |
+| 6386 plate current at 250 V, -50 V grid | 0.56 ± 0.14 mA | 0.559 mA | meets | research/Fairchild-670.md §4.3, GE ET-T1113 average transfer characteristics (D, read off a 1953 graph, ±25 %) |
+| SMPTE IM at +12 dBm out, no limiting | 0.25 ± 0.5 % | 0.212 % | meets | research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 (M, manufacturer measurement, read to ±0.5 points) |
+| SMPTE IM at +16 dBm out, no limiting | 0.6 ± 0.5 % | 0.574 % | meets | research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 (M, manufacturer measurement, read to ±0.5 points) |
+| SMPTE IM at +20 dBm out, no limiting | 1.65 ± 0.5 % | 1.606 % | meets | research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 (M, manufacturer measurement, read to ±0.5 points) |
+| SMPTE IM at +24 dBm out, no limiting | 3.9 ± 0.5 % | 3.561 % | meets | research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 (M, manufacturer measurement, read to ±0.5 points) |
+| harmonic distortion at +18 dBm out, no limiting | 0 to 1 % | 0.358 % | meets | research/Fairchild-670.md §7.1, "less than 1 % at any level up to +18 dbm output (no limiting)" (M) |
+| harmonic distortion at +12 dBm out and 10 dB of limiting | 0 to 1 % | 3.715 % | **misses** | research/Fairchild-670.md §7.1, "less than 1 % at 10 db limiting and +12 dbm output" (M) |
+| release, position 1 | 0.3 ± 0.09 s | 0.299 s | meets | research/Fairchild-670.md §7.1, "RELEASE TIME (from 10 db of limiting)" (M); the model is given the fourteen component values and nothing else |
+| release, position 2 | 0.8 ± 0.24000001 s | 0.821 s | meets | research/Fairchild-670.md §7.1, "RELEASE TIME (from 10 db of limiting)" (M); the model is given the fourteen component values and nothing else |
+| release, position 3 | 2 ± 0.6 s | 2.325 s | meets | research/Fairchild-670.md §7.1, "RELEASE TIME (from 10 db of limiting)" (M); the model is given the fourteen component values and nothing else |
+| release, position 4 | 5 ± 1.5 s | 4.720 s | meets | research/Fairchild-670.md §7.1, "RELEASE TIME (from 10 db of limiting)" (M); the model is given the fourteen component values and nothing else |
+| release, position 6, individual peak (2 ms) | 0.3 ± 0.120000005 s | 0.405 s | meets | research/Fairchild-670.md §7.1, position 6 ".3 seconds for individual peaks" (M) |
+| release, position 6, multiple peaks (0.3 s of limiting) | 10 ± 4 s | 8.107 s | meets | research/Fairchild-670.md §7.1, position 6 "10 seconds for multiple peaks" (M) |
+| release, position 6, sustained (3 s of limiting) | 25 ± 10 s | 18.235 s | meets | research/Fairchild-670.md §7.1, position 6 "25 seconds for consistently high program level" (M); nobody has quantified these three before |
+| release, position 5, individual peak (2 ms) | 2 ± 0.7 s | 3.947 s | **misses** | research/Fairchild-670.md §7.1, position 5 "2 seconds for individual peaks" (M) |
+| release, position 5, multiple peaks (1 s of limiting) | 10 ± 4 s | 7.216 s | meets | research/Fairchild-670.md §7.1, position 5 "10 seconds for multiple peaks" (M) |
+| attack, position 1 | 0.2 ± 0.080000006 ms | 0.167 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| attack, position 2 | 0.2 ± 0.080000006 ms | 0.167 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| attack, position 3 | 0.4 ± 0.16000001 ms | 0.333 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| attack, position 4 | 0.8 ± 0.32000002 ms | 0.667 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| attack, position 5 | 0.4 ± 0.16000001 ms | 0.333 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| attack, position 6 | 0.2 ± 0.080000006 ms | 0.167 ms | meets | research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the circuit); measured at 63 % of a ten decibel step, because Fairchild publish no criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8 |
+| response at 40 Hz, no limiting | 0 ± 1 dB | -0.681 dB | meets | research/Fairchild-670.md §7.1, "40 cycles to 15 kc ± 1 db" (M) |
+| response at 15 kHz, no limiting | 0 ± 1 dB | -0.447 dB | meets | research/Fairchild-670.md §7.1, "40 cycles to 15 kc ± 1 db" (M) |
+| 660 against 670: small-signal gain at 0 dBm in | *(none published)* | -4.74 dB | no figure | — |
+
+Notes:
+
+- **6386 gain-control range, class-A1 point to −16 V**: Raffensperger's fitted law is the only published model of this tube and it reproduces the datasheet's *transfer characteristics* to within the width of the printed curve (next three rows). What it does not reproduce is the slope at the shallow, low-plate-voltage corner GE's table quotes: at Eb = 100 V it is about 30 % flat near Vgk = 0. Refitting would mean substituting my own numbers for a sourced one, so the constants stay and this is recorded. It is also the root of the distortion miss below
+- **harmonic distortion at +12 dBm out and 10 dB of limiting**: Holding the output while taking ten decibels of reduction means driving the grids ten decibels harder — that is the identity this engine exists to express and no model of this circuit can avoid it. What decides the cost is the shape of the tube's curve at the bias the control voltage has moved to, and the fitted law steepens faster below −35 V than the hardware evidently does. Same cause as the gain-range row above
+- **release, position 5, individual peak (2 ms)**: The dossier contradicts itself here and the network settles it. Its §5.4 derives this figure from R_T·C_T alone, treating the uncharged slow leg as not yet loading the node; its §5.5 requires the opposite to reach position 6's 0.3 s, and admits that no single simple reading gives both. Built from the drawing, the mechanism works at position 6, where the node's own 0.44 s is fast against the legs' 0.8 and 2.0 s, and fails at position 5, where the node's 0.88 s is slower than its one leg's 0.8 s — so that leg's 8 µF joins the node immediately whatever the stimulus. The multiple-peaks figure below is met
+- **660 against 670: small-signal gain at 0 dBm in**: the dossier holds **no 660 specification sheet** and says so, so nothing about the 660's static curve or its distortion is asserted. What is modelled is the one difference it trusts: 1800 Ω of cathode resistor against the 670's 680, which is a deeper standing bias and therefore less transconductance and less gain
 
 ## Where this disagreed with the README, and how it was settled
 

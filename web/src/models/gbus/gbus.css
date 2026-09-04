@@ -425,6 +425,19 @@
 }
 
 /*
+ * The transfer plot is square here too, and the rule that makes it square
+ * is the shared one in `style.css`: the canvas takes the height its half of
+ * the column leaves and the aspect ratio gives it the matching width. This
+ * bench stacks its two panels instead of setting them side by side, so the
+ * panel is full width and the square sits centred in it rather than sizing
+ * a grid column. The ceiling is the same as the landscape faces'.
+ */
+.lab-model--gbus .gbus-stage__bench .lab-panel--transfer .lab-panel__canvas {
+  max-width: 300px;
+  max-height: 300px;
+}
+
+/*
  * **Suppress what cannot be read rather than drawing it illegibly.**
  *
  * The panel is a size container, so these ask about the panel's own width

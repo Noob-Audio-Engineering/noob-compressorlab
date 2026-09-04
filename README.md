@@ -922,6 +922,128 @@ panel decision above settles which set is live. `ssl_bypass` and `ssl_mix` are t
 `bypass` and `mix`. `ssl_sc_ext` would need an external sidechain input, and the plug-in declares no
 such bus, so it would be a control that writes nowhere.
 
+## The Fairchild 670
+
+`research/Fairchild-670.md`, section 10 for the design and 11 for the test plan. The engine is
+`src/dsp/vmu/` and the face `web/src/models/vmu/`. Every parameter is prefixed `fc_`, and the unit
+switch chooses between the mono **660** and the stereo **670**.
+
+**This is the only model in the lab with no gain multiplier in it.** Every other engine here
+computes a gain and multiplies the audio by it: a FET channel to ground, a photocell in a divider, a
+Blackmer cell, a ring of diodes, a zener pair. The Fairchild has no such part. The audio is
+amplified by eight 6386 triode sections a channel, and the control voltage reduces gain by walking
+those same sections down their own remote-cutoff curve — so the output is the **difference of two
+tube currents** and there is nothing in the signal path to attenuate. Three things follow, and they
+are the model:
+
+* **Gain reduction and distortion are one curve read at two points.** Small-signal gain is the
+  characteristic's slope and distortion its curvature, both at the point the control voltage sets.
+  Fairchild published a chart in March 1959 that measures exactly this, IM against decibels of
+  limiting at seven output levels, and it is what the engine is calibrated against. There is no
+  drive control on this model and there cannot honestly be one.
+* **The control voltage is common-mode, so it cancels at the output.** It is injected at the centre
+  tap of the input transformer's secondary; both grids move down together while the audio moves them
+  apart, and the output transformer takes the difference. That is the mechanism behind the manual's
+  first boast — *"the complete absence of audible thumps"* — and it means this engine needs no
+  control-signal smoother at all. `t22` asserts it exactly: sweeping the common-mode voltage over
+  nine volts with a silent input gives a floating-point zero at the output.
+* **The audio self-biases.** The two halves' currents move oppositely, so their sum is constant to
+  first order; to second order the curve is convex, the sum rises with signal, and the stage bends
+  its own operating point. That is the small, level-dependent change people mean when they say the
+  box does something at zero gain reduction, and it is why the straight-amplifier curve expands by
+  0.4 dB at +24 dBm rather than sitting on a line.
+
+**The six time constants are a circuit, not a switch statement.** `src/dsp/vmu/network.rs` holds the
+fourteen component values the dossier read off the original Fairchild 660 factory drawing, and the
+engine integrates the node they make: one capacitor across a resistor, with two more capacitors
+behind resistors of their own. Those two charge on their own clock, so while they are empty they
+pull the effective resistance down and the release is fast, and once they are charged the charge has
+to come back out through the same resistors and the release grows a long tail. All four fixed
+release times and **all three** of position 6's programme-dependent figures fall out of it — 0.3 s
+after a two-millisecond peak, 8.1 s after a third of a second of limiting, 18 s after three seconds
+— and nobody, including Fairchild, had quantified those three before. The switch does not discharge
+the capacitors when it moves, which `t24` checks.
+
+**Lateral and vertical is mid-side, and it is not stereo linking.** The AGC switch throws a
+sum-and-difference matrix in front of both channels and another behind them, and what sits between
+is two *entirely independent* limiters working on mid and side. A centred source drives only the
+lateral channel; a hard-panned one drives both equally. Fairchild built it for cutting stereo
+lacquers and made the argument for mid-side bus compression in passing: *"such limiting will retain
+the spatial distribution of instruments and soloists as originally recorded without producing any
+annoying image drift."*
+
+### The controls, and which of them are ours
+
+| control | parameter | notes |
+|---|---|---|
+| UNIT | `fc_model` | 660 or 670. The dossier trusts one difference between them: 1800 Ω of cathode resistor against 680, which is a different operating point in the one stage that does all the work. On the 660 both channels follow the single row and the AGC switch is out of circuit |
+| INPUT GAIN | `fc_input_gain_l`, `fc_input_gain_r` | AT101, a step attenuator: 21 detents, 1 dB apart, printed as attenuation. The default is the manual's own unity-gain setting |
+| THRESHOLD | `fc_threshold_l`, `fc_threshold_r` | R115, printed 0 to 10 and **not decibels**. The pot is linear with a 24 kΩ resistor on its centre tap, so its law has a kink in it, and what it sets jointly with the DC threshold is a curve rather than a point |
+| TIME CONSTANT | `fc_time_l`, `fc_time_r` | S102, six positions. 3 is the manual's general-purpose suggestion |
+| METERING | `fc_meter_l`, `fc_meter_r` | S101, and **not a meter switch**: it reads plate current through the output stage, the push leg, the centre tap and the pull leg. Universal Audio removed these positions from their emulation; this keeps them, because it is the one place the hardware admits its meter is a valve tester |
+| ZERO | `fc_zero_l`, `fc_zero_r` | R142, a screwdriver on the front panel. **A bias trim wearing a meter-calibration label**: it moves the operating point of all eight sections, so it moves the standing gain, the available reduction and the standing distortion together — and the needle. It is the honest version of the "Headroom" knob Universal Audio added and the "calibration" knob Softube added |
+| BAL | `fc_balance_l`, `fc_balance_r` | R105, the other front-panel screwdriver. At zero the push-pull cancels even harmonics to −134 dB; at the extremes it brings the second harmonic in, which is what the hardware's balancing procedure exists to remove |
+| AGC | `fc_agc` | S301, ten wafers: two independent limiters, or the matrix |
+| DC THRESHOLD | `fc_dc_threshold_l`, `fc_dc_threshold_r` | R117, which on the hardware is **inside the chassis**, so it is on the extras strip rather than the panel. It is the ratio and knee control, and every emulation that is any good brings it out. Its default is the factory-adjusted condition |
+| TUBE | `fc_tube` | ours. GE publish 4000 µmhos for the 6386 and JJ 3000 for their modern replacement at the same operating point, which is a real published difference of 2.5 dB |
+| OVERSAMPLE | `fc_oversample` | ours: 4x, 8x or 16x. What the factor buys is a loop delay short against a 200 µs attack |
+| MIX, SC HPF, BYPASS | `mix`, `sc_hpf`, `bypass` | the lab's shared controls |
+| STEREO / LINK | `link` | **the hardware has none.** Its lateral-and-vertical mode is two matrices and two independent limiters, so every preset of this model turns the link off |
+
+There is **no ratio control, no attack control and no release control**, and adding any of them would
+be papering over a mechanism. The ratio is what the two threshold controls jointly produce; the
+attack and the release are what the timing network does.
+
+### Its numbers, and where they come from
+
+Two of the anchors are manufacturer *measurements* rather than specifications, which is unusual here
+and is why this model is calibrated more tightly than most: the December 1959 input/output chart
+(five static curves with the control positions that produce each) and the March 1959 IM chart (seven
+curves of IM against limiting at seven output levels).
+
+| quantity | published | this model |
+|---|---|---|
+| straight-amplifier gain at 0 dBm in | +2.0 dBm | +2.00 |
+| factory curve at 0 / +5 / +10 / +15 / +20 dBm in | +2.0 / +4.3 / +5.3 / +5.7 / +5.9 dBm | +1.82 / +4.12 / +5.39 / +5.83 / +6.07 |
+| IM at +12 / +16 / +20 / +24 dBm out, no limiting | ≈0.25 / 0.6 / 1.65 / 3.9 % | 0.21 / 0.57 / 1.61 / 3.56 |
+| distortion at +18 dBm out, no limiting | under 1 % | 0.36 % |
+| release, positions 1 to 4 | 0.3 / 0.8 / 2 / 5 s | 0.30 / 0.82 / 2.33 / 4.72 |
+| release, position 6, peak / multiple / sustained | 0.3 / 10 / 25 s | 0.41 / 8.1 / 18.2 |
+| attack, positions 1 to 6 | 0.2 / 0.2 / 0.4 / **0.8** / 0.4 / 0.2 ms | 0.167 / 0.167 / 0.333 / 0.667 / 0.333 / 0.167 |
+| frequency response, 40 Hz and 15 kHz | ±1 dB | −0.68 and −0.45 |
+| left-right separation, matrix in, channels matched | 60 dB | 232 dB |
+
+Three fitted constants, each named at its own definition in `src/dsp/vmu/engine.rs` and each fitted
+to a published figure rather than to taste: the sidechain's stage gain, fitted to curve 3 (which it
+then reproduces to 0.16 dB RMS across five points); the grid swing at +24 dBm out, fitted to the IM
+chart's top curve (which fixes the other three); and the cathode bridge's low corner, fitted to the
+published response band, because the dossier says outright that the corner is not established and
+instructs that it be set to meet the figure and then allowed to move with the operating point, which
+it does — from about 35 Hz at rest to 14 Hz at ten decibels of reduction.
+
+### Two places the dossier contradicts itself, and how this rules
+
+**Position 5's release.** Its section 5.4 derives the individual-peak figure from `R_T·C_T` alone,
+treating the uncharged slow leg as not yet loading the node; its 5.5 requires the opposite — that
+the uncharged legs pull the effective resistance down — to reach position 6's 0.3 s, and admits in
+as many words that "no single simple reading reproduces all of positions 5 and 6". Building the
+network settles it. The mechanism is real and it works at position 6, where the node's own 0.44 s is
+genuinely fast against the legs' 0.8 s and 2.0 s; it does not work at position 5, where the node's
+0.88 s is **slower** than its one leg's 0.8 s, so that leg's 8 µF joins the node immediately and the
+tail becomes 220 kΩ into 12 µF whatever the stimulus was. Position 5's individual-peak figure is the
+recorded miss below; its multiple-peaks figure is met.
+
+**The DC threshold's span.** Its 7.2 says curves 4 and 5 "plateau 14 dB apart, at 0 dBm and +10 dBm
+out" while its own transcribed table of the same chart gives 0.0 and +10.2. The table is the reading
+and the prose is an arithmetic slip, so the test asserts **10.2 dB** and the model spans more than
+that.
+
+Two other places it rules against another source and says which: it follows Sound On Sound's attack
+table against the manual, because the circuit says attack is proportional to the timing capacitance
+and the manual's line groups three positions and loses position 4; and it takes the specification
+page's 20:1 over the features page's 30:1, and the specification's 200 µs attack over the features
+page's 100 µs, both of which are the same manual disagreeing with itself.
+
 ## Where the models miss their published figures
 
 Three audits went through these engines against their research documents and found tests that had
@@ -933,8 +1055,8 @@ The table also carries a second kind of row: a **control the research specifies 
 not have**. Those are not missed figures, but they are the other way a model can quietly fall short
 of its document, and the reason each one is absent belongs where people look for gaps rather than
 buried in the model's own section.
-Twenty-one remain, four of them the 33609's, four the TG12413's, four the dbx 160's and two the
-4000 G's.
+Twenty-four remain, four of them the 33609's, four the TG12413's, four the dbx 160's, three the
+670's and two the 4000 G's.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -955,6 +1077,9 @@ Twenty-one remain, four of them the 33609's, four the TG12413's, four the dbx 16
 | 4000 G | `ssl_revision`, switching the panel between the console and the module | not implemented | the console's release switch has five positions and the module's six, and the ratio three against six, so one parameter cannot serve both without a dead detent. The research's section 2.5 settles which set is live: draw the module, because SSL publish a render and a dimensioned recall sheet of it and nothing legible of the console, and print the console's values on it, because card 82E27 gives those and nothing gives the module's |
 | 4000 G | `ssl_bypass` and `ssl_mix`, in the research's parameter table | not implemented | both duplicate a control the lab already shares. The research's own note calls `ssl_bypass` "the plug-in's own sample-exact bypass", which is `bypass`, and `ssl_mix` is `mix`. The hardware's IN switch is a separate thing and does have its own parameter, because it is not a bypass: it removes the sidechain and leaves the VCA and the make-up gain in circuit |
 | 4000 G | `ssl_oversample`'s 4x position | not implemented | both nonlinearities in this audio path are exactly second order, a squarer and a product of two signals, so their output bandwidth is exactly twice their input bandwidth and 2x already contains it with nothing left to fold. A 4x position could not differ audibly from 2x. 1x and 2x are offered |
+| 670 | the 6386's gain-control range, 32.0 dB ± 3 between GE's class-A₁ point and −16 V of grid | 26.1 dB | Raffensperger's is the only published fit of this tube and it is what the dossier prescribes. It reproduces the datasheet's *transfer characteristics* to within the width of the printed curve at three points across two decades of current, which is the check the dossier itself made; what it does not reproduce is the **slope** at the shallow, low-plate-voltage corner GE's table quotes, where it is about 30 % flat. Refitting the law would mean substituting my own numbers for a sourced one, so the constants stay |
+| 670 | distortion under 1 % at +12 dBm out and 10 dB of limiting | 3.7 % | the same cause. Holding the output while taking ten decibels of reduction means driving the grids ten decibels harder, which is the identity this engine exists to express and which no model of this circuit can avoid; what decides the cost is the shape of the tube's curve at the bias the control voltage has moved to, and the fitted law steepens faster below −35 V than the hardware evidently does. Because that law is also 6 dB short on the tube's control range, the model needs a larger control voltage to reach a given reduction and lands further down its own curve than the hardware does. **The direction is right and the specification's two no-limiting figures are met**: 0.08 % at +12 dBm and 0.36 % at +18 |
+| 670 | position 5's release, 2 s for individual peaks | 3.9 s | the dossier contradicts itself here and the section above gives the ruling: the mechanism it describes works at position 6, where the node's 0.44 s is fast against the legs' 0.8 and 2.0 s, and cannot work at position 5, where the node's 0.88 s is slower than its one leg's 0.8. Its multiple-peaks figure, 10 s, is met at 7.2 |
 | 4000 G | the panel's 0.1 ms attack at 4:1, within the research's ±30 % | +30.2 % | **0.2 percentage points outside a tolerance the research itself calls wide on purpose.** The loop gain is `0.11513·d/k` and equals 3 only at the knee, so the harder the box is driven the faster it grabs, while the panel prints one number. Measured at one fixed input level giving 7 to 9.5 dB of reduction, which is how this box is used; the other five positions meet it, and at 12 dB of reduction the slowest runs 41 % fast while at 5 dB the fastest runs 176 % slow. Widening the window to 31 % to collect a green tick is the move this repository's standard forbids, so the figure stands and the miss is recorded |
 | 4000 G | the ratio rising 0.11513 per dB of gain reduction, at 4:1 and 10:1 | 0.130 and 0.180, +13 % and +56 % | that derivation treats D6 as an ideal 0.6 V drop, while the same document insists — correctly — that D6's soft turn-on **is** the knee. Both cannot hold: a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages, and the release resistor loads the loop by the remainder. `k` is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is only 154 mV of control voltage and the diode never leaves its knee, which is the same observation the research makes from the other end when it notices that 10:1's `k` lands near the VCA's own 6.1 mV/dB. The 2:1 position meets the figure at +2.6 %. Nothing is calibrated away, because `k` is an estimate and the ratio calibration is the one test the research explicitly refuses to write |
 | dbx 160 | third harmonic 0.07 % below threshold on the 160X | 0.000 % | with no gain reduction there is no detector ripple, and the third harmonic in the hardware at that point belongs to an output stage dbx publish no distortion figure for, so anything here would be invented. The second-harmonic figure in the same row is met, because that one is the gain cell's and the cell is modelled |
@@ -1047,6 +1172,20 @@ ratio is what is asserted, and the note is at the test.
   the fixed one and that it gives up on long peaks; the meter's calibration; that the bus takes the
   larger reduction rather than the average; and the structural test whose only job is to prove the T4
   cell was not imported, which is the one that stops this becoming a third LA-2A.
+- **the Fairchild 670** (`src/dsp/vmu/tests.rs`): 35 tests numbered as its research's own test plan
+  numbers them, each saying whether the figure it asserts is published and by whom, derived and by
+  whom, or not available at all. The five points of the published input/output curve, its knee at
+  +2 dBm, its plateau at +6 and its progressive ratio at two places — which no fixed-ratio
+  compressor can pass both halves of. Four points of the published IM chart at zero limiting, and
+  the monotonicity of distortion against gain reduction, which is the test that fails if somebody
+  bolts a separate saturator on. The tube's law against the GE datasheet's own curves. All four
+  fixed release times and all three of position 6's programme-dependent figures, out of the
+  component values and nothing else. The six attack times and their proportionality to the timing
+  capacitance, including the correction to the manual at position 4. That the matrix is exact when
+  the channels match and that it is **not** a linked pair when they do not. That a moving
+  common-mode voltage makes no sound at all, which is the anti-thump mechanism asserted as a
+  floating-point zero rather than a chosen bound. And that turning the time-constant switch does not
+  discharge the network, which is the easy mistake here.
 - **the Neve 33609** (`src/dsp/bridge/tests.rs`): 30 tests numbered as its research's own test plan
   numbers them, so a failure names the test in the document it came from, and each one says whether
   the figure it asserts is published and by whom or derived and by whom. The 25 dB open bridge, which

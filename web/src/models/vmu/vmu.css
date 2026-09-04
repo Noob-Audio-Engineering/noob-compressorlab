@@ -121,6 +121,12 @@
   font-size: max(8px, 0.85cqw);
   color: var(--fair-ink-dim);
 }
+.facefair__ident {
+  display: flex;
+  align-items: baseline;
+  gap: 1.1cqw;
+  white-space: nowrap;
+}
 .facefair__logo {
   font-family: Georgia, 'Times New Roman', serif;
   font-style: italic;
@@ -134,7 +140,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.15cqw;
-  font-size: max(7px, 0.62cqw);
+  font-size: max(8px, 0.62cqw);
   letter-spacing: 0.05em;
   color: var(--fair-ink-dim);
   white-space: nowrap;
@@ -175,7 +181,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: max(7px, 0.62cqw);
+  font-size: max(8px, 0.62cqw);
   color: #d8d4cf;
   background: radial-gradient(circle at 34% 28%, #3a3b3d, #131415 72%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
@@ -183,17 +189,29 @@
 
 /* ------------------------------------------------------------- the meters */
 
-.facefair__bezel {
+/*
+ * The meters sit in a moulded surround recessed into the plate. It is drawn
+ * as a recess — a soft inner shadow and a lit top edge — rather than as a
+ * filled black box, because a box of the measured size on a near-black plate
+ * reads as a hole and swallows the mains toggle and the fuse beside it.
+ */
+.lab-model--vmu .facefair__bezel.abs {
   position: absolute;
+  /*
+   * The two meters are given as boxes rather than centres, so they must not
+   * take the shared centring transform. The selector carries `.abs` and the
+   * model root because `.lab-model--vmu .abs` would otherwise outrank a
+   * plain class and shift both recesses half their own size up and left.
+   */
   transform: none;
   border-radius: 1.2cqw;
-  background: linear-gradient(180deg, #0a0a0b, #131415);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(255, 255, 255, 0.012));
   box-shadow:
-    inset 0 0 1.4cqw rgba(0, 0, 0, 0.95),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 1px 0 rgba(255, 255, 255, 0.04);
+    inset 0 0.15cqw 0.9cqw rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.045);
 }
-.facefair__dial {
+.lab-model--vmu .facefair__dial.abs {
   position: absolute;
   transform: none;
 }
@@ -287,15 +305,15 @@
 }
 .fairknob__marks line {
   stroke: var(--fair-ink-dim);
-  stroke-width: 0.7;
+  stroke-width: 1.4;
 }
 .fairknob__marks line.long {
   stroke: var(--fair-ink);
-  stroke-width: 1.1;
+  stroke-width: 2.2;
 }
 .fairknob__marks text {
   fill: var(--fair-ink);
-  font-size: 5.4px;
+  font-size: 10.8px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -306,7 +324,7 @@
 .fairknob__skirtrim {
   fill: none;
   stroke: rgba(255, 255, 255, 0.16);
-  stroke-width: 0.7;
+  stroke-width: 1.4;
 }
 .fairknob__cap {
   fill: #060606;
@@ -314,7 +332,7 @@
 .fairknob__caprim {
   fill: none;
   stroke: rgba(255, 255, 255, 0.12);
-  stroke-width: 0.6;
+  stroke-width: 1.2;
 }
 .fairknob__dot {
   fill: #f0ece6;
@@ -435,7 +453,7 @@
   gap: 2px;
 }
 .fairscrew__caption {
-  font-size: max(7px, 0.62cqw);
+  font-size: max(8px, 0.62cqw);
   letter-spacing: 0.08em;
   color: var(--fair-ink-dim);
 }
@@ -561,6 +579,14 @@
 
 /* ---------------------------------------------------------- the extras bar */
 
+/*
+ * The strip is its own container, so that it can shed its explanations
+ * before it wraps to a second row: this face is the tallest in the lab and
+ * every pixel the strip takes comes off the panel.
+ */
+.extrasfair {
+  container-type: inline-size;
+}
 .extrasfair__item {
   display: flex;
   flex-direction: column;
@@ -612,11 +638,11 @@
   min-height: 0;
 }
 .fairchart__bars {
-  display: grid;
-  grid-template-columns: repeat(3, 22px) 1fr;
-  gap: 8px;
-  align-items: end;
-  height: 56px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: center;
+  height: 58px;
   flex: none;
 }
 .fairchart__bar {
@@ -683,8 +709,14 @@
   margin-bottom: 2px;
 }
 .fairchart__plot svg {
-  flex: 1;
+  /*
+   * `flex: 1 1 0` with a zero basis, because an SVG carries an intrinsic
+   * aspect ratio and a `flex: 1` basis of `auto` lets it claim that height
+   * and overflow its row.
+   */
+  flex: 1 1 0;
   min-height: 0;
+  height: 0;
   width: 100%;
 }
 .fairchart__plot .grid line {
@@ -706,9 +738,71 @@
   stroke-width: 1.2;
 }
 
-/* Short panels drop the prose and keep the plots, as the T4 panel does. */
-@container (max-height: 260px) {
+
+/*
+ * The framework's `Segmented` is unstyled by design — the framework holds
+ * behaviour and the look belongs to the plug-in — so the extras strip
+ * dresses it in the panel's own colours.
+ */
+.extrasfair .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0a0a0b;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+.extrasfair .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(230 226 221 / 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extrasfair .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #33353a, #17181a);
+  color: var(--fair-ink);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+@container (max-width: 1150px) {
+  .extrasfair__hint {
+    display: none;
+  }
+}
+@container (max-width: 900px) {
+  .extrasfair__item:nth-child(4) {
+    display: none;
+  }
+}
+
+/*
+ * The charts panel sheds its content in stages as the drawer gets shorter,
+ * the way the T4 panel sheds its explanation: the prose first, then the
+ * distortion chart, then the static curves, and the three capacitor bars
+ * last, because they are the thing the two programme-dependent positions
+ * cannot be understood without.
+ */
+.fairchart {
+  container-type: size;
+}
+@container (max-height: 320px) {
   .fairchart__note {
+    display: none;
+  }
+}
+@container (max-height: 250px) {
+  .fairchart__plots {
+    grid-template-rows: 1fr;
+  }
+  .fairchart__plot:last-child {
+    display: none;
+  }
+}
+@container (max-height: 160px) {
+  .fairchart__plots {
     display: none;
   }
 }

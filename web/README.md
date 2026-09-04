@@ -4,11 +4,11 @@ The front panels of [Noob CompressorLab](../README.md), a Vue 3 + Tailwind
 single-page app rendered inside the plug-in's native web view (or a browser
 tab), talking to the Rust DSP over
 [noob-vst-webgui-framework](https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework). One instance is one compressor at a
-time: the `model` parameter picks one of seven, the page shows that model's
+time: the `model` parameter picks one of eleven, the page shows that model's
 face, extras and workbench, and because the choice is a parameter it is
 saved with the host's project and can differ per instance.
 
-Everything you see is this plug-in's own look, seven times over: the 1176's
+Everything you see is this plug-in's own look, once for every model: the 1176's
 black (or silver, or blue-striped) panel with its machined knobs, push
 buttons and cream VU face; the LA-2A's brushed plate with its bakelite
 knobs, bat-handle levers, rotary selector and bevelled meter; the LA-3A's
@@ -19,7 +19,10 @@ the tube preamp on the left and the limiter on the right; and the CL-1B's
 blue three-unit panel with its faceted black knobs, three-position levers
 and a ruby pilot jewel; and the 33609's slate blue-grey two-unit panel with
 its twelve switch knobs on bright knurled skirts, eight bat toggles and two
-staggered gain-reduction movements. The framework
+staggered gain-reduction movements; and the 670's near-black eight-unit
+plate, the tallest panel here by a long way, with two cream VU faces
+recessed into moulded bezels, six black two-part knobs, two valve-current
+levers and four brass screwdriver slots. The framework
 supplies behaviour only: parameter handles, knob gestures in rotation space
 (`useKnobGesture` with the `rotation` option, so a printed taper stays under
 the pointer), the needle's ballistics and scale maths, the history and
@@ -110,13 +113,22 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
         ├── Cl1bPower.vue             the mains switch
         ├── VuFaceCl1b.vue            its own VU: two arcs, dB over percentage, maker's script, VU lower right
         └── ExtrasStrip.vue           the shared globals group
-    └── models/bridge/BridgeView.vue  the 33609: the two-unit faceplate, the extras bar, the drawer
+    ├── models/bridge/BridgeView.vue  the 33609: the two-unit faceplate, the extras bar, the drawer
         ├── Faceplate.vue             the 19 : 3.5 panel, every fraction measured off the front photograph; both channel rows drive one set of handles
         ├── NeveKnob.vue              the twelve switch knobs: flat blue cap, knurled grey skirt, one tick per detent on the panel around it
         ├── NeveLever.vue             the bat toggles, legend above and below, two indicator lamps where the centre block has them
         ├── NeveMeter.vue             a gain-reduction movement: glass, bezel lip and can, reading 0 at the left and 20 dB at the right
         ├── NevePower.vue             the round red mains button
         └── ExtrasBar.vue             UNIT, DRIVE and METER, then the shared globals group
+    └── models/vmu/VmuView.vue        the 670: the eight-unit faceplate, the extras strip, the drawer with this model's own charts panel in it
+        ├── Faceplate.vue             the 19 : 14 panel, every position measured off a rectified photograph; two identical channel rows, each with its own parameters
+        ├── FairKnob.vue              the three knob styles: a black skirt with a white pointer dot under a smaller cap, and the scale printed on the panel around it
+        ├── FairLever.vue             the METERING lever, which is a valve-current selector and not a meter switch
+        ├── FairScrew.vue             the screwdriver adjustments, which turn: ZERO and BAL on the panel, the DC threshold on the strip
+        ├── FairToggle.vue            the bat toggles in chrome bushings: the mains switch, and the AGC switch that throws the matrix
+        ├── VuFaceFair.vue            its own VU: cream face, VU printed at both ends, a percentage arc below the dB one
+        ├── Charts.vue                the bench panel: the three timing capacitors, and Fairchild's two 1959 charts with the live operating point on them
+        └── ExtrasBar.vue             UNIT, the DC threshold, TUBE and OVERSAMPLE, then the shared globals group
 ```
 
 Composables and data:
@@ -131,6 +143,7 @@ Composables and data:
 | `models/cl1b/useCl1b.js` | the CL-1B's handles (`useControls()`, ids `cl1b_*`), the measured scale marks, the mains handle |
 | `models/pre6176/usePre.js` | the 6176's handles (`pre_*` plus the `fet_*` half it drives) and the mappings between the 6176's printed numbers and the 1176's |
 | `models/bridge/useBridge.js` | the 33609's handles (`useControls()`, ids `neve_*`), the printed scales and their detent counts, the measured knob sweeps, the meter's measured mark angles, the mains handle |
+| `models/vmu/useVmu.js` | the Fairchild's handles (`useControls()`, ids `fc_*`), the measured knob sweeps and printed scales, the six time constants' published behaviour, and the five input/output curves and seven IM curves the bench panel draws in grey |
 | `models/dbx/useDbx.js` | the 160's handles (`useControls()`, ids `dbx_*`), the two units' printed scales, the measured dial sweeps and the ratio dial's measured taper, and the normalised span each pot covers — the two units' THRESHOLD and COMPRESSION pots have different ranges and one parameter carries the union of each pair |
 | `presets.js` | factory presets per model and the `presets.user.<model>` store helpers |
 | `dev/manifest.js` | the design-mode manifest |
@@ -238,6 +251,35 @@ that divide each detent count into a whole number of degrees, the field
 colour sits between the two sources that disagree about it, and every
 constant in `useTg.js` says which of those it is.
 
+### The 670 is eight rack units, and the drawer gives way to it
+
+The Fairchild is 19 by 14 inches — 8U, from the manual's own specification
+page, which three secondary sources get wrong as 6U. That makes it very nearly
+square and by a long way the tallest face here; the next tallest is the
+LA-2A's 19 : 5.25. Fitted to the height of a 900 x 520 window under a full
+drawer it would be a few hundred pixels wide with its silkscreen unreadable,
+so `VmuView.vue` gives the panel a floor and lets the **drawer** close first:
+below the height at which both fit, the analysis row is not rendered and the
+panel takes the room. Nothing scrolls, and nothing is drawn too small to read.
+The 660 is half the panel and gets the height back, so the aspect follows the
+unit switch rather than being fixed.
+
+Two consequences worth knowing before editing that face.
+
+**The silkscreen has an 8 px floor.** Every legend is sized in container units
+so the panel scales as one piece, under `max(8px, …)`. On this face alone that
+floor actually binds at the smallest window, where a faithful 0.12 inch
+silkscreen would be three pixels tall. Legibility wins over proportion there
+and nowhere else, and the maker's row at the bottom right is laid out as one
+baseline-aligned flex row for the same reason: at the floor its three parts
+push apart instead of overlapping, while at full size they sit where they were
+measured.
+
+**The knob boxes are 200 units across, not 100.** An accessibility audit reads
+the *specified* font size of SVG text and cannot know the viewBox, so a legend
+at 5.4 user units is flagged as illegible however large it renders. Doubling
+the box lets the same drawing carry a 10.8 unit legend.
+
 ### The 4000 G is portrait, so its analysis panels sit beside it
 
 The SSL bus compressor is a double 500-series module, 3.0 by 5.25 inches, an
@@ -321,6 +363,14 @@ which is the only place a screw could be turned.
 | external / internal control (33609) | page state | the hardware's side-chain link to a second unit, which this model has nothing to connect to. It latches and is saved with the page, and it is the one lever on this face that does not reach the engine |
 | the 33609's mains button | `neve_power` if the engine has it, else page state | as the CL-1B's: when the parameter exists the unit powers down, and powering down passes audio through rather than silencing it |
 | UNIT, DRIVE, METER (33609) | `neve_model`, `neve_drive`, `neve_meter_select` | the extras bar, because the 33609's panel has none of them |
+| INPUT GAIN, THRESHOLD, TIME CONSTANT (670) | `fc_input_gain_*`, `fc_threshold_*`, `fc_time_*` | two of each, one per channel, because the 670 is two complete limiters and its two channels are meant to be set differently. The threshold's 0 to 10 is the panel's own scale and not decibels |
+| METERING (670) | `fc_meter_*` | a lever, not a knob, and not a meter switch: it reads plate current through the output stage, one leg at a time or the centre tap |
+| ZERO, BAL (670) | `fc_zero_*`, `fc_balance_*` | screwdriver adjustments on the real front panel, so both are live on the faceplate rather than on the strip, as the LA-2A's R37 and METER ZERO are. ZERO moves the tube bias and therefore the needle |
+| AGC (670) | `fc_agc` | the matrix switch. Not a link: in the lateral-and-vertical position the two limiters are still entirely independent and are now working on mid and side |
+| ON (670) | page state | the hardware's mains switch. The engine publishes no power parameter for this model, so it darkens the panel and nothing else, which is said in `useVmu.js` and here rather than left as an ornament |
+| UNIT, DC THRESHOLD, TUBE, OVERSAMPLE (670) | `fc_model`, `fc_dc_threshold_*`, `fc_tube`, `fc_oversample` | the extras strip. The DC threshold is the hardware's own R117 and is there because the hardware puts it **inside the chassis**; the other three are ours |
+| the 670's two movements | stream `meter[5]` | both read the one field. The meter is a valve-current bridge, so what deflects it is the change in plate current, which is gain reduction as a consequence rather than as a measurement |
+| the 670's timing capacitors | stream `cell` | `[control volts, leg U charge, leg V charge]` — not a photocell's three states, as the CL-1B's are not. Drawn as three bars on this model's own bench panel |
 | STEREO / LINK, MIX, SC HPF | `link`, `mix`, `sc_hpf` | shared by every model |
 | DEMO SOURCE | `src_kind`, `src_level`, `src_freq` | not in the bench bar: it lives in the development panel, and it exists only in the standalone (`hasParam`) |
 | the 33609's two movements | stream `meter[5]` | both read the one field, because the two channels are ganged. Unlike the six VU faces this is a gain-reduction scale: it rests at 0 on the **left** and swings right, and its printed marks are not evenly spaced, so `METER_ANGLES` in `useBridge.js` carries the angle measured for each one and the needle is interpolated through the same table |
@@ -456,6 +506,7 @@ height is left and the charts grow with it.
 | 6176 | two units, full rack | 19 : 3.5 |
 | CL-1B | three units, full rack | 483 : 131 |
 | 33609 | two units, full rack | 19 : 3.5 |
+| 670 | eight units, full rack | 19 : 14 |
 
 The LA-3A is the odd one: the unit itself is only half a rack wide, so its
 face draws the SR-3A mounting kit the hardware is sold with — a full

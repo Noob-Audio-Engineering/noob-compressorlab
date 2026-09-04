@@ -147,7 +147,7 @@ const SCREW = `${(0.6 / 19) * 100}cqw`;
         <!-- the mains toggle, top left, and the fuse below the meters -->
         <div class="abs facefair__on" :style="at(0.9, mono ? 2.0 : 3.3)">
           <div class="facefair__onlabel">ON</div>
-          <FairToggle vertical label="Power" :fallback="power" />
+          <FairToggle vertical aria="Power" :fallback="power" />
         </div>
         <span class="facefair__screw abs" :style="at(0.85, mono ? 5.3 : 6.7)"></span>
         <div class="abs facefair__fuse" :style="at(0.95, mono ? 6.1 : 10.2)">
@@ -232,14 +232,22 @@ const SCREW = `${(0.6 / 19) * 100}cqw`;
           <FairToggle :p="c.agc" up="LEFT&#10;RIGHT" down="LAT&#10;VERT" label="AGC" />
         </div>
 
-        <!-- the maker's name across the bottom right -->
-        <div class="abs facefair__logo" :style="at(11.65, mono ? 6.1 : 12.55)">Noob</div>
-        <div class="abs facefair__address" :style="at(13.6, mono ? 6.05 : 12.5)">
-          <span>RECORDING EQPT. CORP.</span>
-          <span>LONG ISLAND CITY 1, N.Y.</span>
-        </div>
-        <div class="abs facefair__model" :style="at(15.15, mono ? 6.15 : 12.6)">
-          MODEL {{ mono ? '660' : '670' }}
+        <!--
+          The maker's name across the bottom right: the script logo, two
+          small address lines set tight against its right shoulder, and the
+          model number tracked wide. Measured at 10.4 to 12.9, 12.9 to 14.3
+          and 14.4 to 15.9 inches; laid out here as one baseline-aligned row
+          anchored at the logo's left edge, so that at a window small enough
+          to hit the silkscreen's 8 px legibility floor the three parts push
+          apart instead of overlapping.
+        -->
+        <div class="abs facefair__ident" :style="at(13.15, mono ? 6.1 : 12.55)">
+          <span class="facefair__logo">Noob</span>
+          <span class="facefair__address">
+            <span>RECORDING EQPT. CORP.</span>
+            <span>LONG ISLAND CITY 1, N.Y.</span>
+          </span>
+          <span class="facefair__model">MODEL {{ mono ? '660' : '670' }}</span>
         </div>
       </div>
     </div>

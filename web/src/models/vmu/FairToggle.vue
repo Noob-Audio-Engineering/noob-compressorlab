@@ -29,6 +29,8 @@ const props = defineProps({
   down: { type: String, default: '' },
   label: { type: String, default: '' },
   vertical: { type: Boolean, default: false },
+  /** The accessible name, where the panel's legend is drawn separately. */
+  aria: { type: String, default: '' },
   fallback: { type: Object, default: null },
 });
 
@@ -59,7 +61,7 @@ function toggle() {
         type="button"
         role="switch"
         :aria-checked="on"
-        :aria-label="p ? p.name : label"
+        :aria-label="p ? p.name : aria || label"
         @click="toggle"
       >
         <span class="fairtog__bat" :class="on ? 'right' : 'left'"></span>
@@ -75,7 +77,7 @@ function toggle() {
       type="button"
       role="switch"
       :aria-checked="on"
-      :aria-label="label || 'Power'"
+      :aria-label="aria || label || 'Power'"
       @click="toggle"
     >
       <span class="fairtog__bat" :class="on ? 'up' : 'down'"></span>

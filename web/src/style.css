@@ -1003,13 +1003,90 @@ body {
    * what it wants, and every face yields to it the same way.
    */
   min-height: 172px;
+  /*
+   * **And a ceiling, because this row absorbs the whole window otherwise.**
+   * It is the only growing item in the page column, and the faceplate above
+   * is width-capped and cannot use the extra height, so on a large window
+   * every spare pixel landed here: at 2560 x 1440 the bench took the bottom
+   * 40 % of the screen to show four gridlines, the T4 panel became three
+   * thin bars in a very tall box, and the transfer square floated in the
+   * middle of a box twice its height. That is the disproportion a user
+   * reported.
+   *
+   * 366 px is measured, not chosen: 300 for the transfer square, 42 for the
+   * panel around it (a 1 px border, 10 px of padding, a 12 px title and its
+   * 8 px margin, twice over), and 24 for this row own padding. So the row
+   * is exactly tall enough to hold its own tallest panel at full size and
+   * no taller. Below it nothing changes, which is why the small and middle
+   * windows are untouched.
+   */
+  max-height: 366px;
   display: grid;
-  grid-template-columns: 1fr 300px;
+  /*
+   * The transfer column is `auto`, not 300 px. Its panel holds a square
+   * plot whose side follows the row's height, so the column has to size
+   * itself from that rather than being pinned: at 300 px fixed, a taller
+   * window stretched the plot and tilted the unity line off the diagonal.
+   * The history takes whatever is left, and the square's ceiling below
+   * stops a very tall window starving it.
+   */
+  grid-template-columns: 1fr auto;
   gap: 12px;
   padding: 12px;
 }
 .lab-bench.has-t4 {
-  grid-template-columns: 180px 1fr 300px;
+  grid-template-columns: 180px 1fr auto;
+}
+
+/*
+ * **The square, and why it lives here rather than in `TransferPanel.vue`.**
+ *
+ * Equal decibels per pixel on both axes is the correctness requirement, and
+ * with the two ranges now equal it reduces to keeping the plot area square.
+ * The framework's `LinePlot` insets its plot by the same `1.5 x padding` on
+ * both axes, so a square canvas gives a square plot and nothing has to know
+ * the padding.
+ *
+ * `flex: 1` on the canvas already takes the height the row leaves; the
+ * `align-self` stops the column flex stretching it across, so the aspect
+ * ratio is free to set the width from that height, and `margin-inline`
+ * centres it if the panel ends up wider (the title has a minimum width of
+ * its own on a short row).
+ *
+ * The panel keeps its identical chrome under every face. Only the box it is
+ * given changes, which is where the standing instruction puts it.
+ */
+.lab-panel--transfer .lab-panel__canvas {
+  aspect-ratio: 1;
+  align-self: center;
+  width: auto;
+  /*
+   * Centred in whatever room is left, on both axes. Once the square is
+   * capped the panel is often much taller than 300, and left at the top it
+   * sat above a large empty box; auto margins in a flex column put the
+   * leftover space either side of it instead. This works the same in the
+   * grid the landscape faces use and in the stacked column the portrait one
+   * uses, which is why it lives on the canvas rather than in either
+   * container.
+   */
+  margin: auto;
+  /*
+   * **The ceiling has to be on both axes, and this is why.** The canvas
+   * takes its height from `flex: 1` on a row that is itself `flex: 1` in
+   * the page column, so on a tall window that height grows without bound.
+   * Capping only the width let the height run past it and the aspect ratio
+   * could not hold: above the cap the plot went back to being a tall
+   * rectangle, which is the exact fault this rule exists to remove, and on
+   * a maximised window it ran off the screen.
+   *
+   * 300 px is not arbitrary. It is what this column was pinned at before
+   * any of this, so a large window gets the panel back at the width it has
+   * always had, and the only difference from the old behaviour is that it
+   * is now square instead of stretched. Below 300 it still follows the
+   * row, which is what makes a short window work.
+   */
+  max-width: 300px;
+  max-height: 300px;
 }
 /*
  * Below about 640 px of window there is not room for two legible charts side

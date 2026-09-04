@@ -111,11 +111,11 @@ const imLive = computed(() => {
         <div class="bar" :class="b.cls"><div class="fill" :style="{ height: pct(b.v) }"></div></div>
         <div class="fairchart__barlabel">{{ b.label }}</div>
       </div>
-      <p class="fairchart__note">
-        The two slow legs charge on their own clock. Empty, they pull the release fast; full, they hold the
-        node up for tens of seconds. That is the whole of positions 5 and 6.
-      </p>
     </div>
+    <p class="fairchart__note">
+      The two slow legs charge on their own clock. Empty, they pull the release fast; full, they hold the
+      node up for tens of seconds. That is the whole of positions 5 and 6.
+    </p>
 
     <div class="fairchart__plots">
       <figure class="fairchart__plot">
@@ -128,7 +128,7 @@ const imLive = computed(() => {
           <path v-for="c in curves" :key="c.id" :d="c.d" class="pub" />
           <g class="axis">
             <text v-for="v in [-10, 0, 10, 20]" :key="'lx' + v" :x="iox(v)" :y="IO.h + 12" text-anchor="middle">{{ v }}</text>
-            <text v-for="v in [-10, 0, 10, 20]" :key="'ly' + v" :x="-4" :y="ioy(v)" text-anchor="end" dominant-baseline="central">{{ v }}</text>
+            <text v-for="v in [0, 10, 20]" :key="'ly' + v" :x="-4" :y="ioy(v)" text-anchor="end" dominant-baseline="central">{{ v }}</text>
             <text :x="IO.w / 2" :y="IO.h + 24" text-anchor="middle">dBm in</text>
           </g>
           <circle v-if="live.show" class="live" :cx="live.x" :cy="live.y" r="4" />
@@ -145,7 +145,7 @@ const imLive = computed(() => {
           <path v-for="c in imCurves" :key="c.out" :d="c.d" class="pub" />
           <g class="axis">
             <text v-for="v in [0, 5, 10, 15, 20]" :key="'ax' + v" :x="imx(v)" :y="IM.h + 12" text-anchor="middle">{{ v }}</text>
-            <text v-for="v in [0, 5, 10]" :key="'ay' + v" :x="-4" :y="imy(v)" text-anchor="end" dominant-baseline="central">{{ v }}%</text>
+            <text v-for="v in [5, 10]" :key="'ay' + v" :x="-4" :y="imy(v)" text-anchor="end" dominant-baseline="central">{{ v }}%</text>
             <text :x="IM.w / 2" :y="IM.h + 24" text-anchor="middle">dB of limiting</text>
           </g>
           <circle v-if="imLive.show" class="live" :cx="imLive.x" :cy="imLive.y" r="4" />

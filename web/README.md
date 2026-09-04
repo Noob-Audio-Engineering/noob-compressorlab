@@ -193,7 +193,8 @@ lever position for each row rather than one offset applied twice.
 The gain-reduction faces read 0 at the left and 20 dB at the right, and the
 six printed marks are not evenly spaced. Fitting a circle to the ticks in
 AMS Neve's own front photograph,
-<https://www.ams-neve.com/wp-content/uploads/2021/11/33609N-Front.jpg>, puts the pivot 2.16 glass-heights below the top
+<https://www.ams-neve.com/wp-content/uploads/2021/11/33609N-Front.jpg>,
+puts the pivot 2.16 glass-heights below the top
 of the glass and 0.496 of the way across it, ticks on a radius of 0.767
 glass widths, residuals under a third of a pixel; against that centre the
 marks fall at −30.8°, −17.2°, −2.3°, +8.3°, +19.5° and +30.4° from vertical.

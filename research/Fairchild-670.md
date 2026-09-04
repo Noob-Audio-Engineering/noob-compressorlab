@@ -914,6 +914,29 @@ sound and I will use it.** It is also the only published fit of this tube that e
 reproduces a 1953 GE plot to that accuracy is a better validation than Raffensperger himself gives it — his
 paper validates the *circuit* against SPICE, not the tube against the datasheet.
 
+**A deficiency in it that matters more than the divergence, and that I only found when the shared-component
+question forced me to differentiate it (12.3a).** The equation is fitted to plate *current*, and it
+reproduces current well — that is what my three-point check above tested. Its *slope* is a different matter,
+and slope is what a variable-mu model actually runs on, because gain is transconductance.
+
+| | Raffensperger eq. 1 | General Electric [12] |
+|---|---|---|
+| Ia at the class-A1 point (Eb 100 V, Vg −1.92 V) | 8.52 mA | 9.6 mA, **11 % low** |
+| gm at the same point | 2309 µmho | 4000 µmho, **42 % low** |
+| gm at Vg = −16 V | 114 µmho | 100 µmho, good |
+
+Worse, its transconductance is **not monotone in slope**. Differentiating it at Vak = 250 V, the decay rate
+falls from 4.09 dB per volt near zero bias to a minimum of **0.15 dB per volt around −40 V** and then rises
+again to 1.73 dB per volt by −60 V (**derived**). GE's published curve has no such inflection: it is a
+straight line on a logarithmic gm axis, at a constant 0.94 dB per volt, over that whole span (12.3a). The
+wobble is an artefact of the interaction between the equation's power-law factor and its exponential factor,
+and it is invisible if you only ever look at current.
+
+**So: use eq. 1 for plate current, and do not trust its derivative.** If the model needs transconductance —
+for the meter, for a gain-range test, or for anything that reasons about gain directly — take it from GE's
+own curve, where it is a clean exponential, rather than from the derivative of this fit. Test 6 in section
+11.1 asserts GE's figures for exactly this reason and would fail on eq. 1's derivative.
+
 **Where it is silent.** The fit is to a family of static curves between roughly 0 and −55 V of grid and 100
 to 300 V of plate. Outside that box it is an extrapolation of an eight-parameter empirical function and it
 will do whatever it likes. In particular `(p3 − p4·Vgk)` goes to zero at `Vgk = +5 V`, so the expression
@@ -1281,7 +1304,10 @@ to control voltage — then after 2.59 τ the remaining gain reduction is
 ```
 
 So **"release time from 10 dB of limiting" means the time to recover to within about three quarters of a
-decibel of unity**, or equivalently to give back about 92.5 % of the reduction. That is a perfectly sensible
+decibel of unity**, or equivalently to give back about 92.5 % of the reduction. **The assumption that dB of
+gain reduction is proportional to control voltage is not an assumption any more**: section 12.3a measures
+the 6386's transconductance law from GE's logarithmic plot and finds a pure exponential, n = 1.01 ± 0.16, at
+0.94 dB per volt of grid. That is a perfectly sensible
 1950s definition and it is not one you could have guessed. (**Derived.**)
 
 **Notice which two positions agree with each other.** Positions 3 and 5 have identical `R_T` and `C_T` and
@@ -2159,6 +2185,8 @@ published value [18]; D = my derivation; E = my estimate.
 | p8 | 0.2 | **R** |
 | `Vgk` clamp | −0.5 V | **D**, eq. 1 diverges at +5 V (4.3) |
 | checked against GE curves at (250 V, −10/−30/−50 V) | 19.9 / 4.15 / 0.56 mA | **D** (4.3) |
+| eq. 1's gm at the class-A1 point | 2309 µmho against GE's 4000 — **do not use its derivative** | **D** (4.3) |
+| gm law from GE's logarithmic plot | pure exponential, **n = 1.01 ± 0.16**, 0.94 dB per volt | **D** (12.3a) |
 | μ, GE 6386 | 17 | **GE** [12] |
 | gm at the class-A1 point | 4000 µmhos | **GE** |
 | gm at Vg = −16 V | 100 µmhos | **GE** |
@@ -2670,10 +2698,65 @@ one):
 | 6386 [12] | ≈ 19 at −1.5 V | ≈ 7 at −7.5 V | **1.45** |
 | 6BC8 [55] | ≈ 34 at 0 V | ≈ 8 at −10 V | **1.26** |
 
-Within 15 per cent of each other. **So the μ objection is gone, and it was an artefact of the same kind as
-the gm one**: a single tabulated μ at one operating point says nothing about bias dependence, and reading
-the curve shows the two tubes collapsing their amplification factor at very nearly the same rate. Both
-tapers, gm and μ, are the same law with different constants.
+Within 15 per cent of each other. So a single tabulated μ at one operating point says nothing about bias
+dependence, and both tubes collapse their amplification factor at a similar *average* rate.
+
+### 12.3a The exponent, which is where the two tubes actually differ
+
+**Everything above compares average tapers, and average taper is the wrong statistic.** The 176 research
+fitted the 6BC8's transconductance to a stretched exponential,
+
+```
+gm(w) = gm0 · exp( −(w / V0)^n )          w = volts of grid below zero
+```
+
+and obtained **V0 = 4.16 V, n = 2.16**, arguing that a true remote-cutoff tube is designed to give an
+exponential law, meaning n = 1, so that an exponent far from 1 would be a difference of *shape* rather than
+of constants. I fitted the same form to the 6386 to settle it, and **the 176 research is right about the
+difference.**
+
+**The 6386's exponent is 1.** General Electric plot its transconductance against grid voltage on a
+**logarithmic** gm axis [12], where a pure exponential is a straight line, and the published curve is
+straight over most of its range. Reading crossings off a calibrated overlay of the Ecc2 = 300 V curve
+(working image `ref/fairchild-6386-gm-log-calibrated.png`):
+
+| gm (µmho) | 5000 | 2000 | 1000 | 500 | 200 | 100 | 50 | 20 |
+|---|---|---|---|---|---|---|---|---|
+| volts below zero | 2.4 | 7.1 | 11.5 | 16.2 | 23.2 | 28.0 | 32.6 | 38.8 |
+
+Successive factors of 25 in gm span 20.8, 20.9, 21.1 and 22.6 volts — constant to 8 per cent, which is a
+straight line and therefore an exponential. Fitting the stretched form:
+
+| span fitted | n | rms residual |
+|---|---|---|
+| w = 7.1 to 38.8 V, the straight part | **1.00** | 0.29 dB |
+| w = 2.4 to 38.8 V, the full published range | 0.88 | 0.71 dB |
+| w = 2.4 to 11.5 V, the 6BC8's whole range | 0.70 | poorly determined, 3 points |
+
+Forcing other exponents on the straight part gives rms residuals of 0.93 dB at n = 0.7, **0.29 dB at
+n = 1.0**, 1.61 dB at n = 1.6 and **2.88 dB at n = 2.16** — an order of magnitude worse than the optimum.
+Perturbing every read point by 1 V of noise over 300 trials gives **n = 1.01 ± 0.16**, and not one trial in
+300 landed above 1.6 (**derived**).
+
+**So n = 1.0 for the 6386 against 2.16 for the 6BC8, and the gap is not a span artefact**: restricting the
+6386 to the 6BC8's own voltage range pushes its exponent *down* toward 0.7, not up. The two tubes do have
+genuinely different curvature, and my earlier conclusion that they were "the same law with different
+constants" was wrong. Average taper is a first-moment statistic and is blind to exactly the thing the
+exponent measures.
+
+**What that does and does not kill.** It kills the idea that this family has a universal shape, and with it
+any plan to fit one tube and assume the other's curve. It does *not* by itself kill a shared component,
+because **n is a parameter of the form**, and a part holding `(gm0, V0, n)` per tube type covers both a
+6386 at n = 1.0 and a 6BC8 at n = 2.16. What the finding changes is the discipline: every tube type needs
+its own fit against its own published curve, and the physical argument "remote cutoff implies exponential"
+holds for the 6386 and demonstrably does not hold for the semiremote-cutoff 6BC8. That is a stronger reason
+to defer the component than the one in 12.1, not a weaker one.
+
+**And there is a dividend for this plug-in.** n = 1.00 means the 6386's transconductance is a pure
+exponential in grid voltage over its whole working range, so **gain in decibels is linear in control
+voltage** — 0.94 dB per volt on the Ecc2 = 300 V curve (**derived**). Section 5.4 assumed exactly that when
+it turned the release network's RC products into the manual's published release times, and the assumption
+is now measured rather than asserted.
 
 **So the honest summary is: one part, one architectural lesson, and one piece of infrastructure.** The part
 belongs in the crate. The architectural lesson belongs in the lab's documentation and in the shape of

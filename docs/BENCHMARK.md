@@ -37,7 +37,7 @@ The misses are the honest part of this table, and none of them is a widened tole
 
 ## 1176 — UREI 1176 Peak Limiter
 
-Figures from [`research/1176.md`](research/1176.md).
+Figures from [`research/1176.md`](../research/1176.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
@@ -72,18 +72,18 @@ Notes:
 
 ## LA-2A — Teletronix LA-2A Leveling Amplifier
 
-Figures from [`research/LA-2A.md`](research/LA-2A.md).
+Figures from [`research/LA-2A.md`](../research/LA-2A.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
 | PR 30, onset of 1 dB gain reduction | 0 ± 1 dB relative to 0 VU | 1.000 dB relative to 0 VU | meets | research/LA-2A.md §8.2, from [2][3] |
 | PR 50 at 0 VU, gain reduction | 5 ± 1.5 dB | 6.440 dB | meets | research/LA-2A.md §8.2, from [2][3] |
-| PR 100 at +16 dB, maximum gain reduction | 30 to 40 dB | 32.470 dB | meets | research/LA-2A.md §8.2, from [2][3] |
-| slope in the 6 to 20 dB gain-reduction region | 2.5 to 4.5 :1 | 2.971 :1 | meets | research/LA-2A.md §8.3, from [3][4][8][46] |
-| attack, 63 % of final gain reduction | 5 to 60 ms | 9.833 ms | meets | research/LA-2A.md §8.4, from Canopus [29][53] |
+| PR 100 at +16 dB, maximum gain reduction | 30 to 40 dB | 32.457 dB | meets | research/LA-2A.md §8.2, from [2][3] |
+| slope in the 6 to 20 dB gain-reduction region | 2.5 to 4.5 :1 | 2.968 :1 | meets | research/LA-2A.md §8.3, from [3][4][8][46] |
+| attack, 63 % of final gain reduction | 5 to 60 ms | 10.000 ms | meets | research/LA-2A.md §8.4, from Canopus [29][53] |
 | release, first stage to 50 % recovery | 40 to 120 ms | 75.667 ms | meets | research/LA-2A.md §8.5, from [2] |
-| release, second stage to 90 % recovery | 500 to 3000 ms | 1806.000 ms | meets | research/LA-2A.md §8.5, from [2] |
-| 10 kHz gain reduction above 100 Hz, equal levels | 2 to 6 dB | 3.558 dB | meets | research/LA-2A.md §8.7, from [20] |
+| release, second stage to 90 % recovery | 500 to 3000 ms | 1805.000 ms | meets | research/LA-2A.md §8.5, from [2] |
+| 10 kHz gain reduction above 100 Hz, equal levels | 2 to 6 dB | 3.570 dB | meets | research/LA-2A.md §8.7, from [20] |
 | THD at 0 VU with no gain reduction | below 0.300 % | 0.135 % | meets | research/LA-2A.md §8.1, from [2][5] |
 | THD at 0 VU with gain reduction | 0.8 to 4 % | 0.829 % | meets | research/LA-2A.md §8.8, from [26][53] |
 | cell era speed multipliers | *(none published)* | Silver 0.7, Gray 1.0, LA-2 1.6 (ordering only) | no figure | — |
@@ -94,12 +94,12 @@ Notes:
 
 ## LA-3A — UREI LA-3A Audio Leveler
 
-Figures from [`research/LA-3A.md`](research/LA-3A.md).
+Figures from [`research/LA-3A.md`](../research/LA-3A.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
 | maximum gain reduction, Limit | 38 to 42 dB | 40.058 dB | meets | research/LA-3A.md §8, from the reissue manual |
-| maximum gain reduction, Compress | 40 dB | 37.71 dB | **misses** | research/LA-3A.md §8, from the reissue manual |
+| maximum gain reduction, Compress | 40 dB | 37.69 dB | **misses** | research/LA-3A.md §8, from the reissue manual |
 | attack, 63 % of final gain reduction | 0.2 to 3 ms | 1.000 ms | meets | research/LA-3A.md §8 test 8, from [1][2] |
 | release, first stage to 50 % recovery | 20 to 120 ms | 75.667 ms | meets | research/LA-3A.md §8, from the 60 ms figure |
 | 10 kHz gain reduction above 100 Hz, equal levels | positive (the side-chain is deaf below about 100 Hz) | 3.08 dB | meets | research/LA-3A.md §3.5, from the schematic |
@@ -114,7 +114,7 @@ Notes:
 
 ## Distressor — Empirical Labs EL8 Distressor
 
-Figures from [`research/Distressor.md`](research/Distressor.md).
+Figures from [`research/Distressor.md`](../research/Distressor.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
@@ -143,7 +143,7 @@ Notes:
 
 ## 6176 — Universal Audio 6176 (610B preamp into the 1176LN)
 
-Figures from [`research/610.md`](research/610.md).
+Figures from [`research/610.md`](../research/610.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
@@ -172,7 +172,7 @@ Notes:
 
 ## CL-1B — Tube-Tech CL 1B
 
-Figures from [`research/CL-1B.md`](research/CL-1B.md).
+Figures from [`research/CL-1B.md`](../research/CL-1B.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
@@ -197,7 +197,7 @@ Notes:
 
 ## 33609 — Neve 2254 and 33609
 
-Figures from [`research/Neve-33609.md`](research/Neve-33609.md).
+Figures from [`research/Neve-33609.md`](../research/Neve-33609.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|

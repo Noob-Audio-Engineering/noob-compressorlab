@@ -566,7 +566,47 @@ know.
 
 ---
 
-## 7. Sources
+
+---
+
+## 7. What the dossiers have since overturned
+
+This survey was written before any of the units in it had been researched in depth, and three of
+the dossiers it recommended have since contradicted it. The original text above is left as it was
+written, because a survey that quietly edits itself teaches nobody anything about how far a survey
+can be trusted. What follows is what is now established.
+
+**The Neve's gain element does not follow the equation this survey expected.** The survey's case for
+building it first rested partly on a 2025 paper supplying a closed-form solution through the Wright
+omega function. The dossier derived the law from the topology instead and found a hyperbolic
+tangent, because four diodes with two floating common nodes make a differential pair. The
+derivation validates itself, giving 25.001 dB of open-bridge loss from three resistor values where
+Neve annotated 25 dB on the same drawing. The paper remains cited for family membership and for
+antialiasing, not for the core equation.
+
+**The Neve's distortion is set by the voltage across the bridge, not by how much gain reduction is
+happening.** The survey had it the other way round.
+
+**The SSL bus compressor is a feedback design, not a feedforward one.** The dossier traced the
+sidechain amplifier on SSL's own card taking the same control voltage as the audio path plus the
+threshold offset, and a modelling team independently found that models lacking that feedback cannot
+reproduce the unit's changing curve.
+
+**The EMI TG12413 is not a diode bridge**, which was the reason it appeared here as a second member
+of that family. Its four diodes are two series branches sharing a rail rather than a ring, and as
+drawn they run in reverse breakdown. The shared bridge component does not serve it, and the family
+in the plug-in is now called `diode` rather than `diode bridge` to hold both forms.
+
+**Something close to a null test exists after all.** This survey recorded that no vendor publishes
+one, which remains true, but a paper published shortly before this work recorded thousands of hours
+through a real SSL bus compressor and benchmarks four commercial emulations against the hardware.
+The manufacturer's own plug-in is not the closest of the four. So for one unit in this list there is
+public measured ground truth, and the survey's blanket statement that none exists is too strong.
+
+**Two smaller corrections to the emulation notes.** Waves' relevant Neve plug-in models the 2254
+rather than the 33609, and the dossier could not confirm that two other vendors named here ship a
+33609 model at all.
+## 8. Sources
 
 Everything below was fetched during this survey. Manufacturer documents are cited as manufacturer
 claims; the clone-builder page is cited as a clone builder's reading of a schematic he had and I do

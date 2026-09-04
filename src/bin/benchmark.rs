@@ -2572,7 +2572,9 @@ fn render(sections: &[Section]) -> String {
     // Per model.
     for s in sections {
         let _ = writeln!(out, "## {} — {}\n", s.model, s.unit);
-        let _ = writeln!(out, "Figures from [`{}`]({}).\n", s.dossier, s.dossier);
+        // The report is written into `docs/`, so a dossier path relative to the
+        // repository root has to climb out of it or the link is dead.
+        let _ = writeln!(out, "Figures from [`{}`](../{}).\n", s.dossier, s.dossier);
         out.push_str("| quantity | published | measured | verdict | source |\n");
         out.push_str("|---|---|---|---|---|\n");
         for r in &s.rows {

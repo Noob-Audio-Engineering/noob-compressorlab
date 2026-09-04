@@ -131,6 +131,7 @@ Composables and data:
 | `models/cl1b/useCl1b.js` | the CL-1B's handles (`useControls()`, ids `cl1b_*`), the measured scale marks, the mains handle |
 | `models/pre6176/usePre.js` | the 6176's handles (`pre_*` plus the `fet_*` half it drives) and the mappings between the 6176's printed numbers and the 1176's |
 | `models/bridge/useBridge.js` | the 33609's handles (`useControls()`, ids `neve_*`), the printed scales and their detent counts, the measured knob sweeps, the meter's measured mark angles, the mains handle |
+| `models/dbx/useDbx.js` | the 160's handles (`useControls()`, ids `dbx_*`), the two units' printed scales, the measured dial sweeps and the ratio dial's measured taper, and the normalised span each pot covers — the two units' THRESHOLD and COMPRESSION pots have different ranges and one parameter carries the union of each pair |
 | `presets.js` | factory presets per model and the `presets.user.<model>` store helpers |
 | `dev/manifest.js` | the design-mode manifest |
 
@@ -203,6 +204,77 @@ the ticks are drawn where they were measured, and the needle is interpolated
 through the same table, so a reading taken off this face is the reading the
 metal gives.
 
+### The TG12413 is a module strip, not a rack face
+
+Every other view here is a rack unit that fills the width. The TG12413 is a
+plug-in module in a console frame, about one fifth as wide as it is tall, so
+`TgView.vue` turns the layout the other way round: the strip takes the height
+it is given and the frame beside it takes the width. The strip carries three
+switches and nothing else, which is what the module has; the internal HOLD
+preset, the gain-reduction meter, the live control current and the provenance
+notes all sit in the frame, because none of them is on the module.
+
+Two consequences worth knowing before editing it.
+
+**The switches size off the strip's height, not its width.** Three knobs at
+86 % of a 92-pixel strip need 237 pixels that a 230-pixel strip has not got,
+which is what the first pass did and what overflowed the module onto the
+bench in a 520-pixel window. `.tgstrip__control .tgswitch` divides the height
+the head and foot leave, and `TgSwitch.vue` leaves its inline width off unless
+a size is passed, so the stylesheet decides.
+
+**The strip is a size container.** Below 360 pixels tall the printed legends
+around the knobs come off and a read-out under each switch takes their place,
+because legends printed round a forty-pixel knob are four pixels high.
+Nothing else on the page knows how tall the strip is, so that question can
+only be asked from inside it.
+
+**No photograph of a bare TG12413 module face exists**, which section 2.9 of
+the dossier says plainly. So unlike the other faces here, none of this
+geometry is measured: the sweeps are the standard rotary-switch index angles
+that divide each detent count into a whole number of degrees, the field
+colour sits between the two sources that disagree about it, and every
+constant in `useTg.js` says which of those it is.
+
+### The 4000 G is portrait, so its analysis panels sit beside it
+
+The SSL bus compressor is a double 500-series module, 3.0 by 5.25 inches, an
+aspect of 1 : 1.769. Stacking the history and transfer panels under it the way
+the rack faces do would leave the panel about 240 pixels wide in a 900 x 520
+window with six knobs on it, so `GbusView.vue` puts them beside it instead and
+lets the panel take the height. The bench bar keeps its place directly under
+the top bar, as every model does, and the two shared panels are the same
+components under this face as under any other.
+
+Three things worth knowing before editing it.
+
+**The stage carries a minimum height and it is not zero.** A flex item that
+may shrink to nothing will, and with the development panel open at the
+900 x 520 minimum the stage collapsed and took the whole faceplate off the
+page. It is `max(240px, 58vh)`: the viewport term is what matters on a large
+window, where the development panel otherwise took half of a 1000-pixel window
+and left the panel 199 pixels wide with its silkscreen at seven pixels.
+
+**A knob box is the knob's own fraction of the panel, not the panel.** A box
+declared 100 % wide and pulled back by half of itself reaches half the panel
+either side of its centre, which made the panel scroll horizontally by 32
+pixels at the largest window size. `knobAt()` in `Faceplate.vue` sets the width
+from the knob part it is drawing.
+
+**The unit legends sit inside the dot ring, in the gap at six o'clock.** The
+dots run over 300 degrees with a 60 degree gap at the bottom, and that gap is
+what the `dB`, `ms`, `s` and `Hz` legends are for. Outside the ring there is no
+room for them: the knob rows are only 0.181 of the panel height apart and the
+bottom row would push its legend into the strap line.
+
+**Everything else is measured**, from SSL's own render of the module and their
+dimensioned recall sheet, and `useGbus.js` carries the fractions. Where the two
+sources disagree the panel wins and the disagreement is recorded: SSL's product
+page says the sidechain filter reaches 106 Hz where the panel and the recall
+sheet both print 105, and the geometry table puts the zero-adjust screw inside
+the meter glass where the sentence beside it says the screw is below the glass,
+which is the only place a screw could be turned.
+
 ## What binds to what
 
 | control | parameter | notes |
@@ -255,6 +327,17 @@ metal gives.
 | TRANSFER | stream `transfer`, marker from `meter[0, 2]` | sticky curve, republished on change |
 | INSIDE THE T4 | stream `cell` | light, free and trapped carriers (the two optical models) |
 | REDLINE, 1% THD, the PRE needle | stream `lamps` | `thd_pct, redline, pre_vu_db, drive`; published while the Distressor or the 6176 is active |
+| MODE | `tg_mode` | COMPRESS / OUT / LIMIT, in EMI's printed order; OUT is not a bypass |
+| RECOVERY | `tg_recovery` | six positions marked 1 to 6, with no times, because none is published |
+| OUTPUT LEVEL | `tg_output` | the panel's −10 to +10 dB; the engine works from twenty-one resistances |
+| RV1 HOLD | `tg_hold` | an internal preset, drawn in the frame rather than on the module |
+| REGION, INPUT, DRIVE, MISMATCH, OVERSAMPLE | `tg_region`, `tg_input`, `tg_drive`, `tg_mismatch`, `tg_oversample` | ours, not EMI's; on the extras strip where the page says so |
+| THRESHOLD, COMPRESSION, OUTPUT GAIN (160) | `dbx_threshold`, `dbx_ratio`, `dbx_output` | the three knobs both units have. Each dial turns across only the normalised span **its own** pot covers, so the original's threshold stops at its 10 mV and 3 V marks and its ratio at the ∞ mark, while the 160A's carry on to −40 dBu and −1:1. `dbx_ratio` is the coefficient the pot sets, `α = 1 − 1/R`, because the ratio itself runs through infinity and comes back negative; the host is shown what the panel prints |
+| METER buttons, DISPLAY (160) | `dbx_meter` | the original's three push buttons are the three positions; the 160A's DISPLAY button moves its LED row between the first two |
+| BYPASS, SLAVE, POWER (160) | `bypass`, `link` | the 160A's relay bypass and its strapping jack are exactly the lab's shared bypass and link, so the buttons drive those rather than a second copy; the original's POWER switch drives the same bypass, because a plug-in has no mains |
+| OverEasy (160A) | `dbx_knee` | the 160A only. The original has no such switch and the engine forces it hard there: OverEasy is a 1978 invention that arrived three years after the 160 shipped |
+| UNIT, METER CAL, OVEREASY WIDTH, DETECTOR τ, LOOK-AHEAD (160) | `dbx_model`, `dbx_meter_cal`, `dbx_knee_width`, `dbx_tau`, `dbx_lookahead` | the extras strip. The trimmer is on the rear panel of both units; the other three are numbers dbx never gave anyone, and the strip says so |
+| BELOW / ABOVE, OVEREASY, the ghost trace (160) | stream `lamps` | the same four slots saying something else: `below, above, ghost_gr_db, overeasy`. The two threshold indicators are one comparator's two sides, so they sum to one and both sit half lit at the threshold, which dbx specify; the ghost is what a peak detector would have asked for |
 
 ### The shared panels
 

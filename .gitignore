@@ -1,5 +1,8 @@
 # Rust
 /target
+# Parallel builds use their own target directories to avoid fighting
+# over cargo's lock when several models are being written at once.
+/target-*
 
 # Node
 node_modules/

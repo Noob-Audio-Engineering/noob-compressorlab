@@ -10,6 +10,16 @@ web/dist/
 *.log
 npm-debug.log*
 
+# Reference imagery for the dossiers.
+#
+# The research files measure faceplates and read curves off manufacturer
+# photographs, manual scans and patent sheets. Those are other companies'
+# copyrighted material and this repository is public, so the images stay out
+# of it and every dossier cites the URL it took each figure from instead. A
+# measurement that cannot be re-checked from its cited source is a fault in
+# the dossier, not a reason to commit the image.
+research/ref/
+
 # IDE and OS
 .idea/
 .vscode/

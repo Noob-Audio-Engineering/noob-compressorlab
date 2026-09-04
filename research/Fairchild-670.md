@@ -2640,15 +2640,40 @@ A ratio of **1.28**, not the 1.7 the raw figures suggest (**derived**). Two tube
 by less than a third, over control ranges within 15 % of each other, are the same law with different
 constants — which is the case *for* a shared, per-type-parameterised component rather than against one.
 
-**One caveat that would change this, and it is about μ rather than gm.** The 176 research reports the 6BC8's
-μ as "comparatively flat" across its control range. The 6386's is not: GE's "Average Characteristics, Each
-Section" plot shows **μ falling from about 18 at 10 mA of plate current to about 7 at 2 mA** [12], read off
-the curve by eye. If the 6BC8's μ genuinely stays near 34 while its gm falls 42 dB, then its plate resistance
-must rise by that whole factor and the two tubes load their following stages very differently, which *is* a
-shape difference. But μ falling at low plate current is universal to triodes, so I would want that claim
-checked against a μ-versus-plate-current *curve* rather than against three datasheets agreeing on a single
-tabulated μ at one operating point — the latter says nothing about bias dependence. **Until somebody reads
-that curve, treat the μ difference as unestablished.**
+**The one thing that could still have sunk it, checked rather than left as a caution.** The 176 research
+reported the 6BC8's μ as "comparatively flat" across its control range, which would have been a genuine
+shape difference: if μ holds near 34 while gm falls 42 dB, plate resistance has to rise by that whole factor
+and the two tubes load their following stages quite differently. **It is not flat.** Sylvania's *Engineering
+Data Service* sheet for the 6BC8 and 4BC8, September 1955, plots μ and gm together against grid voltage on
+one axis, and I read the μ family off it after calibrating the μ scale against the plot's own gm gridlines
+[55]. The calibration checks out: at zero bias the curves land on μ ≈ 35, which is the value Sylvania
+tabulate on page 1 of the same document.
+
+| grid volts | μ, Eb = 100 V | μ, Eb = 150 V | μ, Eb = 200 V |
+|---|---|---|---|
+| 0 | ≈ 34 | ≈ 35 | ≈ 36 |
+| −4 | ≈ 22 | ≈ 24 | ≈ 26 |
+| −6 | ≈ 14 | ≈ 16 | ≈ 21 |
+| −8 | ≈ 11 | ≈ 12 | ≈ 17 |
+| −10 | ≈ 8 | ≈ 12 | ≈ 18 |
+
+Read by eye against a calibrated overlay, so ±2 on each figure; the working image is saved as
+`ref/fairchild-6bc8-mu-curve-calibrated.png`. **The 6BC8's μ falls by a factor of about four across its
+control range**, which is more variation than the 6386 shows, not less.
+
+Putting both tubes on the same footing, as decibels of μ change per volt of grid at Eb = 100 V
+(**derived**, and the 6386 figure composes two of GE's plots so it carries two eyeball steps rather than
+one):
+
+| | μ at the operating point | μ near the bottom of the control range | dB of μ per volt of grid |
+|---|---|---|---|
+| 6386 [12] | ≈ 19 at −1.5 V | ≈ 7 at −7.5 V | **1.45** |
+| 6BC8 [55] | ≈ 34 at 0 V | ≈ 8 at −10 V | **1.26** |
+
+Within 15 per cent of each other. **So the μ objection is gone, and it was an artefact of the same kind as
+the gm one**: a single tabulated μ at one operating point says nothing about bias dependence, and reading
+the curve shows the two tubes collapsing their amplification factor at very nearly the same rate. Both
+tapers, gm and μ, are the same law with different constants.
 
 **So the honest summary is: one part, one architectural lesson, and one piece of infrastructure.** The part
 belongs in the crate. The architectural lesson belongs in the lab's documentation and in the shape of
@@ -2696,7 +2721,8 @@ in the archive and they OCR differently in the three places where it mattered (1
 manual" without qualification I mean [1] and I have checked the passage against [2] and [3].
 
 Entries 52 to 54 are files in this repository and its sibling rather than public URLs, so they carry a
-path instead of a link.
+path instead of a link. Entry 55 arrived after the rest and is numbered last rather than renumbering the
+others; it is the 6BC8 datasheet that settled the shared-component question in 12.3.
 
 Manufacturer and vendor documents are cited as manufacturer claims. Where two Fairchild documents disagree
 — and they do, about the maximum ratio, the fastest attack, the position-4 attack time and the remote-meter
@@ -2873,6 +2899,17 @@ voltage (5.6, 7.1, 2.6) — both are cited and the disagreement is stated rather
 51. `noob-electrical-components`, README. The component-boundary rule, the "coming candidates" list that
     already names the variable-mu element, and the diode bridge's recorded weaker justification.
     https://github.com/Noob-Audio-Engineering/noob-electrical-components
+55. Sylvania Electric Products Inc., Radio Tube Division, **Engineering Data Service, types 6BC8 and
+    4BC8**, September 1955, five pages, prepared and released by the Technical Publications Section,
+    Emporium, Pennsylvania. Page 1 gives the Class A characteristics (plate 150 V, cathode-bias resistor
+    220 Ω, plate current 10 mA, transconductance 6200 µmho, amplification factor 35, grid voltage for
+    gm = 50 µmho approximately −13 V) and describes the tube as "a miniature, medium mu, **semi-remote
+    cutoff** twin triode intended for application as a v-h-f cascode amplifier in television receivers".
+    **Page 4 plots μ and gm together against grid voltage**, which is the plot section 12.3 reads. Four
+    copies of this sheet are on `frank.pocnet.net` under volumes 049, 106, 127 and 137; volume 137 is the
+    highest resolution. Saved as `ref/fairchild-6bc8-sylvania-1955.pdf`.
+    https://frank.pocnet.net/sheets/137/6/6BC8.pdf
+
 52. `noob-compressorlab`, `research/SURVEY.md`. The survey that ranked this unit second, listed the
     documents and judged its ground truth thin — a judgement sections 4.6 and 7.2 supersede.
 53. `noob-compressorlab`, `research/Neve-33609.md`. The diode-bridge dossier, whose structure and standards
@@ -2948,3 +2985,4 @@ voltage (5.6, 7.1, 2.6) — both are cited and the disagreement is stated rather
 [49]: https://www.arturia.com/products/software-effects/comp-tubesta/overview
 [50]: https://www.gyraf.dk/g-22-dual-stereo-ms-vari-mu-compressor/
 [51]: https://github.com/Noob-Audio-Engineering/noob-electrical-components
+[55]: https://frank.pocnet.net/sheets/137/6/6BC8.pdf

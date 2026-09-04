@@ -3818,7 +3818,7 @@ fn bench_gbus() -> Section {
 
     // -- the gain cell, on its own, as its datasheet measures it ---------
     for (v_rms, gain_db, want_pct) in [(1.0f32, 0.0f32, 0.005f32), (3.1623, -15.0, 0.020)] {
-        let mut cell = gbus::BlackmerCell::new(SR);
+        let mut cell = gbus::GainStage::new(SR);
         let amp = v_rms * std::f32::consts::SQRT_2 / gbus::engine::VOLTS_PER_SAMPLE;
         let g = cell.gain(gain_db);
         let n = 8192usize;
@@ -4208,7 +4208,7 @@ fn bench_tg() -> Section {
 
     // The gain element, against the law it generalises.
     {
-        let ring = tg::element::Element::ring();
+        let ring = tg::element::DiodeArmPair::ring();
         let k = 2.0 * tg::element::JUNCTION_SCALE;
         let mut worst = 0.0f32;
         for decade in 0..4 {
@@ -4294,7 +4294,7 @@ fn bench_tg() -> Section {
         ));
     }
     {
-        let e = tg::element::Element::breakdown();
+        let e = tg::element::Network::breakdown();
         rows.push(Row::unanchored(
             "gain reduction floor, breakdown region",
             format!("{:.1} dB", e.gr_db(1.0)),

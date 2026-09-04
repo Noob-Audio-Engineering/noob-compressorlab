@@ -42,8 +42,8 @@ use super::filters::{Biquad, OnePole, Shelf};
 /// around the cell, the sidechain that lights it and the amplifier after
 /// it, which are this machine's and not the part's.
 pub use noob_electrical_components::photocell::{
-    CELL_GAMMA, CELL_SPEEDS, Cell, CellParams, EL_B, K_G, LA2_FAST_SHARE, LA2_FAST_SPEED, R_DARK,
-    R_MIN, T4Variant, cell_params_for, distortion, resistance_for,
+    CELL_GAMMA, CELL_SPEEDS, Cell, CellParams, EL_B, K_G, LA2_FAST_SHARE, LA2_FAST_SPEED,
+    Photoresistor, R_DARK, R_MIN, T4Variant, cell_params_for, distortion, resistance_for,
 };
 
 /// The divider's series resistance, `R6 + R7` of the schematic (ohms).
@@ -103,7 +103,8 @@ pub struct Divider {
     /// The pot the cell shunts.
     pub r_pot: f32,
     /// The cell's resistance in full light, which sets the maximum
-    /// reduction.
+    /// reduction. This one is the part's rather than the circuit's, and
+    /// [`Divider::photoresistor`] is where it is handed back to the part.
     pub r_min: f32,
 }
 
@@ -115,12 +116,33 @@ impl Divider {
         r_min: R_MIN,
     };
 
+    /// The photoresistor this divider shunts.
+    ///
+    /// Named for the resistive element rather than for the cell, because
+    /// it is only that half: a [`Cell`] is the whole T4 module, panel and
+    /// traps included, and what sits in the divider is the photoconductor
+    /// alone. Its three numbers are in the shape the photocell crate keeps
+    /// them, so the law lives in the crate and this file holds only the
+    /// circuit around it.
+    ///
+    /// This is the **tied** case: the conductance scale is derived from
+    /// the endpoints here, because a T4 at full carriers lands on exactly
+    /// its lit resistance. The CL-1B is where that stops being true and
+    /// sets its scale from a calibration instead, which is why the crate
+    /// keeps the three apart; see [`Photoresistor`].
+    #[inline]
+    pub fn photoresistor(&self) -> Photoresistor {
+        Photoresistor {
+            r_dark: R_DARK,
+            r_min: self.r_min,
+            k_g: 1.0 / self.r_min - 1.0 / R_DARK,
+        }
+    }
+
     /// Cell resistance for `n_f` free carriers.
     #[inline]
     pub fn resistance(&self, n_f: f32) -> f32 {
-        let k_g = 1.0 / self.r_min - 1.0 / R_DARK;
-        let g = 1.0 / R_DARK + k_g * n_f;
-        (1.0 / g).clamp(self.r_min, R_DARK)
+        self.photoresistor().resistance(n_f)
     }
 
     /// Divider gain with a dark cell: the normalisation.

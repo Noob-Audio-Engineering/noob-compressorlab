@@ -427,10 +427,12 @@ fn t10_the_original_has_neither() {
 /// peak — against dbx's "**True rms level-detection**". The cheapest
 /// possible test that nobody has quietly substituted a peak detector.
 ///
-/// The model lands at 2.98 rather than 3.01 because its thermal decibel
-/// divides two datasheet figures that carry different ideality
-/// assumptions; [`D_DB`] states the whole argument and
-/// [`D_DB_EXACT`] is the value that would make it exact.
+/// The model lands on 3.01, because [`D_DB`] is `10/ln 10` exactly rather
+/// than the quotient of two datasheet figures that carry different
+/// ideality assumptions. That quotient, 4.246, would leave a sine 2.98 dB
+/// below its peak; the argument for the exact value is at [`D_DB`], and
+/// the component that owns it asserts the same identity directly on the
+/// detector, without a compressor around it.
 #[test]
 fn t11_a_sine_settles_three_decibels_below_its_peak() {
     let mut c = unit(SR, |s| {
@@ -1797,14 +1799,26 @@ fn t_constants() {
         (120.0..=125.0).contains(&rate),
         "the release rate is {rate} dB/s"
     );
-    let cell = BlackmerCell::default();
-    // 6.1 mV/dB, both ways.
-    assert!((cell.gain_db(61.0) + 10.0).abs() < 1e-3);
-    assert!((cell.control_mv(-10.0) - 61.0).abs() < 1e-3);
+    let cell = CELL;
+    // 6.1 mV/dB on the negative port, both ways. The cell is the
+    // component's now, so this is a check that the engine holds the part
+    // the schematic names rather than a re-test of the component.
+    assert!((cell.gain_db(0.0, 61.0) + 10.0).abs() < 1e-3);
+    assert!((cell.control_mv_for_gain(-10.0) - 61.0).abs() < 1e-3);
     // +0.33 %/°C referenced to 27 °C.
     let warm = BlackmerCell {
         temp_c: 37.0,
-        ..BlackmerCell::default()
+        ..CELL
     };
-    assert!((warm.k() / cell.k() - 1.033).abs() < 1e-4);
+    assert!((warm.k_at_temp() / cell.k_at_temp() - 1.033).abs() < 1e-4);
+    // And the residual dbx published is the shape their own footnote
+    // describes: a half-path gain mismatch, whose second harmonic is a
+    // fixed fraction rather than a function of level. The component owns
+    // the `4/(3π)`; dbx own the 0.075 %.
+    assert_eq!(cell.residual, EvenResidual::HalfPathMismatch);
+    assert_eq!(cell.even_coefficient(), CELL_ASYMMETRY);
+    assert!(
+        (cell.residual.thd_for_coefficient(CELL_ASYMMETRY, 1.0) - 0.000_75).abs() < 1e-9,
+        "the fitted residual is not dbx's 0.075 %"
+    );
 }

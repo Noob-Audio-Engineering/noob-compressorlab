@@ -7,6 +7,8 @@
 //! published at all (the OverEasy knee width, which is a parameter with an
 //! estimated default).
 
+use noob_electrical_components::blackmer_cell;
+
 use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
 use crate::dsp::flush;
 use crate::dsp::opto::filters::OnePole;
@@ -16,16 +18,45 @@ use super::{
     THRESHOLD_160_MAX_DBU, THRESHOLD_160_MIN_DBU, THRESHOLD_MAX_DBU, THRESHOLD_MIN_DBU,
 };
 
+/// The gain cell, from the components repository: the dbx model 200 the
+/// schematic calls out as `VCA (200)`, reference designator M1, and its
+/// descendants down to the THAT 2180.
+///
+/// It knows the control law, its tolerance, its temperature coefficient
+/// and its even-order residual. It knows nothing about R26 and R32, the
+/// threshold, the ratio, the detector or the control-port divider, because
+/// those are the dbx 160 and the other box built from the same cell has
+/// different ones. This engine's own choices about the part are in
+/// [`CELL`].
+pub use noob_electrical_components::blackmer_cell::BlackmerCell;
+
+/// Which of the two even-order shapes the component carries this box
+/// uses. The component's own documentation sets out why there are two and
+/// which published figures pull which way; [`CELL`] records the choice
+/// made here and [`CELL_ASYMMETRY`] the magnitude dbx published for it.
+pub use noob_electrical_components::blackmer_cell::EvenResidual;
+
+/// The detector, from the components repository. dbx's own contribution to
+/// it is [`TAU_DEFAULT_S`], which is two components off their drawing;
+/// everything else about it is the technique and lives there.
+pub use noob_electrical_components::log_rms_detector::LogRmsDetector as RmsDetector;
+
 // ------------------------------------------------------------- constants
 
 /// Thermal voltage at 300 K, from the descendant part's datasheet.
+///
+/// It survives here rather than moving to the detector component because
+/// the only thing it is used for is deriving [`TAU_DEFAULT_S`] from R35 and
+/// C15, which are dbx's components on dbx's drawing. The detector's own
+/// scale carries no junction constants at all, because they cancel; see
+/// [`D_DB`].
 pub const V_T_MV: f32 = 25.9;
 
 /// The Blackmer log constant, millivolts per decibel, on both the cell and
 /// the detector: "6.1 mV/dB (6.0 min, 6.2 max)" measured over a −60 to
 /// +40 dB gain range. dbx built the box out of two parts with the same
 /// constant, which is why a volt is a decibel everywhere in the sidechain.
-pub const K_MV_PER_DB: f32 = 6.1;
+pub const K_MV_PER_DB: f32 = blackmer_cell::K_TYP_MV_PER_DB;
 
 /// The junctions' ideality factor, implied by the datasheet's own two
 /// numbers.
@@ -38,48 +69,32 @@ pub const K_MV_PER_DB: f32 = 6.1;
 /// 5.96 bare thermal voltage alone would give.
 pub const IDEALITY: f32 = K_MV_PER_DB * 10.0 / (V_T_MV * std::f32::consts::LN_10);
 
-/// The **thermal decibel**: how many decibels one junction voltage is worth
-/// in the sidechain. It is the natural unit of the log-domain filter, and
-/// it sets both the release rate (`D/τ` decibels per second) and how much
-/// faster a big step attacks than a small one.
+/// The **thermal decibel**, `10/ln 10`: how many decibels one junction
+/// voltage is worth in the sidechain. It sets both the release rate (`D/τ`
+/// decibels per second) and how much faster a big step attacks than a
+/// small one.
 ///
-/// # Why this is exactly `10/ln 10` and not `V_T/K`
+/// The constant and the whole argument for its exact value are properties
+/// of the technique rather than of this box, so they live in the component
+/// and are re-exported here. The short version of the argument, because it
+/// is **the one place this model departs from the research's own
+/// arithmetic**: the research divides the datasheet's 25.9 mV by its
+/// 6.1 mV/dB and gets 4.246, and those two figures do not correspond,
+/// since 6.1 is a measured typical carrying the junctions' ideality with it
+/// (see [`IDEALITY`]) while 25.9 is bare `kT/q`. Doing the algebra instead,
+/// the ideality and the temperature both cancel and the unit is `10/ln 10`
+/// exactly — which is what makes the averaging an average of the square,
+/// and therefore what makes this a true-RMS detector at all.
 ///
-/// **This is the one place the model departs from the research's own
-/// arithmetic, and the reason is that the detector is either a true RMS
-/// detector or it is not.**
-///
-/// The research divides the datasheet's 25.9 mV by its 6.1 mV/dB and gets
-/// 4.246. Those two figures do not correspond: 6.1 is a measured typical
-/// that carries the junctions' ideality with it (see [`IDEALITY`]) while
-/// 25.9 is bare `kT/q`, so the quotient is 2 % small.
-///
-/// Doing the algebra instead: the log converter puts `2·n·V_T·ln(I/I_S)`
-/// on the charging junction, and that junction's own current is
-/// `exp((v_in − v_C)/(n·V_T))`. The capacitor settles where the mean of
-/// that current equals the constant discharge current, which is where
-/// `⟨(I/I_S)²⟩ = exp(v_C/(n·V_T))` — **the true mean of the square**, with
-/// the ideality and the temperature both cancelling because the same kind
-/// of junction does the logarithm and the averaging. The filter's decibel
-/// unit is then `n·V_T / (n·V_T·ln10/10) = 10/ln 10`, exactly, whatever the
-/// ideality and whatever the temperature.
-///
-/// So this constant is not a measurement to be rounded. It is the number
-/// that makes the averaging an average of the square, and at any other
-/// value the detector reads a slightly different mean — high on peaky
-/// material at 4.246, which is the wrong sign against the datasheet's
-/// crest-factor table as well as leaving a sine 2.98 dB rather than 3.01 dB
-/// below its peak.
-///
-/// **What it costs.** dbx's published attack times and their published
-/// release rate cannot both be met by any single-constant detector, and the
-/// hardware is a single-constant detector; the research establishes that
-/// their three attack figures alone imply time constants spanning 27 to
-/// 40 ms. With the exact unit the release rate and two of the three attack
-/// figures are met and the 20 dB attack point is 35 % slow. That miss is
-/// asserted against dbx's own components rather than hidden, and
-/// `README.md` records it.
-pub const D_DB: f32 = 10.0 / std::f32::consts::LN_10;
+/// **What it costs, which is dbx's part of the story and stays here.**
+/// dbx's published attack times and their published release rate cannot
+/// both be met by any single-constant detector, and the hardware is a
+/// single-constant detector; the research establishes that their three
+/// attack figures alone imply time constants spanning 27 to 40 ms. With the
+/// exact unit the release rate and two of the three attack figures are met
+/// and the 20 dB attack point is 35 % slow. That miss is asserted against
+/// dbx's own components rather than hidden, and `README.md` records it.
+pub use noob_electrical_components::log_rms_detector::D_DB;
 
 /// The detector's time constant, seconds.
 ///
@@ -146,7 +161,37 @@ pub const KNEE_WIDTH_MAX_DB: f32 = 12.0;
 /// one-variable trend. Nothing here ever varied with reduction and nothing
 /// here should start: a tabulated value at one operating point says
 /// nothing about how a quantity varies.
-pub const CELL_ASYMMETRY: f32 = 0.000_75 * 3.0 * std::f32::consts::PI / 4.0;
+///
+/// The `3π/4` is the component's, not this file's: it is
+/// [`EvenResidual::HalfPathMismatch`]'s relation between a coefficient and
+/// the second harmonic it produces. What is dbx's, and what stays here, is
+/// [`CELL_THD2`], the one magnitude they published.
+pub const CELL_ASYMMETRY: f32 = EvenResidual::HalfPathMismatch.coefficient_for_thd(CELL_THD2, 1.0);
+
+/// The one distortion magnitude dbx published for the original: "0.075 %
+/// 2nd harmonic at infinite compression at +4dBm output", as a fraction.
+///
+/// It carries no reference level, which is not an omission on dbx's part:
+/// a half-path gain mismatch produces a fixed *fraction* of second harmonic
+/// whatever the level, so there is nothing for a level to attach to. That
+/// is why [`CELL_ASYMMETRY`] passes a reference amplitude the component
+/// documents as ignored for this shape, and it is the same property dbx
+/// assert when they call the second harmonic "relatively unaffected by
+/// compression ratio, time constants and frequency".
+pub const CELL_THD2: f32 = 0.000_75;
+
+/// This box's gain cell: a trimmed typical part at its reference
+/// temperature, carrying dbx's published even-order residual.
+///
+/// The part is the component crate's. What this constant adds is the two
+/// choices that are dbx's rather than the part's: which of the two
+/// residual shapes the component carries, and how much of it.
+pub const CELL: BlackmerCell = BlackmerCell {
+    thd_unity: CELL_THD2,
+    thd_peak: 1.0,
+    residual: EvenResidual::HalfPathMismatch,
+    ..BlackmerCell::TYPICAL
+};
 
 /// Input coupling corner, Hz. **Derived** from C12 = 0.15 µF into
 /// R26 = 100 kΩ at the cell's virtual ground. dbx publish no frequency
@@ -160,20 +205,6 @@ pub const INPUT_HP_HZ: f32 = 10.6;
 /// the transimpedance stage's compensation. The 160A's published −3 dB at
 /// 90 kHz is a loose corroboration from the later board.
 pub const OUTPUT_LP_HZ: f32 = 72_300.0;
-
-/// Level, in dBFS, below which the detector's input is floored.
-///
-/// The excursion at every zero crossing is what generates the detector's
-/// ripple, which is what generates dbx's published low-frequency third
-/// harmonic, so this floor must be far enough down to be inaudible in that
-/// mechanism rather than a smoother placed to tidy it away.
-const POWER_FLOOR_DBFS: f64 = -200.0;
-
-/// How far below the stored level the instantaneous one has to fall before
-/// the general update is replaced by its exact asymptote. Below this
-/// `exp(-q)` would overflow, and the asymptote is a straight line in
-/// decibels, which is the release.
-const RATE_LIMIT_Q: f64 = -40.0;
 
 /// Longest `dbx_lookahead`, milliseconds.
 pub const LOOKAHEAD_MAX_MS: f32 = 10.0;
@@ -190,173 +221,6 @@ pub const VU_REFERENCE_DBFS: f32 = -18.0;
 /// Mean of `|sin|`, for turning a block's rectified average back into the
 /// sine level a VU movement is calibrated against.
 const SINE_MEAN_ABS: f32 = std::f32::consts::FRAC_2_PI;
-
-// ---------------------------------------------------------- the gain cell
-
-/// The Blackmer gain cell's control law, and nothing else.
-///
-/// Everything here is a property of the **part** — the dbx model 200 the
-/// schematic calls out as `VCA (200)`, reference designator M1, and its
-/// descendants down to the THAT 2180. Nothing here knows about R26 and
-/// R32, the threshold, the ratio, the detector or the control-port
-/// divider, because those are the dbx 160 and another box built from the
-/// same cell would have different ones.
-///
-/// [`gain_db`](Self::gain_db) deliberately takes a **voltage**. The whole
-/// reason this is a part rather than a multiply is the 6.1 mV/dB constant
-/// with its tolerance and its temperature coefficient, and a caller that
-/// passes decibels has already thrown those away.
-#[derive(Clone, Copy, Debug)]
-pub struct BlackmerCell {
-    /// The log constant, mV/dB. Nominally [`K_MV_PER_DB`], 6.0 to 6.2
-    /// across the part's tolerance.
-    pub k_mv_per_db: f32,
-    /// The even-order residual from the mismatch of the two half-wave
-    /// paths; zero when the symmetry trim is perfect.
-    pub symmetry: f32,
-    /// Chip temperature, °C. The control constant carries +0.33 %/°C
-    /// referenced to 27 °C, which is what the matched transistor dbx
-    /// supplied with the module compensates.
-    pub temp_c: f32,
-}
-
-impl Default for BlackmerCell {
-    fn default() -> Self {
-        BlackmerCell {
-            k_mv_per_db: K_MV_PER_DB,
-            symmetry: CELL_ASYMMETRY,
-            temp_c: 27.0,
-        }
-    }
-}
-
-impl BlackmerCell {
-    /// The log constant in force, including the temperature coefficient.
-    #[inline]
-    pub fn k(&self) -> f32 {
-        self.k_mv_per_db * (1.0 + 0.0033 * (self.temp_c - 27.0))
-    }
-
-    /// Gain in decibels for a control-port voltage, in millivolts. The
-    /// positive port; the negative one is `-K`.
-    #[inline]
-    pub fn gain_db(&self, v_ctrl_mv: f32) -> f32 {
-        -v_ctrl_mv / self.k()
-    }
-
-    /// The control voltage in millivolts that asks for a gain in decibels.
-    #[inline]
-    pub fn control_mv(&self, gain_db: f32) -> f32 {
-        -gain_db * self.k()
-    }
-
-    /// One sample through the cell at a linear gain, with the cell's own
-    /// even-order residual. `dc` is a slow running mean of `|x|`, which
-    /// the caller keeps: the residual carries a DC term that the real
-    /// output coupling removes, and subtracting the mean is that removal
-    /// without putting another pole in the audio path.
-    #[inline]
-    pub fn process(&self, x: f32, gain: f32, dc: f32) -> f32 {
-        gain * (x + self.symmetry * (x.abs() - dc))
-    }
-}
-
-// ----------------------------------------------------------- the detector
-
-/// Blackmer's true-RMS detector as a log-domain filter.
-///
-/// The capacitor is charged through a junction whose current is the
-/// antilogarithm of the difference between the log-domain signal and the
-/// capacitor voltage, and discharged by a constant current. Writing the
-/// stored level as `L` decibels and the instantaneous one as `L_inst`,
-///
-/// ```text
-/// dL/dt = (D/τ) · ( exp( (L_inst − L) / D ) − 1 )
-/// ```
-///
-/// which has an exact discrete solution for a held input over one sample
-/// period, so [`step`](Self::step) costs one `exp` and one `ln` and is
-/// unconditionally stable at any rate. There is no attack branch and no
-/// release branch, because the circuit has neither: a rising signal
-/// attacks faster the bigger the step, a falling one decays along a
-/// straight line of `D/τ` decibels per second, and the two are one
-/// constant seen from two sides.
-#[derive(Clone, Copy, Debug)]
-pub struct RmsDetector {
-    /// Stored level in dB, kept in `f64` because it can sit a hundred
-    /// decibels above the instantaneous one and the difference matters.
-    level_db: f64,
-    /// `exp(-h/τ)` for the sample period in force.
-    a: f64,
-    /// `(D/τ)·h`, the decibels one sample of rate-limited release costs.
-    rate_step_db: f64,
-    d: f64,
-}
-
-impl Default for RmsDetector {
-    fn default() -> Self {
-        let mut d = RmsDetector {
-            level_db: POWER_FLOOR_DBFS,
-            a: 0.0,
-            rate_step_db: 0.0,
-            d: D_DB as f64,
-        };
-        d.set(TAU_DEFAULT_S, 48_000.0);
-        d
-    }
-}
-
-impl RmsDetector {
-    /// Retune to a time constant and a sample rate. This is the only
-    /// rate-dependent coefficient in the whole detector, which is the
-    /// pleasant consequence of solving the filter exactly rather than
-    /// discretising it by hand.
-    pub fn set(&mut self, tau_s: f32, sr: f32) {
-        let h = 1.0 / sr.max(1.0) as f64;
-        let tau = tau_s.max(1e-4) as f64;
-        self.a = (-h / tau).exp();
-        self.rate_step_db = self.d / tau * h;
-    }
-
-    /// Forget the stored level.
-    pub fn reset(&mut self) {
-        self.level_db = POWER_FLOOR_DBFS;
-    }
-
-    /// The stored level, dBFS.
-    #[inline]
-    pub fn level_db(&self) -> f32 {
-        self.level_db as f32
-    }
-
-    /// Release rate in decibels per second, `D/τ`.
-    pub fn release_rate_db_s(&self, tau_s: f32) -> f32 {
-        D_DB / tau_s.max(1e-4)
-    }
-
-    /// One sample of the detector's power input.
-    #[inline]
-    pub fn step(&mut self, power: f32) -> f32 {
-        let inst = if power > 1e-20 {
-            10.0 * (power as f64).log10()
-        } else {
-            POWER_FLOOR_DBFS
-        };
-        let q0 = (inst - self.level_db) / self.d;
-        if q0 < RATE_LIMIT_Q {
-            // The charging junction is shut; the capacitor is discharged by
-            // the constant current alone and the level falls along a
-            // straight line. This is the exact asymptote of the line below,
-            // not an approximation of it, and it is also what keeps
-            // `exp(-q0)` from overflowing after loud material stops.
-            self.level_db -= self.rate_step_db;
-        } else {
-            let m = 1.0 - (1.0 - (-q0).exp()) * self.a;
-            self.level_db = inst + self.d * m.max(1e-300).ln();
-        }
-        self.level_db as f32
-    }
-}
 
 // ------------------------------------------------------- the static curve
 
@@ -545,8 +409,10 @@ struct Channel {
     sc_hpf: OnePole,
     in_hp: OnePole,
     out_lp: OnePole,
-    /// Slow mean of `|x|` at the cell, so its even-order residual carries
-    /// no DC.
+    /// Slow mean of the cell residual's own shape, so the even-order
+    /// term it adds carries no direct current. This is the coupling
+    /// capacitor the component crate stops short of, and it is here
+    /// because it is downstream of the part.
     cell_dc: OnePole,
     /// Anticipated compression, at the internal rate.
     look: Vec<f32>,
@@ -559,7 +425,7 @@ struct Channel {
 impl Channel {
     fn new(sr: f32) -> Self {
         let mut c = Channel {
-            det: RmsDetector::default(),
+            det: RmsDetector::new(TAU_DEFAULT_S, sr),
             ghost_db: -120.0,
             sc_hpf: OnePole::default(),
             in_hp: OnePole::default(),
@@ -639,7 +505,7 @@ impl Compressor {
         let mut c = Compressor {
             sr,
             settings: Settings::default(),
-            cell: BlackmerCell::default(),
+            cell: CELL,
             ch: [Channel::new(sr), Channel::new(sr)],
             oversample,
             look_samples: 0,
@@ -863,8 +729,12 @@ impl Compressor {
             let d = c.delay(x, k.look);
             let a = c.in_hp.hp(d);
             let gain = 10f32.powf(-gr / 20.0) * k.make_up;
-            let dc = c.cell_dc.lp(a.abs());
-            out[i] = flush(c.out_lp.lp(self.cell.process(a, gain, dc)));
+            // The coupling capacitor after the cell, which the
+            // component deliberately leaves to whoever owns it: a slow
+            // mean of the residual's own shape, subtracted at the seam the
+            // component offers, so the linear path keeps no extra pole.
+            let dc = c.cell_dc.lp(self.cell.residual.shape(a));
+            out[i] = flush(c.out_lp.lp(gain * self.cell.process_coupled(a, dc)));
         }
         self.gr_db[0] = gr0;
         self.gr_db[1] = gr1;

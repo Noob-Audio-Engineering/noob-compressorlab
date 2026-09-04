@@ -81,21 +81,30 @@ on the 1176 and a dead ornament on the LA-2A.
 
 ## Components
 
-**Do not extract a component crate to `noob-electrical-components`, ever, on your own authority.**
-Build the part in one small separable place inside your engine and tell the coordinator what it is.
-Extraction is the coordinator's decision and needs evidence from more than one build.
+**Every electrical component a model contains belongs in `noob-electrical-components`**, on the
+user's instruction of 2026-09-04. So a new model's parts are not built to live in its engine: write
+the part against that repository, and if the crate does not exist yet, say so and it will be created.
 
-The rule that repository now uses: a part is admitted when **two units are documented to contain it**,
-on drawings, not when one does and another is expected to. That clause is stricter than it was, and it
-is stricter because the looser version has already been wrong once. The diode bridge was admitted on
-the expectation that the EMI TG12413 would be its second user; the TG12413 turned out not to contain a
-bridge at all, and the crate sits there with one user.
+That reverses what this section said until then, which was never to extract on your own authority and
+to wait for a second documented user. The old rule is worth knowing because it failed in an
+instructive way: the diode bridge was admitted on the expectation that the EMI TG12413 would be its
+second user, and the TG12413 turned out not to contain a bridge at all. Its four diodes are two series
+branches sharing a rail rather than a ring. So predicting a user is not the same as having one, and
+that is a lesson about **evidence**, not about counting.
 
 Two failures to keep in view, because they are the two ways this goes wrong. Three "tube stages" were
 three different circuits sharing a word, and were rightly refused. A component called "a VCA" would
 have been the fourth, and was renamed to the Blackmer gain cell, which is a part rather than a
-category, and admitted with two documented users. The test is always whether the units share an
-**equation**, never whether they share a **word**.
+category. The test is always whether the units share an **equation**, never whether they share a
+**word**.
+
+**And a shape taken from one implementation is usually wrong for the second**, which is the reason
+the old rule wanted two users and is still true now that it does not require them. When a part is
+extracted, reconcile every engine that already contains it rather than lifting whichever was written
+first. The photocell paid this out: its resistance law hardcoded two quantities because in a T4 cell
+the lit endpoint and the conductance scale are **one fact**, related by definition. In the CL-1B they
+are two facts from two sources, one solved from a service manual and one an estimate. No number of
+users sharing a T4 could have surfaced that.
 
 ## Web
 

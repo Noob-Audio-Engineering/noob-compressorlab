@@ -3,6 +3,14 @@
 //! second stage's feedback loop, and a transformer at each end
 //! (`research/610.md` section 8).
 //!
+//! The valve and the transformers are shared components rather than local
+//! code: [`Triode`] is `noob-electrical-components-small-signal-triode` and
+//! [`Rolloff`] and [`Core`] are `noob-electrical-components-transformer`.
+//! What stays here is the machine around them — which voicing picks which
+//! numbers, the feedback the Gain switch trades against attenuation, the
+//! supply sag, the oversampling, and every filter the parts are realised
+//! through.
+//!
 //! Calibration follows the rest of the lab: 0 dBFS is +22 dBu, so +4 dBu
 //! (0 VU) is −18 dBFS and the preamp's +20 dBm maximum sits at −2 dBFS.
 //! Every constant in [`Voicing`] is an **estimate** tuned against the test
@@ -15,6 +23,24 @@ use super::{
     Settings, level_to_db,
 };
 use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
+pub use noob_electrical_components::transformer::{Core, Rolloff};
+
+/// The valve, from the component crate: `S(v) = v / (1 + |v|^n)^(1/n)`, the
+/// tanh-like family both gain stages are built from, and the stage law
+/// `T(v) = (S(v + b) − S(b)) / S'(b)` that sits on it.
+///
+/// Re-exported under the 610's own vocabulary because this file and
+/// [`Adaa`] both work in it, and because the component crate is the one
+/// copy of the law: [`Adaa`] integrates exactly what [`tube`] evaluates,
+/// and a second copy here would let the two drift apart.
+///
+/// It is the **small-signal** triode and not the remote-cutoff valve a
+/// variable-mu unit uses. This law's bias sets the asymmetry of the curve
+/// and can never set its gain, so it cannot be a gain element at all; the
+/// component's own documentation says why the two are different parts.
+pub use noob_electrical_components::small_signal_triode::{
+    Triode, s_curve, s_slope, transfer as tube,
+};
 
 /// 0 VU of the PRE meter, as the mean rectified value of a sine at
 /// −18 dBFS.
@@ -32,17 +58,19 @@ pub struct Voicing {
     /// attenuation change: 1 would make the distortion at a fixed output
     /// rise 20 dB from −10 to +10, 0 would make the switch clean.
     pub kappa: f32,
-    /// Input stage: bias offset (the asymmetry that makes the second
-    /// harmonic dominate), knee sharpness, and the amplitude at which it
-    /// saturates.
-    pub b1: f32,
-    pub n1: f32,
+    /// Input stage: the valve, and the amplitude at which it saturates.
+    ///
+    /// The valve is the bias offset (the asymmetry that makes the second
+    /// harmonic dominate) and the knee sharpness, which are the component's
+    /// two numbers. `x1` is not the valve's: it is where this machine's
+    /// gain structure puts the stage's saturation point, tuned against a
+    /// published distortion figure, and the Gain switch moves it further.
+    pub in_stage: Triode,
     pub x1: f32,
-    /// Output stage: the same three, with a harder knee.
-    pub b2: f32,
-    pub n2: f32,
+    /// Output stage: the same, with a harder knee.
+    pub out_stage: Triode,
     pub x2: f32,
-    /// Input transformer: high-pass corner and quality, and the top-end
+    /// Input transformer: its low-frequency roll-off, and the top-end
     /// roll-off.
     ///
     /// The research gives the two transformer roll-offs as 40 kHz and
@@ -57,8 +85,13 @@ pub struct Voicing {
     /// is what the research was trying to do. The A voicing keeps its own
     /// much lower corners: it is the 1958 module, it is meant to be darker,
     /// and the +0 / −1 dB figure is the 6176's rather than its.
-    pub in_hp_hz: f32,
-    pub in_hp_q: f32,
+    ///
+    /// The top-end roll-off stays a bare number here rather than joining
+    /// the component: as the paragraph above says, it was fitted to the
+    /// whole chain's response with the resamplers accounted for, which
+    /// makes it this machine's calibration rather than a property of a
+    /// wound part.
+    pub in_hp: Rolloff,
     pub in_lp_hz: f32,
     /// The output transformer's own low-frequency roll-off. The research
     /// gives this the same corner as the flux integrator and then asserts
@@ -67,11 +100,9 @@ pub struct Voicing {
     /// the two are −2.47 dB at 20 Hz and the design as written cannot meet
     /// its own response figure. Separating the roll-off from the flux
     /// corner fixes it without changing how the core saturates.
-    pub out_hp_hz: f32,
-    /// Output transformer: the flux corner, the flux the core can carry,
-    /// and the top-end roll-off.
-    pub flux_hz: f32,
-    pub flux_sat: f32,
+    pub out_hp: Rolloff,
+    /// Output transformer: the core, and the top-end roll-off.
+    pub core: Core,
     pub out_lp_hz: f32,
     /// Depth of the self-rectification that shifts the operating point
     /// after a loud passage.
@@ -85,22 +116,18 @@ pub const B: Voicing = Voicing {
     gain_steps: GAIN_STEPS_DB,
     pad_db: -15.0,
     kappa: 0.8,
-    b1: 0.12,
-    n1: 2.5,
+    in_stage: Triode::new(0.12, 2.5),
     // Tuned so that a microphone at +30 dB with the Gain switch at +10
     // reaches 1 % at the −12 dBu equivalent, the SOLO/610's figure, and
     // measured there rather than assumed: at 12.9 it gave 1.9 %.
     x1: 24.5,
-    b2: 0.08,
-    n2: 4.0,
+    out_stage: Triode::new(0.08, 4.0),
     // The hard ceiling sits just above the published +20 dBm maximum.
     x2: 0.8,
-    in_hp_hz: 7.0,
-    in_hp_q: 0.6,
+    in_hp: Rolloff::two_pole(7.0, 0.6),
     in_lp_hz: 80_000.0,
-    out_hp_hz: 6.0,
-    flux_hz: 10.0,
-    flux_sat: 0.085,
+    out_hp: Rolloff::one_pole(6.0),
+    core: Core::new(10.0, 0.085),
     out_lp_hz: 100_000.0,
     sag: 0.3,
     fixed_eq: false,
@@ -111,18 +138,14 @@ pub const A: Voicing = Voicing {
     gain_steps: GAIN_STEPS_A_DB,
     pad_db: -20.0,
     kappa: 0.7,
-    b1: 0.20,
-    n1: 2.5,
+    in_stage: Triode::new(0.20, 2.5),
     x1: 24.5,
-    b2: 0.12,
-    n2: 3.5,
+    out_stage: Triode::new(0.12, 3.5),
     x2: 0.63,
-    in_hp_hz: 10.0,
-    in_hp_q: 0.6,
+    in_hp: Rolloff::two_pole(10.0, 0.6),
     in_lp_hz: 22_000.0,
-    out_hp_hz: 9.0,
-    flux_hz: 16.0,
-    flux_sat: 0.0425,
+    out_hp: Rolloff::one_pole(9.0),
+    core: Core::new(16.0, 0.0425),
     out_lp_hz: 25_000.0,
     sag: 0.5,
     fixed_eq: true,
@@ -206,28 +229,6 @@ pub const SAG_UP_S: f32 = 0.005;
 pub const SAG_DOWN_S: f32 = 0.2;
 /// Smoothing of the Level knob, seconds.
 pub const LEVEL_SMOOTH_S: f32 = 0.005;
-
-/// `S(v) = v / (1 + |v|^n)^(1/n)`: the tanh-like family the tube stages
-/// are built from, and its slope at the origin's bias point.
-#[inline]
-pub fn s_curve(v: f32, n: f32) -> f32 {
-    let a = v.abs().powf(n);
-    v / (1.0 + a).powf(1.0 / n)
-}
-
-/// `S'(v) = (1 + |v|^n)^(−(n+1)/n)`.
-#[inline]
-pub fn s_slope(v: f32, n: f32) -> f32 {
-    let a = v.abs().powf(n);
-    (1.0 + a).powf(-(n + 1.0) / n)
-}
-
-/// One tube stage: `S(v + b) − S(b)`, normalised to unity small-signal
-/// gain so the bias only bends the curve and does not change the gain.
-#[inline]
-pub fn tube(v: f32, b: f32, n: f32) -> f32 {
-    (s_curve(v + b, n) - s_curve(b, n)) / s_slope(b, n)
-}
 
 /// Per-channel state.
 #[derive(Clone, Default)]
@@ -416,8 +417,8 @@ impl Stage {
         // The tables belong to the exponents, so they are rebuilt only when
         // the voicing changes them; this runs off the audio thread.
         for ch in &mut self.ch {
-            ch.shape_in = Adaa::new(v.n1);
-            ch.shape_out = Adaa::new(v.n2);
+            ch.shape_in = Adaa::new(v.in_stage.knee);
+            ch.shape_out = Adaa::new(v.out_stage.knee);
         }
         let (lf_hz, hf_hz) = if v.fixed_eq {
             (LF_FREQ_HZ[1], HF_FREQ_HZ[2])
@@ -430,7 +431,7 @@ impl Stage {
         let sr_p = self.sr * self.factor as f32;
         let lf = Shelf::new(sr_p, lf_hz, SHELF_GAIN_DB[s.lf_gain.min(10)], true);
         let hf = Shelf::new(sr_p, hf_hz, SHELF_GAIN_DB[s.hf_gain.min(10)], false);
-        let in_hp = Hp2::new(self.sr, v.in_hp_hz, v.in_hp_q);
+        let in_hp = Hp2::new(self.sr, v.in_hp.hz, v.in_hp.q);
         let (tlo_hz, tlo_db, thi_hz, thi_db) = INPUT_TILT[s.input.min(4)];
         let tilt_lo = Shelf::new(self.sr, tlo_hz.max(1.0), tlo_db, true);
         let tilt_hi = Shelf::new(self.sr, thi_hz.max(1.0), thi_db, false);
@@ -452,8 +453,8 @@ impl Stage {
             ch.cut.set_from(&cut);
             ch.in_lp.set(v.in_lp_hz, sr_p);
             ch.out_lp.set(v.out_lp_hz, sr_p);
-            ch.flux.set(v.flux_hz, sr_p);
-            ch.out_hp.set(v.out_hp_hz, sr_p);
+            ch.flux.set(v.core.integrator_hz, sr_p);
+            ch.out_hp.set(v.out_hp.hz, sr_p);
             // The 600 Ω roll-off is a real in-band effect, about 2 dB down
             // at 20 kHz, but its corner sits above Nyquist at 48 kHz, so it
             // has to be designed at the oversampled rate to be placed at
@@ -563,7 +564,7 @@ impl Stage {
                         self.sag_down
                     };
                     ch.sag = flush(ch.sag + a * (au - ch.sag));
-                    let bias = v.b1 * (1.0 + v.sag * ch.sag.min(4.0));
+                    let bias = v.in_stage.bias * (1.0 + v.sag * ch.sag.min(4.0));
                     y = x1_scale * ch.shape_in.process(u, bias);
 
                     // Level, then the shelves (which sit in the output
@@ -574,14 +575,13 @@ impl Stage {
                     y2 = ch.hf.process(y2);
 
                     // Output tube stage.
-                    let y3 = v.x2 * ch.shape_out.process(y2 / v.x2, v.b2);
+                    let y3 = v.x2 * ch.shape_out.process(y2 / v.x2, v.out_stage.bias);
 
                     // Output transformer: the core carries only so much
                     // flux, and what it cannot carry never reaches the
                     // secondary.
                     let phi = ch.flux.process(y3);
-                    let excess = phi - v.flux_sat * s_curve(phi / v.flux_sat, 4.0);
-                    let mut y4 = y3 - excess;
+                    let mut y4 = v.core.through(y3, phi);
                     y4 = ch.out_hp.process(y4);
                     // The 1176 section's input loading sits after the
                     // output transformer, and inside the oversampled block
@@ -634,9 +634,9 @@ impl Stage {
         let v = self.v;
         let amp = 10f32.powf(in_db / 20.0) * self.front_gain;
         let x1_scale = v.x1 * self.f_rel;
-        let y1 = x1_scale * tube(amp * self.a_in / x1_scale, v.b1, v.n1);
+        let y1 = x1_scale * v.in_stage.shape(amp * self.a_in / x1_scale);
         let y2 = y1 * self.level_lin;
-        let y3 = v.x2 * tube(y2 / v.x2, v.b2, v.n2);
+        let y3 = v.x2 * v.out_stage.shape(y2 / v.x2);
         20.0 * y3.abs().max(1e-9).log10()
     }
 }

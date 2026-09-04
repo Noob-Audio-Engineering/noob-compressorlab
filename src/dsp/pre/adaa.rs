@@ -26,6 +26,14 @@
 //! and read back by interpolation. Above the table's range `S` is within a
 //! fraction of a per cent of one, so the antiderivative continues as a
 //! straight line of slope one.
+//!
+//! The shaper is not defined here. `S` and the stage law built on it are the
+//! valve, which is a shared component, and this file integrates what that
+//! component evaluates: the table below is a numerical integral of
+//! [`s_curve`] and would go quietly wrong the moment a second copy of the
+//! law existed for it to drift from. The anti-aliasing is a technique rather
+//! than a part and stays here, which is the division the component's own
+//! documentation draws.
 
 use super::stage::{s_curve, tube};
 

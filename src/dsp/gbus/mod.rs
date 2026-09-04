@@ -74,8 +74,10 @@
 //!   to the level the only measured recordings of this unit were made at.
 //! - [`V_DIODE`] and [`SOFTPLUS_V`] — a silicon small-signal diode's drop
 //!   and turn-on width.
-//! - The second-harmonic coefficient in [`engine::BlackmerCell`], set from
-//!   the THAT 2180A datasheet's own THD table.
+//! - The second-harmonic coefficient in [`engine::GainStage`], set from
+//!   the THAT 2180A datasheet's own THD table. The relation between that
+//!   table and a coefficient is the gain cell component's; what is
+//!   estimated here is the amplitude the console measures it in.
 //!
 //! # Three places this module departs from the dossier's section 11
 //!
@@ -97,7 +99,7 @@
 //!    first THD point and misses its second by a factor of seven, because
 //!    the datasheet's distortion *rises* as the gain falls. Shaping before
 //!    the gain fits both points within 27 %, which is inside the ±50 % the
-//!    dossier's own test 24 allows. See [`engine::BlackmerCell`].
+//!    dossier's own test 24 allows. See [`engine::GainStage`].
 //! 3. **Oversampling offers 1× and 2×, not 4×.** Both nonlinearities here
 //!    are exactly second order — a squarer and a product of two signals —
 //!    so their output bandwidth is exactly twice their input bandwidth and
@@ -107,7 +109,7 @@
 
 pub mod engine;
 
-pub use engine::{BlackmerCell, Compressor, Settings, Timing};
+pub use engine::{BlackmerCell, Compressor, GainStage, Settings, Timing};
 
 /// Labels of `ssl_attack`, exactly as card 82E27's panel legend prints
 /// them under `ATTACK mS` (dossier 7.1).

@@ -20,6 +20,11 @@ npm-debug.log*
 # the dossier, not a reason to commit the image.
 research/ref/
 
+# The local override that points the components dependency at a working
+# copy while parts are being extracted into it. Temporary and never
+# committed: the real end state is the git dependency on a pushed commit.
+.cargo/
+
 # IDE and OS
 .idea/
 .vscode/

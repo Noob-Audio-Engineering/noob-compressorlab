@@ -17,11 +17,24 @@
 //! doing anything, Fix/Man would stop being distinguishable from Manual,
 //! and this would quietly become a third LA-2A with extra knobs.
 //!
-//! What is shared is real: the static photoconductive power law and its
-//! `CELL_GAMMA`, `R_DARK`, the filters, the VU reference and its
-//! constants, the stereo link, the denormal flushing and the transfer
-//! solver. What is not shared is the cell, its electroluminescent panel
-//! law, and every one of its time constants.
+//! What is shared is real, and it is precisely the general half of the
+//! photocell crate, the half that belongs to any photoresistor rather
+//! than to a T4: the photoconductor's own odd-order distortion law, and
+//! its resistance law through `Photoresistor`, both called out of the
+//! crate with this element's own numbers rather than the T4's. Alongside
+//! them the lab's own filters, the VU reference and its constants, the
+//! stereo link, the denormal flushing and the transfer solver.
+//!
+//! What is not shared is the cell, its electroluminescent panel law,
+//! every one of its time constants, and its `CELL_GAMMA`. That last one
+//! is worth naming because the research proposed borrowing it: the power
+//! law has the same shape here, but its exponent is solved from the
+//! published 2:1 ratio and comes out at 1.36, for the reason at
+//! `engine::k::GRE_GAMMA`. Nor are the endpoints shared beyond the dark
+//! resistance: this element's conductance scale comes from the service
+//! manual's 10 dB calibration and its floor is a separate estimate,
+//! which is the pair the crate's `Photoresistor` keeps apart and the T4
+//! ties together.
 //!
 //! | element | LA-2A | LA-3A | CL 1B here |
 //! |---|---|---|---|

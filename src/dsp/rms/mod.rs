@@ -75,7 +75,8 @@
 //!
 //! | module | contents |
 //! |---|---|
-//! | [`engine`] | the Blackmer cell, the log-domain detector, the static curve, the unit |
+//! | [`engine`] | the static curve, the unit, and what dbx contribute to the two components it is built from |
+//! | `noob-electrical-components` | the Blackmer gain cell and the log-domain detector, as parts |
 //! | this file | the constants, the dial laws, the switch labels and [`Settings`] |
 
 pub mod engine;

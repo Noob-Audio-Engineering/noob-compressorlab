@@ -297,6 +297,14 @@ third-order) resistance, preamp and line-amp soft saturation, an output-transfor
 [`research/1176.md`](research/1176.md) has the equations; `src/dsp/fet/compressor.rs` the
 constants that were tuned against the tests.
 
+The gain element itself lives in the `fet-variable-resistor` crate of
+`noob-electrical-components`: a junction FET used as a voltage-controlled resistor, which owns the
+control law, the conductance it implies and the way the swing across the channel modulates it. It
+is one of the three circuits the word "VCA" would have covered and it is not the Blackmer cell the
+dbx and the SSL share, so it has its own crate and the crate says why. What stays here is the
+machine: the divider that closes around the channel, the ratio ladder and diode bias that develop
+its control voltage, the two amplifier stages and the transformers.
+
 ### Revisions
 
 `fet_revision` selects a circuit and, on the page, a faceplate look. Revisions that share a circuit
@@ -430,6 +438,17 @@ the 610 has two gain controls instead of one. The chain per channel is the input
 the input transformer, the input tube stage, the Level pot, the two shelves, the output tube stage,
 the output transformer (whose core saturates on low frequencies at a level where the midrange is
 still clean), the polarity switch and an optional low cut.
+
+Two of those are shared components rather than code that lives here. The valve is
+`noob-electrical-components-small-signal-triode`, and the transformers' low end — the roll-off at
+each end and the core's flux limit — is `noob-electrical-components-transformer`, which the 1176
+sitting behind this preamp in the same box also uses. **The valve is not the Fairchild's.** That
+one is a remote-cutoff triode, whose grid bias is its gain control, and this one is normalised so
+that its bias can only change the asymmetry of the curve and never the gain; they are two
+components with two crates, and each says why the other cannot serve. What stays here is the
+machine: which of the two voicings picks which numbers, the feedback the Gain switch trades against
+attenuation, the supply sag that walks the valve's bias after a loud passage, the oversampling and
+the anti-aliasing, and every filter the parts are realised through.
 
 The Ratio switch's two extra positions are routing, and the 1176 engine runs in all three so the
 latency never changes:
@@ -606,10 +625,13 @@ the whole engine.
 with two floating common nodes, forward-biased by an injected current, one junction per arm. EMI's is
 two branches of two diodes in series, both the same way up, whose common node is the +20 V supply
 rail, and as drawn they sit in reverse breakdown rather than forward conduction. Six of the thirteen
-rows in the dossier's side-by-side table are structural rather than differences of value. So the
-element is built in `dsp::tg::element` and the dossier's own constants table has an empty row headed
-"from the shared diode-bridge component crate". **That empty row is the finding**, and the
-`diode-bridge` crate now says in its own documentation what it models and what it does not.
+rows in the dossier's side-by-side table are structural rather than differences of value. So the two
+are two components: this element is `noob-electrical-components-diode-arm-pair` and Neve's is
+`noob-electrical-components-diode-bridge`, and the dossier's own constants table still has an empty
+row headed "from the shared diode-bridge component crate". **That empty row is the finding**, and
+each crate now says in its own documentation what the other is and why one does not serve both.
+`dsp::tg::element` keeps only the machine around the part: R14, the divider it makes and the node
+solve.
 
 What generalises is one level up, and the element here is written as that generalisation: *n*
 junctions per arm with a bulk resistance,
@@ -619,8 +641,8 @@ u(i) = 2·r_b·i + 2·V_n·artanh( i / I )
 ```
 
 which becomes the Neve's law exactly at *n* = 1 and *r_b* = 0. A test asserts that identity against
-the shipped crate to the limit of what f32 can represent, which is the argument for a re-drawn
-component made executable rather than argued.
+the shipped bridge crate to the limit of what f32 can represent, which is the argument for a
+re-drawn component made executable rather than argued.
 
 **Distortion goes the other way from the Neve's, because the element is transparent when it is
 idle.** The Neve's bridge shunts a divider and the voltage across it falls as the control current

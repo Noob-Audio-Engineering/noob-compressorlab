@@ -33,9 +33,14 @@
 use super::{METER_COMP, METER_IN, METER_OUT, MODE_FIXED, MODE_FIXMAN};
 use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
 use crate::dsp::opto::filters::{Biquad, OnePole, flush};
-// Deliberately narrow: `Cell` is *not* imported, and `tests::the_t4_cell_was_not_imported`
-// exists to catch a future refactor that makes importing it look convenient.
-use crate::dsp::opto::model::{R_DARK, SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS, distortion};
+use crate::dsp::opto::model::{SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS};
+// The photoresistor's general half, taken from the part's own crate rather
+// than through the LA-2A's circuit file, because that is exactly the half
+// this unit shares: laws that belong to any photoresistor, and no T4.
+// Deliberately narrow for the same reason: `Cell` is *not* imported, and
+// `tests::the_t4_cell_was_not_imported` exists to catch a future refactor
+// that makes importing it look convenient.
+use noob_electrical_components::photocell::{Photoresistor, R_DARK, distortion};
 
 /// 0 VU, in dBFS. Shared with every other model, and Softube publish the
 /// same reference for their own CL 1B.
@@ -311,8 +316,12 @@ impl Network {
 /// written down.
 #[derive(Clone, Copy, Debug)]
 pub struct Calibration {
-    /// Conductance scale of the GRE at the 10 dB point.
-    pub k_g: f32,
+    /// The GRE's static law: the photoresistor resistance law from the
+    /// photocell crate, carrying this element's own endpoints and the
+    /// conductance scale solved below. The law is shared because it
+    /// belongs to any photoresistor; none of the three numbers in it is
+    /// the T4's.
+    pub gre: Photoresistor,
     /// Side-chain gain offset in dB.
     pub g0_db: f32,
 }
@@ -359,7 +368,17 @@ impl Calibration {
         let mean = peak * SINE_MEAN_ABS * net.nodes(r1).1;
         let want = u1 / mean;
         let g0_db = 20.0 * want.log10() + threshold_dbu(0.519);
-        Calibration { k_g, g0_db }
+        // The scale and the floor reach this struct from two unrelated
+        // places, which is why the crate keeps them apart: `k_g` is solved
+        // from the manual's 10 dB point just above, while `R_GRE_MIN` is
+        // an estimate of a maximum reduction nobody publishes. In a T4
+        // they would be one number.
+        let gre = Photoresistor {
+            r_dark: R_DARK,
+            r_min: k::R_GRE_MIN,
+            k_g,
+        };
+        Calibration { gre, g0_db }
     }
 
     /// Side-chain gain for a Threshold knob position.
@@ -385,8 +404,7 @@ impl Calibration {
     #[inline]
     pub fn resistance(&self, i: f32) -> f32 {
         let drive = (i / k::U_REF_10DB).max(0.0);
-        let g = 1.0 / R_DARK + self.k_g * drive.powf(k::GRE_GAMMA);
-        (1.0 / g).clamp(k::R_GRE_MIN, R_DARK)
+        self.gre.resistance(drive.powf(k::GRE_GAMMA))
     }
 }
 

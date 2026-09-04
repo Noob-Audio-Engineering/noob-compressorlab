@@ -19,7 +19,7 @@
 //!
 //! | module | contents |
 //! |---|---|
-//! | [`triode`] | the remote-cutoff triode, kept separable |
+//! | [`triode`] | the remote-cutoff triode, now its own component crate |
 //! | [`network`] | the six-position time-constant network, from the factory drawing |
 //! | [`oversample`] | the half-band cascade, 4x / 8x / 16x |
 //! | [`engine`] | the push-pull stage, the sidechain, the matrix, the meters, the static curve |
@@ -28,7 +28,16 @@
 pub mod engine;
 pub mod network;
 pub mod oversample;
-pub mod triode;
+
+/// The remote-cutoff triode lives in its own crate, because a valve is a
+/// part and everything this module puts around it — four sections a side,
+/// push-pull, the cathode resistors, the control injection, the timing
+/// network — is the machine. The evidence went with it: the law is fitted to
+/// plate current, its slope is a separate matter, and one parameter of the
+/// published fit had to be refitted against the manufacturer's plate
+/// characteristics before the slope was usable at all
+/// (`research/Fairchild-670.md` section 4.3).
+pub use noob_electrical_components::remote_cutoff_triode as triode;
 
 pub use engine::Compressor;
 pub use network::TIME_NAMES;

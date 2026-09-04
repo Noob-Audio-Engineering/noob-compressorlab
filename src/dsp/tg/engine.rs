@@ -42,7 +42,7 @@
 use crate::dsp::flush;
 use crate::dsp::opto::filters::OnePole;
 
-use super::element::{Element, R_SERIES};
+use super::element::Network;
 use super::oversample::{Chain, Delay, latency};
 use super::{MODE_COMPRESS, MODE_LIMIT, MODE_OUT, REGION_FORWARD};
 
@@ -667,7 +667,7 @@ impl Channel {
 pub struct Compressor {
     sr: f32,
     settings: Settings,
-    element: Element,
+    net: Network,
     k_i: f32,
     ch: [Channel; 2],
     gr_db: [f32; 2],
@@ -681,12 +681,12 @@ impl Compressor {
     /// A module at `sr` hertz with default settings.
     pub fn new(sr: f32) -> Self {
         let s = Settings::default();
-        let element = element_for(&s);
+        let net = element_for(&s);
         let mut c = Compressor {
             sr,
             settings: s,
-            element,
-            k_i: fit_k_i(&element),
+            net,
+            k_i: fit_k_i(&net),
             ch: [Channel::new(sr), Channel::new(sr)],
             gr_db: [0.0; 2],
             in_peak: [0.0; 2],
@@ -729,9 +729,9 @@ impl Compressor {
         &self.settings
     }
 
-    /// The gain element as configured.
-    pub fn element(&self) -> &Element {
-        &self.element
+    /// R14 and the gain element, as configured.
+    pub fn network(&self) -> &Network {
+        &self.net
     }
 
     /// Amps of control current per volt of store, as fitted.
@@ -752,8 +752,8 @@ impl Compressor {
         }
         let retune = s.oversample != self.settings.oversample || s.sc_hpf != self.settings.sc_hpf;
         self.settings = s;
-        self.element = element_for(&s);
-        self.k_i = fit_k_i(&self.element);
+        self.net = element_for(&s);
+        self.k_i = fit_k_i(&self.net);
         if retune {
             self.retune();
         }
@@ -799,7 +799,7 @@ impl Compressor {
         let steps = if s.drive > 0.5 { 2 } else { 1 };
         let out_gain = output_gain(s.output);
         let use_hpf = s.sc_hpf > 1.0;
-        let element = self.element;
+        let net = self.net;
         let k_i = self.k_i;
         let processing = !s.bypass;
 
@@ -855,12 +855,12 @@ impl Compressor {
                 }
                 for c in 0..2 {
                     let v_s = self.ch[c].dc_in.hp(ups[c][k]) * scale;
-                    let u = element.solve(v_s, ctrl[c], steps);
+                    let u = net.solve(v_s, ctrl[c], steps);
                     let y = self.ch[c].dc_out.hp(u / scale);
                     outs[c][k] = y;
                     self.ch[c].z_tap = y;
                     self.ch[c].z_ctrl = ctrl[c];
-                    gr_sum[c] += element.gr_db(ctrl[c]);
+                    gr_sum[c] += net.gr_db(ctrl[c]);
                     ctrl_sum[c] += ctrl[c];
                 }
             }
@@ -915,7 +915,7 @@ impl Compressor {
     /// quantities the element actually has, the way the CL-1B does.
     pub fn cell_state(&self) -> [f32; 3] {
         let i = 0.5 * (self.ctrl_a[0] + self.ctrl_a[1]);
-        let r = self.element.resistance(i);
+        let r = self.net.element.resistance(i);
         [
             i * 1e6,
             if r.is_finite() { r } else { 1e9 },
@@ -942,7 +942,7 @@ impl Compressor {
         let p = (amp_peak * trim).max(0.0);
         let ratio = tau_ratio(self.settings.recovery, self.settings.hold);
         let demand = |store: f32| {
-            let a = self.element.gain(I_MIN + self.k_i * store);
+            let a = self.net.gain(I_MIN + self.k_i * store);
             static_store(p * a, gains, ratio) - store
         };
         if demand(0.0) <= 0.0 {
@@ -960,7 +960,7 @@ impl Compressor {
                 hi = mid;
             }
         }
-        self.element.gr_db(I_MIN + self.k_i * (0.5 * (lo + hi)))
+        self.net.gr_db(I_MIN + self.k_i * (0.5 * (lo + hi)))
     }
 
     /// The static transfer curve, output dBFS for `min_dbfs..max_dbfs` in.
@@ -983,17 +983,16 @@ impl Compressor {
     }
 }
 
-/// The element the settings ask for.
-pub fn element_for(s: &Settings) -> Element {
-    let mut e = if s.region == REGION_FORWARD {
-        Element::forward(super::element::N_JUNCTIONS)
+/// R14 around the element the settings ask for.
+pub fn element_for(s: &Settings) -> Network {
+    let mut n = if s.region == REGION_FORWARD {
+        Network::forward(super::element::N_JUNCTIONS)
     } else {
-        Element::breakdown()
+        Network::breakdown()
     };
     // The dossier's range for the imbalance is 0 to 5 % (11.3).
-    e.mismatch = 0.05 * s.mismatch.clamp(0.0, 1.0);
-    e.r_series = R_SERIES;
-    e
+    n.element.mismatch = 0.05 * s.mismatch.clamp(0.0, 1.0);
+    n
 }
 
 /// Fit the control-current constant to the calibration target.
@@ -1004,11 +1003,11 @@ pub fn element_for(s: &Settings) -> Element {
 /// this unit. Fitting it rather than writing a number down means the
 /// region switch and the mismatch control do not quietly change how deep
 /// the unit goes, only how it sounds getting there.
-pub fn fit_k_i(element: &Element) -> f32 {
+pub fn fit_k_i(net: &Network) -> f32 {
     let gains = mode_gains(MODE_COMPRESS);
     let a = 10f32.powf(-CAL_GR_DB / 20.0);
     let store = static_store(CAL_INPUT_AMP * a, gains, tau_ratio(CAL_RECOVERY, 0.0));
-    match element.current_for_gr_db(CAL_GR_DB) {
+    match net.current_for_gr_db(CAL_GR_DB) {
         Some(i) if store > 1e-9 => (i - I_MIN).max(0.0) / store,
         _ => 0.0,
     }

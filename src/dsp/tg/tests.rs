@@ -26,7 +26,7 @@
 //! honoured. There is no test below for any of them.**
 
 use super::*;
-use element::Element;
+use element::{DiodeArmPair, Network};
 use engine::*;
 
 use crate::dsp::bridge;
@@ -174,7 +174,7 @@ fn thd_pct(x: &[f32], sr: f32) -> f32 {
 
 /// Run the gain element alone: a sine of peak `v_s` volts through the
 /// divider at a fixed bias current, mean removed.
-fn element_run(e: &Element, v_s: f32, i_bias: f32, cycles: usize, per: usize) -> Vec<f32> {
+fn element_run(e: &Network, v_s: f32, i_bias: f32, cycles: usize, per: usize) -> Vec<f32> {
     let n = cycles * per;
     let mut out: Vec<f32> = (0..n)
         .map(|i| {
@@ -538,7 +538,7 @@ fn t07_stereo_link_is_a_maximum_over_control_currents() {
 /// and the tolerance below says so.
 #[test]
 fn t08_the_generalised_law_contains_the_neves_exactly() {
-    let ring = Element::ring();
+    let ring = DiodeArmPair::ring();
     let k = noob_electrical_components::diode_bridge::THERMAL_SCALE;
     let mut worst_fwd = 0.0f32;
     let mut worst_rev = 0.0f32;
@@ -603,7 +603,7 @@ fn t09_two_junctions_per_arm_quarter_the_third_harmonic() {
     const TARGET_U: f32 = 0.02;
     let mut ratios = [0.0f32; 2];
     for (slot, n) in [1u32, 2].iter().enumerate() {
-        let e = Element::forward(*n);
+        let e = Network::forward(*n);
         let i = e.current_for_gr_db(GR).expect("forward has no floor");
         // "At equal drive" is equal **voltage across the element**, so the
         // source is scaled by each element's own divider gain to put the
@@ -633,11 +633,11 @@ fn t09_two_junctions_per_arm_quarter_the_third_harmonic() {
 #[test]
 fn t10_the_element_makes_odd_harmonics_and_essentially_no_even_ones() {
     const PER: usize = 512;
-    for e in [Element::breakdown(), Element::forward(2)] {
+    for e in [Network::breakdown(), Network::forward(2)] {
         let i = e
             .current_for_gr_db(12.0)
             .expect("12 dB is inside the floor");
-        let v_s = 0.5 * e.resistance(i) * i / e.gain(i);
+        let v_s = 0.5 * e.element.resistance(i) * i / e.gain(i);
         let x = element_run(&e, v_s, i, 8, PER);
         let h2 = element_harmonic(&x, 2, PER);
         let h3 = element_harmonic(&x, 3, PER);
@@ -660,12 +660,12 @@ fn t11_mismatch_reintroduces_even_harmonics_monotonically() {
     let mut last = 0.0f32;
     let mut top = (0.0f32, 0.0f32);
     for step in 0..=10 {
-        let mut e = Element::breakdown();
-        e.mismatch = 0.05 * step as f32 / 10.0;
+        let mut e = Network::breakdown();
+        e.element.mismatch = 0.05 * step as f32 / 10.0;
         let i = e
             .current_for_gr_db(12.0)
             .expect("12 dB is inside the floor");
-        let v_s = 0.2 * e.resistance(i) * i / e.gain(i);
+        let v_s = 0.2 * e.element.resistance(i) * i / e.gain(i);
         let x = element_run(&e, v_s, i, 8, PER);
         let h1 = element_harmonic(&x, 1, PER);
         let h2 = element_harmonic(&x, 2, PER) / h1;
@@ -673,7 +673,7 @@ fn t11_mismatch_reintroduces_even_harmonics_monotonically() {
         assert!(
             h2 >= last * 0.999,
             "at {:.1} % mismatch the second harmonic fell to {h2:.3e} from {last:.3e}",
-            100.0 * e.mismatch
+            100.0 * e.element.mismatch
         );
         last = h2;
         top = (h2, h3);
@@ -894,7 +894,7 @@ fn t15_the_two_modes_are_one_law_at_two_thresholds() {
 /// is the point.
 #[test]
 fn t16_gain_reduction_has_a_floor_in_breakdown_and_none_in_forward() {
-    let e = Element::breakdown();
+    let e = Network::breakdown();
     let deep = e.gr_db(1.0);
     let deeper = e.gr_db(1000.0);
     assert!(
@@ -906,7 +906,7 @@ fn t16_gain_reduction_has_a_floor_in_breakdown_and_none_in_forward() {
         "breakdown offered a current for {:.1} dB, which is past its own floor",
         deep + 6.0
     );
-    let f = Element::forward(2);
+    let f = Network::forward(2);
     let a = f.gr_db(1.0);
     let b = f.gr_db(1000.0);
     assert!(

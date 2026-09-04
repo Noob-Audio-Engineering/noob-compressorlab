@@ -1618,21 +1618,63 @@ dependencies = [
 [[package]]
 name = "noob-electrical-components"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
 dependencies = [
+ "noob-electrical-components-blackmer-cell",
+ "noob-electrical-components-diode-arm-pair",
  "noob-electrical-components-diode-bridge",
+ "noob-electrical-components-fet-variable-resistor",
+ "noob-electrical-components-log-rms-detector",
  "noob-electrical-components-photocell",
+ "noob-electrical-components-remote-cutoff-triode",
+ "noob-electrical-components-small-signal-triode",
+ "noob-electrical-components-transformer",
 ]
+
+[[package]]
+name = "noob-electrical-components-blackmer-cell"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-diode-arm-pair"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
 
 [[package]]
 name = "noob-electrical-components-diode-bridge"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-fet-variable-resistor"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-log-rms-detector"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
 
 [[package]]
 name = "noob-electrical-components-photocell"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-remote-cutoff-triode"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-small-signal-triode"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
+
+[[package]]
+name = "noob-electrical-components-transformer"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#8dda53542e701872d6daf6e77e64986be2cb2286"
 
 [[package]]
 name = "noob-vst-webgui-framework"

@@ -20,7 +20,7 @@
 //!
 //! The audio path is one multiply. There are no filters in it, no
 //! transformer and no saturator; the only nonlinearity is inside the
-//! multiply, in [`BlackmerCell`]. Latency is zero unless the oversampled
+//! multiply, in [`GainStage`]. Latency is zero unless the oversampled
 //! path is switched in.
 
 use super::{
@@ -28,8 +28,27 @@ use super::{
     LN10_OVER_20, RATIO_PRINTED, RELEASE_AUTO, RELEASE_R, SOFTPLUS_V, TIMING_C, V_DIODE,
     ratio_scaling,
 };
+use noob_electrical_components::blackmer_cell;
+
 use crate::dsp::fet::oversample::{Downsampler, LATENCY, Upsampler};
 use crate::dsp::flush;
+
+/// The gain cell, from the components repository: the `dbx 202C` SSL
+/// lettered onto card 82E26, a module built from ten paralleled
+/// `dbx 2150` cells around a common control buffer.
+///
+/// It knows the control law, its linearity tolerance, its temperature
+/// coefficient and its even-order residual. It knows nothing about the
+/// 68.1 kΩ input resistor, the I/V converter, the detector, the threshold
+/// or how the control voltage was arrived at; those are the circuit around
+/// it and they live in [`Compressor`]. What this console adds to the part
+/// is in [`GainStage`].
+pub use noob_electrical_components::blackmer_cell::BlackmerCell;
+
+/// Which of the two even-order shapes the component carries this console
+/// uses. See [`GainStage::CELL`] for the choice, and the component's own
+/// documentation for why there are two of them.
+pub use noob_electrical_components::blackmer_cell::EvenResidual;
 
 /// How the two channels' detectors are tied together.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -60,20 +79,15 @@ impl Link {
     }
 }
 
-/// The Blackmer gain cell, and nothing else.
+/// The gain cell as card 82E26 wires it.
 ///
-/// This is a `dbx 202C` on SSL's card 82E26, which is a module built from
-/// ten paralleled `dbx 2150` cells around a common control buffer. The
-/// numbers here are the THAT Corporation datasheet's, since THAT bought the
-/// design and still publish it; the SSL drawing names the part and the
-/// datasheet gives the law.
-///
-/// **The boundary is deliberately narrow.** This struct knows the control
-/// law, its linearity tolerance, its temperature coefficient and its
-/// symmetry residual. It does not know about the 68.1 kΩ input resistor,
-/// the I/V converter, the detector, the threshold, or how the control
-/// voltage was arrived at. Those are the circuit around it and they live in
-/// [`Compressor`].
+/// The **part** is [`BlackmerCell`], from the components repository, and
+/// nothing about it is here. What is here is the console's own three
+/// additions: the amplitude units the residual's coefficient is quoted in,
+/// the coupling that takes the direct current a squared residual
+/// necessarily produces back out again, and the panel drive that scales
+/// it. All three differ from unit to unit while the part does not, which
+/// is why the split falls here.
 ///
 /// # Why the distortion is applied before the gain
 ///
@@ -86,22 +100,32 @@ impl Link {
 /// fits the first point exactly by construction and the second to within
 /// 27 %, which is inside the ±50 % the dossier's own test 24 allows;
 /// shaping the output misses the second by a factor of seven. This is a
-/// current-mode cell whose distortion is set by the current driven into it,
-/// which is the input voltage across a resistor, so the datasheet and the
-/// topology agree.
+/// current-mode cell whose distortion is set by the current driven into
+/// it, which is the input voltage across a resistor, so the datasheet and
+/// the topology agree. The component records the same argument, because it
+/// is a property of the part rather than of this console.
+///
+/// # Why this console takes the squared shape
+///
+/// The component carries two even-order shapes and does not choose between
+/// them, because the published data does not. This console takes
+/// [`EvenResidual::Squarer`] for two reasons that are its own rather than
+/// the part's. The 27 % fit above is one. The other is that a squarer is
+/// exactly second order, so the audio path's output bandwidth is exactly
+/// twice its input bandwidth and the 2× oversampling this module offers
+/// contains it with nothing left to fold — which is this module's own
+/// argument for there being no 4× position. The other shape has a corner,
+/// its spectrum does not stop, and no oversampling ratio contains it.
 #[derive(Clone, Copy, Debug)]
-pub struct BlackmerCell {
-    /// Gain-control constant, volts per dB. −6.1 mV/dB typical on the
-    /// datasheet, with −6.2 and −6.0 as the min and max.
-    volts_per_db: f32,
-    /// Second-harmonic coefficient, per unit sample amplitude at the
-    /// cell's input.
-    d2: f32,
-    /// Running mean of the squared input, used to take the DC that a
-    /// squarer necessarily produces back out again. A console strip blocks
-    /// it with a coupling capacitor; taking it off the squared term alone
-    /// leaves the linear path flat to floating-point precision, which is
-    /// what the audio path having no filters in it means.
+pub struct GainStage {
+    cell: BlackmerCell,
+    /// Running mean of the residual's own shape, used to take the DC that
+    /// a squarer necessarily produces back out again. A console strip
+    /// blocks it with a coupling capacitor; taking it off the squared term
+    /// alone leaves the linear path flat to floating-point precision,
+    /// which is what the audio path having no filters in it means. The
+    /// component offers the seam and deliberately does not offer the
+    /// filter.
     dc: f32,
     /// One-pole coefficient for `dc`, about 2 Hz.
     dc_a: f32,
@@ -114,30 +138,55 @@ pub struct BlackmerCell {
 /// 1.228 V RMS, so one unit of sample amplitude is 13.79 V.
 pub const VOLTS_PER_SAMPLE: f32 = 13.794;
 
+/// The datasheet's distortion condition, 0 dBV, in this console's own
+/// sample amplitude.
+///
+/// This is the figure the component asks a caller for and would otherwise
+/// have to assume. 0 dBV is one volt RMS, so √2 volts of peak, which
+/// through [`VOLTS_PER_SAMPLE`] is 0.1025 of full scale.
+pub const D2_PEAK_AMPLITUDE: f32 = std::f32::consts::SQRT_2 / VOLTS_PER_SAMPLE;
+
+/// The second-harmonic ratio the untrimmed part produces at that
+/// condition: THAT's "VIN = 0 dBV, 0 dB gain: **0.005 %**" for the A
+/// grade, read from the component's copy of the published table rather
+/// than retyped here.
+pub const THD_UNITY: f32 = blackmer_cell::THD_UNTRIMMED.unity_gain_0dbv[blackmer_cell::GRADE_A];
+
 /// The second-harmonic coefficient at unity drive, per unit sample
 /// amplitude.
 ///
-/// From the THAT 2180A datasheet's "VIN = 0 dBV, 0 dB gain: **0.005 %**".
 /// For `y = u + d2·u²` a sine of peak `U` gives a second harmonic of
-/// `d2·U²/2` against a fundamental of `U`, so `THD = d2·U/2`. At 0 dBV,
-/// `U = √2` volts, giving `d2 = 7.07e-5` per volt, which is
-/// `7.07e-5 × 13.794 = 9.75e-4` per unit sample amplitude.
-pub const D2_UNITY: f32 = 9.754e-4;
+/// `d2·U²/2` against a fundamental of `U`, so `THD = d2·U/2` and the
+/// coefficient follows. That relation is the component's
+/// ([`EvenResidual::coefficient_for_thd`]); [`THD_UNITY`] and
+/// [`D2_PEAK_AMPLITUDE`] are what this console supplies to it.
+pub const D2_UNITY: f32 = EvenResidual::Squarer.coefficient_for_thd(THD_UNITY, D2_PEAK_AMPLITUDE);
 
-impl Default for BlackmerCell {
+impl Default for GainStage {
     fn default() -> Self {
-        BlackmerCell {
-            volts_per_db: -6.1e-3,
-            d2: D2_UNITY,
+        GainStage {
+            cell: Self::CELL,
             dc: 0.0,
             dc_a: 0.0,
         }
     }
 }
 
-impl BlackmerCell {
+impl GainStage {
+    /// This console's cell: an untrimmed A-grade part, carrying the
+    /// datasheet's distortion at the amplitude this console measures in.
+    ///
+    /// The symmetry residual on the control port is left at zero because
+    /// SSL fit a `DISTORTION NULL` trimmer and the console ships adjusted.
+    pub const CELL: BlackmerCell = BlackmerCell {
+        thd_unity: THD_UNITY,
+        thd_peak: D2_PEAK_AMPLITUDE,
+        residual: EvenResidual::Squarer,
+        ..BlackmerCell::TYPICAL
+    };
+
     pub fn new(sr: f32) -> Self {
-        let mut c = BlackmerCell::default();
+        let mut c = GainStage::default();
         c.set_sample_rate(sr);
         c
     }
@@ -150,30 +199,32 @@ impl BlackmerCell {
         self.dc = 0.0;
     }
 
-    /// The datasheet's gain-control constant, volts per dB (negative).
-    pub fn volts_per_db(&self) -> f32 {
-        self.volts_per_db
+    /// The part itself.
+    pub fn cell(&self) -> &BlackmerCell {
+        &self.cell
     }
 
-    /// Set the second-harmonic coefficient as a multiple of [`D2_UNITY`].
+    /// Set the second-harmonic ratio as a multiple of the datasheet's
+    /// [`THD_UNITY`].
     pub fn set_drive(&mut self, multiple: f32) {
-        self.d2 = D2_UNITY * multiple.max(0.0);
+        self.cell.thd_unity = THD_UNITY * multiple.max(0.0);
     }
 
     /// The control voltage the cell's port needs for `gain_db` of gain.
     ///
     /// The engine works in decibels throughout, so nothing in the audio
     /// path calls this. It exists because it is the cell's actual
-    /// interface, and it is what a component crate would take.
+    /// interface, and the component states it in millivolts because that
+    /// is the unit its 6.1 mV/dB constant is published in.
     #[inline]
     pub fn control_volts(&self, gain_db: f32) -> f32 {
-        gain_db * self.volts_per_db
+        self.cell.control_mv_for_gain(gain_db) * 1e-3
     }
 
     /// Linear gain for a control voltage at the cell's port.
     #[inline]
     pub fn gain_from_volts(&self, v: f32) -> f32 {
-        10f32.powf(v / self.volts_per_db / 20.0)
+        10f32.powf(self.cell.gain_db(0.0, v * 1e3) / 20.0)
     }
 
     /// Linear gain for a gain in dB. Exponential in dB by construction,
@@ -188,9 +239,9 @@ impl BlackmerCell {
     /// untouched, so with the drive at rest this is `x` to within 1e-6.
     #[inline]
     pub fn shape(&mut self, x: f32) -> f32 {
-        let sq = x * x;
+        let sq = self.cell.residual.shape(x);
         self.dc = flush(self.dc * self.dc_a + sq * (1.0 - self.dc_a));
-        x + self.d2 * (sq - self.dc)
+        self.cell.process_coupled(x, self.dc)
     }
 }
 
@@ -480,7 +531,7 @@ impl Default for Settings {
 struct Channel {
     up: Upsampler,
     down: Downsampler,
-    cell: BlackmerCell,
+    cell: GainStage,
     dry: [f32; LATENCY + 1],
     dry_pos: usize,
     /// Last block's gain, so the gain can be interpolated across the
@@ -497,7 +548,7 @@ impl Channel {
         Channel {
             up: Upsampler::new(),
             down: Downsampler::new(),
-            cell: BlackmerCell::new(sr),
+            cell: GainStage::new(sr),
             dry: [0.0; LATENCY + 1],
             dry_pos: 0,
             g_prev: 1.0,

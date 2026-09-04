@@ -881,3 +881,69 @@ fn only_the_la2_cell_gained_the_third_photocell() {
         assert_eq!(c.conductance(), c.n_f, "cell {cell} drifted on release");
     }
 }
+
+/// Both optical models shunt the photoresistor the component crate
+/// describes, and the LA-2A's is the T4 itself.
+///
+/// *No figure is published for this.* It is a structural claim about which
+/// part each divider is fitted with, and it exists because the resistance
+/// law used to be spelled out here as well as in the crate. Now that the
+/// law lives in one place, this is what catches a divider being handed the
+/// wrong part: the LA-2A's must be bit-for-bit the crate's own T4 path,
+/// and the LA-3A's must be its own slightly tighter cell rather than a
+/// copy of the LA-2A's.
+///
+/// It also pins the relation that makes deriving the conductance scale
+/// from the endpoints legitimate on this side of the boundary. Both of
+/// these cells are **tied**: full carriers land on the lit resistance, so
+/// the scale follows from the two endpoints and is not an independent
+/// number. The CL-1B's cell is not tied, which is why
+/// [`Photoresistor`] keeps all three apart, and why the three fields
+/// should not be collapsed back into two on the strength of these two
+/// units alone.
+#[test]
+fn both_dividers_shunt_the_photoresistor_the_crate_describes() {
+    // The LA-2A's divider is fitted with the T4 the crate documents, so
+    // its parameterised path and the crate's unparameterised one give the
+    // same numbers rather than merely close ones.
+    assert_eq!(
+        Divider::LA2A.r_min,
+        R_MIN,
+        "the LA-2A's divider stopped shunting a T4"
+    );
+    for i in 0..=1000 {
+        let n = i as f32 / 100.0;
+        assert_eq!(
+            Divider::LA2A.resistance(n),
+            resistance_for(n),
+            "the LA-2A's divider and the crate's T4 path disagree at n = {n}"
+        );
+    }
+
+    // The LA-3A's is its own cell: a few per cent tighter at full light
+    // (`research/LA-3A.md` 3.3 and 7.5), which is part of what gives it
+    // more reduction than the LA-2A.
+    let la3a = crate::dsp::opto3::engine::k::DIVIDER;
+    assert!(
+        la3a.r_min < R_MIN,
+        "the LA-3A's cell is no longer the tighter one: {}",
+        la3a.r_min
+    );
+    assert!(
+        la3a.resistance(1.0) < Divider::LA2A.resistance(1.0),
+        "the LA-3A stopped reaching a lower resistance than the LA-2A"
+    );
+
+    // Both are tied cells, and both keep the crate's dark resistance.
+    for d in [Divider::LA2A, la3a] {
+        let cell = d.photoresistor();
+        assert_eq!(cell.r_dark, R_DARK, "a divider moved the dark resistance");
+        assert_eq!(cell.resistance(0.0), R_DARK, "a dark cell is not R_DARK");
+        assert!(
+            (cell.resistance(1.0) - cell.r_min).abs() < 1.0,
+            "full carriers land on {} rather than the lit endpoint {}",
+            cell.resistance(1.0),
+            cell.r_min
+        );
+    }
+}

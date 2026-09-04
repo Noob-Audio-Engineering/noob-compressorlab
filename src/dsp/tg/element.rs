@@ -1,156 +1,83 @@
-//! The TG12413's gain element: equation (G1) of `research/TG12413.md`.
+//! The resistances around the TG's gain element, and the node solve.
 //!
-//! Four HS2051 diodes in **two branches of two in series**, both the same
-//! way up, sharing the +20 V rail as their common node. That is not the
-//! Neve's ring, which is four diodes with two *floating* common nodes and
-//! one junction per arm, and section 4.5 of the dossier lists six
-//! structural differences between them rather than six different values.
-//! So this element is built here rather than taken from
-//! `noob-electrical-components-diode-bridge`, and the empty right-hand
-//! column of the dossier's constants table in 11.6 is the finding.
+//! The element itself is a shared component,
+//! `noob-electrical-components-diode-arm-pair`, re-exported here as
+//! [`DiodeArmPair`]. It carries equation (G1) of `research/TG12413.md` —
+//! *n* junctions per arm with a bulk resistance, two arms in opposition —
+//! together with the constants and the argument for why it is a separate
+//! part from the diode bridge the Neve model uses. Read it there; nothing
+//! about the part is restated here.
 //!
-//! # The law
+//! What is here is the machine: **R14**, the 20 kΩ series arm the source
+//! drives the element through, the divider those two make, and the Newton
+//! solve of that divider's node equation. Those are the plug-in's because
+//! they are the plug-in's: R14 is a resistor on EMI's drawing, the divider
+//! is this module's gain structure, and a different unit built on the same
+//! part would put different resistors around it. The Neve model draws the
+//! same line at the same place, in `super::super::bridge::engine::Network`.
 //!
-//! Model each arm as *n* junctions in series with a bulk resistance, two
-//! arms in opposition across the differential audio, biased at *I* each
-//! and carrying `I + i` and `I − i`. Then
+//! There is no [`Network`] for the Neve's ring, because nothing puts R14
+//! around a ring. The identity that test 8 asserts is between two *laws*,
+//! so it takes [`DiodeArmPair::ring`] and needs no divider at all.
 //!
-//! ```text
-//! u(i) = 2·r_b·i + 2·V_n·artanh( i / I )        (G1)
-//! ```
+//! # What the shared crate is used for and what it is not
 //!
-//! and three circuits fall out of it by choosing two constants:
-//!
-//! | circuit | n | V_n | r_b | reduces to |
-//! |---|---|---|---|---|
-//! | Neve ring, forward | 1 | η·V_T | 0 | `i = I·tanh(u / 2ηV_T)` |
-//! | TG, forward | 2 | 2·η·V_T | ≈0 | `i = I·tanh(u / 4ηV_T)` |
-//! | TG, breakdown | 2 | knee scale, **estimate** | **> 0** | a soft knee onto a resistive floor |
-//!
-//! [`Element::ring`] is the first row and it exists for exactly one
-//! reason: test 8 asserts that it reproduces the shipped crate's law to
-//! 1 × 10⁻⁹ relative. That is the whole argument of the dossier's section
-//! 4.9 made executable — (G1) is the correct generalisation, and a crate
-//! with the constant baked in cannot serve this unit.
-//!
-//! # Mismatch, and why the implementation is a logarithm rather than an
-//! `artanh`
-//!
-//! EMI specify D1/D3 and D2/D4 as matched pairs on two separate drawings
-//! and provide two adjust-on-test resistors to trim what is left, so the
-//! balance between the two arms is a thing the factory adjusted by hand
-//! and a thing that can be out. Writing the law as
-//!
-//! ```text
-//! u(i) = 2·r_b·i + V_n·ln( (I_a + i) / (I_b − i) )
-//! ```
-//!
-//! carries the two arm currents separately, becomes (G1) exactly when
-//! `I_a == I_b`, and gives the even harmonics that an unbalanced pair
-//! really does make. The `artanh` form cannot express it at all.
-//!
-//! # What is not modelled
-//!
-//! Temperature, junction capacitance, reverse recovery and the element's
-//! own noise, all following the dossier's section 4.10. Temperature is the
-//! interesting exclusion: a forward junction and a zener below 5 V and an
-//! avalanche device above 6 V have three different signs of coefficient,
-//! and since nobody has a datasheet for an HS2051 the sign is unknown.
-//! Modelling it would mean inventing it.
+//! The plug-in takes the law, its slope, the small-signal resistance and
+//! the inverse of that resistance. It does **not** take a thermal scale, a
+//! solver or a divider from the diode-bridge crate, and the empty
+//! right-hand column of the dossier's constants table in 11.6 is still
+//! empty: the finding that the TG takes nothing from the bridge survived
+//! the extraction, because what it now takes comes from its own component.
 
-use noob_electrical_components::diode_bridge as ring;
-
-/// η·V_T for **one** junction, in volts: 45.4 mV.
-///
-/// Taken from the shipped crate's own fitted ideality and thermal voltage
-/// rather than restated here, so that test 8's identity is exact against
-/// the thing it is an identity with. Both are **estimates** — the crate's
-/// note says they were fitted to a 1N4148, and neither HBX 31 nor HS2051
-/// has a reachable datasheet.
-pub const JUNCTION_SCALE: f32 = ring::IDEALITY * ring::THERMAL_VOLTAGE;
-
-/// Junctions per arm on the TG: four diodes, two branches (dossier 4.2).
-pub const N_JUNCTIONS: u32 = 2;
+pub use noob_electrical_components::diode_arm_pair::{
+    CURRENT_FLOOR, DiodeArmPair, JUNCTION_SCALE, N_JUNCTIONS,
+};
 
 /// R14, the series arm the source drives the element through, in ohms.
 ///
 /// Read off TG12413-D101. This is the resistance that turns the element
-/// into a divider, and it is the machine rather than the part.
+/// into a divider, and it is the machine rather than the part, which is
+/// why it is here and not in the component crate.
 pub const R_SERIES: f32 = 20_000.0;
 
-/// R16, in ohms, and the default for `r_b` in the breakdown region.
+/// How close to an arm's bias current the Newton iterate may come.
 ///
-/// **A hint, not a measurement.** Two adjust-on-test resistors sit in
-/// parallel opposite this fixed 24 Ω on the other branch, which is what
-/// you build when you are trimming the balance between two branches that
-/// must carry the same current. A device in breakdown presents a bulk
-/// resistance in the ohms to tens of ohms, and you trim against ohms
-/// because ohms is what the element presents (dossier 4.7).
-pub const R_BALANCE: f32 = 24.0;
-
-/// The knee scale of one arm in reverse breakdown, in volts.
-///
-/// **Estimate with no source at all.** The forward figure follows from
-/// the crate's fitted η and V_T; this one does not follow from anything,
-/// because breakdown is tunnelling below about 5 V and avalanche above
-/// about 6 V and neither is the diode exponential. 120 mV is the
-/// dossier's starting value in 11.6 and it is a calibration knob.
-pub const V_N_BREAKDOWN: f32 = 0.120;
-
-/// Below this control current the element is treated as an open circuit.
-///
-/// At 1 pA the element's resistance is 2.4 × 10¹¹ Ω, which is 140 dB above
-/// the series arm, so the divider is unity to far better than f32 can
-/// represent and the linear seed would only lose precision.
-pub const CURRENT_FLOOR: f32 = 1e-12;
-
-/// How close to an arm's bias current the signal current may come.
-///
-/// The dossier asks for `|i| < I·(1 − 1e−6)`; the logarithm form needs the
-/// same guard on each arm separately, because with mismatch the two ends
-/// are not at the same place.
+/// The dossier asks for `|i| < I·(1 − 1e−6)`. The component applies the
+/// same guard inside its own law; this one brackets the iterate, so that a
+/// Newton step cannot walk outside the range the law is defined on and
+/// come back through the clamp instead of through the arithmetic.
 const HEADROOM: f32 = 1e-6;
 
-/// The two-branch diode gain element, as a shunt across a divider.
+/// The element as a shunt across a divider: R14, and the part it feeds.
 ///
-/// The source drives it through [`Element::r_series`] and the output is
+/// The source drives the element through [`R_SERIES`] and the output is
 /// the voltage across the element, so **no control current means unity
 /// gain** and a large one shorts the signal away. Note what that makes of
 /// the distortion: an element carrying no current cannot bend a waveform,
-/// so this element is transparent when it is not working and dirtiest when
+/// so this network is transparent when it is not working and dirtiest when
 /// it is working hardest, which is the opposite of the Neve's bridge and
 /// is the difference the dossier's section 9.2 stakes the model on.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Element {
-    /// `V_n` of (G1): the knee scale of one arm, in volts.
-    pub v_n: f32,
-    /// `r_b` of (G1): the bulk resistance of one arm, in ohms.
-    pub r_b: f32,
+pub struct Network {
     /// The series arm, in ohms.
     pub r_series: f32,
-    /// Arm imbalance as a fraction of the bias current, 0 to 1: the arms
-    /// carry `I·(1 + m)` and `I·(1 − m)`.
-    pub mismatch: f32,
+    /// The gain element itself.
+    pub element: DiodeArmPair,
 }
 
-impl Default for Element {
+impl Default for Network {
     /// The TG as drawn: two junctions per arm, in breakdown.
     fn default() -> Self {
-        Element::breakdown()
+        Network::breakdown()
     }
 }
 
-impl Element {
-    /// Neve's ring: one junction per arm, forward, no bulk term.
-    ///
-    /// Not used by the engine. It exists so that test 8 can assert that
-    /// (G1) contains the shipped crate's law exactly.
-    pub fn ring() -> Self {
-        Element {
-            v_n: JUNCTION_SCALE,
-            r_b: 0.0,
+impl Network {
+    /// R14 around a given element.
+    pub fn new(element: DiodeArmPair) -> Self {
+        Network {
             r_series: R_SERIES,
-            mismatch: 0.0,
+            element,
         }
     }
 
@@ -161,77 +88,18 @@ impl Element {
     /// Neve's with the thermal scale doubled, and therefore four times
     /// less third harmonic at equal drive.
     pub fn forward(n: u32) -> Self {
-        Element {
-            v_n: n as f32 * JUNCTION_SCALE,
-            r_b: 0.0,
-            r_series: R_SERIES,
-            mismatch: 0.0,
-        }
+        Network::new(DiodeArmPair::forward(n))
     }
 
     /// The breakdown reading, which is what the drawing shows.
     pub fn breakdown() -> Self {
-        Element {
-            v_n: V_N_BREAKDOWN,
-            r_b: R_BALANCE,
-            r_series: R_SERIES,
-            mismatch: 0.0,
-        }
-    }
-
-    /// The two arm currents for a bias current, largest first.
-    #[inline]
-    fn arms(&self, i_bias: f32) -> (f32, f32) {
-        let m = self.mismatch.clamp(0.0, 0.95);
-        (i_bias * (1.0 + m), i_bias * (1.0 - m))
-    }
-
-    /// (G1): the differential voltage across the element for a signal
-    /// current `i` at bias `i_bias`.
-    ///
-    /// With `mismatch == 0` this is `2·r_b·i + 2·V_n·artanh(i/I)` to the
-    /// last bit, since `ln((I+i)/(I−i)) == 2·artanh(i/I)`.
-    #[inline]
-    pub fn voltage(&self, i: f32, i_bias: f32) -> f32 {
-        let (a, b) = self.arms(i_bias);
-        let num = (a + i).max(a * HEADROOM);
-        let den = (b - i).max(b * HEADROOM);
-        2.0 * self.r_b * i + self.v_n * (num / den).ln()
-    }
-
-    /// `du/di`, which the Newton step needs.
-    #[inline]
-    pub fn slope(&self, i: f32, i_bias: f32) -> f32 {
-        let (a, b) = self.arms(i_bias);
-        let num = (a + i).max(a * HEADROOM);
-        let den = (b - i).max(b * HEADROOM);
-        2.0 * self.r_b + self.v_n * (1.0 / num + 1.0 / den)
-    }
-
-    /// The small-signal resistance the element presents, in ohms.
-    ///
-    /// `2·r_b + 2·V_n / I` when the arms are matched. **The `2·r_b` term
-    /// is a floor**, so the divider's loss is bounded and gain reduction
-    /// stops increasing however hard the sidechain is driven. That is a
-    /// property of breakdown operation and it is the mechanism the
-    /// dossier offers for "not a brick-wall limiter: transients are
-    /// expected to pass"; test 16 asserts it, and asserts that the
-    /// forward reading with `r_b = 0` has no such floor.
-    #[inline]
-    pub fn resistance(&self, i_bias: f32) -> f32 {
-        // The NaN test is not decoration: a control current that has gone
-        // non-finite must leave the element open rather than fall through
-        // to a logarithm, because `NaN <= x` is false on its own.
-        if i_bias.is_nan() || i_bias <= CURRENT_FLOOR {
-            return f32::INFINITY;
-        }
-        self.slope(0.0, i_bias)
+        Network::new(DiodeArmPair::breakdown())
     }
 
     /// The divider's gain, 1 with the element open.
     #[inline]
     pub fn gain(&self, i_bias: f32) -> f32 {
-        let r = self.resistance(i_bias);
+        let r = self.element.resistance(i_bias);
         if r.is_finite() {
             r / (self.r_series + r)
         } else {
@@ -245,23 +113,20 @@ impl Element {
     }
 
     /// The bias current giving `gr` dB of reduction, or `None` when the
-    /// bulk floor puts that depth out of reach.
+    /// element's bulk floor puts that depth out of reach.
     ///
-    /// Closed form, because `r = 2·r_b + 2·V_n/I` is.
+    /// Closed form, because the divider is and so is the element's
+    /// `r = 2·r_b + 2·V_n/I`. The `None` comes from the component: below
+    /// `2·r_b` there is no current that will do it, which is the floor on
+    /// gain reduction that breakdown operation implies and that the
+    /// forward reading does not have.
     pub fn current_for_gr_db(&self, gr: f32) -> Option<f32> {
         if gr <= 0.0 {
             return Some(0.0);
         }
         let a = 10f32.powf(-gr / 20.0);
         let r = a * self.r_series / (1.0 - a);
-        let m = self.mismatch.clamp(0.0, 0.95);
-        let top = 2.0 * self.v_n / (1.0 - m * m);
-        let bottom = r - 2.0 * self.r_b;
-        if bottom <= 0.0 {
-            None
-        } else {
-            Some(top / bottom)
-        }
+        self.element.current_for_resistance(r)
     }
 
     /// Solve the node equation for the voltage across the element.
@@ -272,21 +137,35 @@ impl Element {
     /// working range; the engine uses two when the drive control is past
     /// half, which is where the element is being pushed towards its
     /// asymptote on purpose.
+    ///
+    /// This is the caller's job rather than the component's, because R14
+    /// is the machine and only the element is the part. Note also which
+    /// variable it solves in: the bridge crate's law is explicit in
+    /// voltage and its network solves in `u`, while (G1) is explicit in
+    /// current and this solves in `i`. The two solvers look alike and are
+    /// not the same code, which is one more reason the two parts are two
+    /// crates.
     #[inline]
     pub fn solve(&self, v_s: f32, i_bias: f32, steps: u32) -> f32 {
         if i_bias.is_nan() || i_bias <= CURRENT_FLOOR {
             return v_s;
         }
-        let (a, b) = self.arms(i_bias);
+        let (a, b) = (i_bias * (1.0 + self.m()), i_bias * (1.0 - self.m()));
         let lo = -a * (1.0 - HEADROOM);
         let hi = b * (1.0 - HEADROOM);
-        let r0 = self.resistance(i_bias);
+        let r0 = self.element.resistance(i_bias);
         let mut i = (v_s / (self.r_series + r0)).clamp(lo, hi);
         for _ in 0..steps.max(1) {
-            let f = self.voltage(i, i_bias) - (v_s - self.r_series * i);
-            let fp = self.slope(i, i_bias) + self.r_series;
+            let f = self.element.voltage(i, i_bias) - (v_s - self.r_series * i);
+            let fp = self.element.slope(i, i_bias) + self.r_series;
             i = (i - f / fp).clamp(lo, hi);
         }
         v_s - self.r_series * i
+    }
+
+    /// The element's clamped imbalance, which the solve's brackets need.
+    #[inline]
+    fn m(&self) -> f32 {
+        self.element.mismatch.clamp(0.0, 0.95)
     }
 }

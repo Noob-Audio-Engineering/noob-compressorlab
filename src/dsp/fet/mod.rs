@@ -24,7 +24,7 @@ pub mod compressor;
 pub mod filters;
 pub mod oversample;
 
-pub use compressor::{Circuit, Compressor, TRANSFER_POINTS, circuit};
+pub use compressor::{Circuit, Compressor, Nonlinearity, TRANSFER_POINTS, circuit};
 
 /// in" operating point, not a fifth ratio.
 pub const RATIO_NAMES: [&str; 5] = ["4", "8", "12", "20", "All"];

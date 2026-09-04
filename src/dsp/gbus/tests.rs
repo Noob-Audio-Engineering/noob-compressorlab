@@ -24,7 +24,9 @@
 //! so and says why. Three do.
 
 use super::*;
-use crate::dsp::gbus::engine::{BlackmerCell, D2_UNITY, Link, VOLTS_PER_SAMPLE};
+use crate::dsp::gbus::engine::{
+    D2_PEAK_AMPLITUDE, D2_UNITY, EvenResidual, GainStage, Link, THD_UNITY, VOLTS_PER_SAMPLE,
+};
 
 const SR: f32 = 48_000.0;
 
@@ -1240,7 +1242,7 @@ fn t24_the_gain_cells_distortion() {
         (3.1623, -15.0, 0.020),
     ];
     for (v_rms, gain_db, want_pct) in cases {
-        let mut cell = BlackmerCell::new(SR);
+        let mut cell = GainStage::new(SR);
         let amp = volts_to_amp(v_rms);
         let g = cell.gain(gain_db);
         let n = 8192usize;
@@ -1277,8 +1279,8 @@ fn t24_the_gain_cells_distortion() {
     }
     // And the drive control raises it, which is what THE BUS+'s 4K MODE
     // does. Ours, so this asserts direction only.
-    let mut plain = BlackmerCell::new(SR);
-    let mut driven = BlackmerCell::new(SR);
+    let mut plain = GainStage::new(SR);
+    let mut driven = GainStage::new(SR);
     driven.set_drive(64.0);
     let amp = 0.2;
     // The same window as above: 4096 samples holds 85.5 cycles of this
@@ -1301,7 +1303,18 @@ fn t24_the_gain_cells_distortion() {
         bin(&b, 2.0 * hz, SR) > 10.0 * bin(&a, 2.0 * hz, SR),
         "the drive control did not raise the second harmonic"
     );
-    assert!((D2_UNITY - 9.754e-4).abs() < 1e-7);
+    // The coefficient is the component's relation applied to two numbers
+    // this console owns: the datasheet's 0.005 % and the amplitude this
+    // console measures 0 dBV at. Asserted against the published figure it
+    // comes from rather than against itself.
+    assert_eq!(THD_UNITY, 0.00005);
+    assert!((D2_PEAK_AMPLITUDE - std::f32::consts::SQRT_2 / 13.794).abs() < 1e-9);
+    assert!(
+        (EvenResidual::Squarer.thd_for_coefficient(D2_UNITY, D2_PEAK_AMPLITUDE) - 0.00005).abs()
+            < 1e-9,
+        "the coefficient does not give the datasheet's 0.005 %"
+    );
+    assert_eq!(GainStage::CELL.residual, EvenResidual::Squarer);
 }
 
 /// Test 25. **The control law is exponential and linear in dB.**
@@ -1318,7 +1331,7 @@ fn t24_the_gain_cells_distortion() {
 /// omission recorded in the README rather than a pass.
 #[test]
 fn t25_the_control_law_is_linear_in_db() {
-    let cell = BlackmerCell::new(SR);
+    let cell = GainStage::new(SR);
     let mut per_volt = Vec::new();
     let mut db = -60.0f32;
     while db <= 40.0 {

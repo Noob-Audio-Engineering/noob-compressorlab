@@ -32,6 +32,13 @@
 //! button is derived from the target ratio, and the ladder gain `k_r` places
 //! the tap threshold at [`TAP_THRESHOLD_DB`].
 //!
+//! The three middle lines of that block belong to the gain element rather
+//! than to this machine and live in
+//! [`noob_electrical_components::fet_variable_resistor`]: the control law,
+//! the conductance it implies, and the way the swing across the channel
+//! modulates it. What stays here is the divider that closes around them,
+//! the sidechain that develops the control voltage, and the amplifiers.
+//!
 //! ## Constants (tuned against the tests; the research's estimates noted)
 //!
 //! | constant | value | note |
@@ -43,7 +50,7 @@
 //! | tap thresholds | −26, −24.5, −23, −20 dBFS (research: about a 6 dB spread) | with Input at 24 |
 //! | all buttons | `G_MAX` 32, onset 16, `V_OFF` 1.2 V, ladder of 20:1 | bias shift, plateau, distortion ×5, sag |
 //! | `X0` | 0.02 (−34 dBFS across the FET, −10 dBFS at the tap; research: 250 mV, about −14 dBFS) | FET nonlinearity reference; lower so the blue stripe distorts at normal drive |
-//! | `a2`, `a3` | per revision ([`Circuit`]): LN family 0.04 / 0.10 at half FET swing, A 0.20 / 0.06, B 0.15 / 0.05 | even / odd FET terms |
+//! | `a2`, `a3` | per revision ([`Circuit::fet`]): LN family 0.04 / 0.10 at half FET swing, A 0.20 / 0.06, B 0.15 / 0.05 | even / odd FET terms, fitted here because nothing published gives them |
 //! | `x_pre`, `x_line` | 1.67 (A preamp 1.25, F and later line amp 2.2) | 0 dBFS is 1 dB into the tanh |
 //! | `c_line` | 0.03 (0 for the push-pull stage of F and later) | line-amp second harmonic |
 //! | `tilt_db` | A / B 1.2, C to E and LN 0.8, F 0.5, G / H 0.3 | high shelf at 6 kHz |
@@ -71,6 +78,28 @@ use super::filters::{Biquad, OnePole, coefficient, flush};
 use super::oversample::{Downsampler, LATENCY, Upsampler};
 use super::{MeterMode, Ratio, Revision, Settings, attack_seconds, mark_to_db, release_seconds};
 
+// The gain element itself lives in its own crate: a junction FET used as a
+// voltage-controlled variable resistor, which is one of the three circuits
+// the word "VCA" would have covered and not the same part as the Blackmer
+// cell the dbx and the SSL share. It owns the control law, the channel's
+// signal-dependent conductance and the half-swing of a reduced-drive
+// circuit. What is left in this file is the machine around it: the divider
+// it shunts, the sidechain that develops its gate voltage and the
+// amplifiers after it.
+use noob_electrical_components::fet_variable_resistor as gain_fet;
+
+// The transformers at either end are a component too. Their
+// low-frequency roll-off, a corner and a Q, is
+// `noob-electrical-components-transformer`, shared with the 610 preamp
+// that sits in front of this compressor in a 6176. Which corner a
+// revision gets stays here, and so does the biquad each one is realised
+// through: a filter is infrastructure rather than a part.
+use noob_electrical_components::transformer::Rolloff;
+
+/// Re-exported so a [`Circuit`] still reads as the whole of one revision's
+/// character without the caller naming the components crate.
+pub use noob_electrical_components::fet_variable_resistor::Nonlinearity;
+
 /// Points of the static transfer curve (input −60..0 dBFS).
 pub const TRANSFER_POINTS: usize = 128;
 
@@ -91,6 +120,10 @@ pub const TAP_THRESHOLD_DB: [f32; 4] = [-26.0, -24.5, -23.0, -20.0];
 /// FET nonlinearity reference amplitude: −34 dBFS across the FET, which
 /// is −10 dBFS at the preamp output (the signal across the FET is 24 dB
 /// below the tap; the research quotes 250 mV, reached only when driven).
+///
+/// This is where [`gain_fet::REFERENCE_SWING_VOLTS`] lands in this model's
+/// units, which is a property of where the machine puts full scale rather
+/// than of the transistor, so it stays here.
 const X0: f32 = 0.02;
 /// tanh knee of the preamp and line amp: 0 dBFS is 1 dB into the tanh.
 const X_TANH: f32 = 1.67;
@@ -104,12 +137,14 @@ const DB_PER_NEPER: f32 = 0.115_129_25;
 /// revision table lists the values and the source of each.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Circuit {
-    /// FET even-order term: second harmonic, the blue-stripe signature.
-    pub a2: f32,
-    /// FET odd-order term.
-    pub a3: f32,
+    /// The gain FET's channel nonlinearity: its even-order term (second
+    /// harmonic, the blue-stripe signature) and its odd-order one. The law
+    /// they parameterise is [`gain_fet::conductance_modulation`]; these are
+    /// the values fitted for this unit, which no source publishes.
+    pub fet: Nonlinearity,
     /// The LN circuit ("reduced voltage to the gain-reduction FET"): halves
-    /// the signal swing the FET's nonlinearity sees.
+    /// the signal swing the FET's nonlinearity sees
+    /// ([`gain_fet::swing_scale`]).
     pub ln: bool,
     /// Preamp tanh knee; the FET preamp of Rev A clips earlier.
     pub x_pre: f32,
@@ -118,11 +153,15 @@ pub struct Circuit {
     /// Line-amp asymmetry (second harmonic of a single-ended class-A stage;
     /// 0 for the push-pull stage).
     pub c_line: f32,
-    /// Input transformer high-pass (corner Hz, Q); G and later are
+    /// The input transformer's low-frequency roll-off; G and later are
     /// electronically balanced and only keep a DC blocker.
-    pub in_hp: (f32, f32),
-    /// Output transformer high-pass (corner Hz, Q).
-    pub out_hp: (f32, f32),
+    ///
+    /// The roll-off itself is the shared component, and which corner a
+    /// revision gets is this machine's; the README's revision table
+    /// sources each one.
+    pub in_hp: Rolloff,
+    /// The output transformer's low-frequency roll-off.
+    pub out_hp: Rolloff,
     /// High-shelf tilt at 6 kHz (`TILT_HZ`), dB (the "bright" tilt of the sources).
     pub tilt_db: f32,
     /// Noise floor: white noise into the preamp, given as the output RMS in
@@ -132,35 +171,32 @@ pub struct Circuit {
 
 /// Rev A: FET preamp, no LN circuit, Peerless / UA-5002 transformers.
 const CIRCUIT_A: Circuit = Circuit {
-    a2: 0.20,
-    a3: 0.06,
+    fet: Nonlinearity::new(0.20, 0.06),
     ln: false,
     x_pre: 1.25,
     x_line: X_TANH,
     c_line: -0.03,
-    in_hp: (13.0, 0.6),
-    out_hp: (17.0, 0.7),
+    in_hp: Rolloff::two_pole(13.0, 0.6),
+    out_hp: Rolloff::two_pole(17.0, 0.7),
     tilt_db: 1.2,
     noise_dbfs: -70.0,
 };
 /// Rev B: the bipolar preamp (and the AB resistor changes), still no LN circuit.
 const CIRCUIT_B: Circuit = Circuit {
-    a2: 0.15,
-    a3: 0.05,
+    fet: Nonlinearity::new(0.15, 0.05),
     x_pre: X_TANH,
     noise_dbfs: -72.0,
     ..CIRCUIT_A
 };
 /// Rev C / D / E: the LN circuit, class-A 1108-style output, both transformers.
 const CIRCUIT_LN: Circuit = Circuit {
-    a2: 0.04,
-    a3: 0.10,
+    fet: Nonlinearity::new(0.04, 0.10),
     ln: true,
     x_pre: X_TANH,
     x_line: X_TANH,
     c_line: -0.03,
-    in_hp: (10.0, 0.6),
-    out_hp: (14.0, 0.707),
+    in_hp: Rolloff::two_pole(10.0, 0.6),
+    out_hp: Rolloff::two_pole(14.0, 0.707),
     tilt_db: 0.8,
     noise_dbfs: -74.0,
 };
@@ -168,14 +204,14 @@ const CIRCUIT_LN: Circuit = Circuit {
 const CIRCUIT_F: Circuit = Circuit {
     x_line: 2.2,
     c_line: 0.0,
-    out_hp: (12.0, 0.6),
+    out_hp: Rolloff::two_pole(12.0, 0.6),
     tilt_db: 0.5,
     noise_dbfs: -78.0,
     ..CIRCUIT_LN
 };
 /// Rev G (and H, cosmetic only): electronically balanced input.
 const CIRCUIT_G: Circuit = Circuit {
-    in_hp: (5.0, 0.5),
+    in_hp: Rolloff::two_pole(5.0, 0.5),
     tilt_db: 0.3,
     noise_dbfs: -80.0,
     ..CIRCUIT_F
@@ -248,10 +284,14 @@ impl Loop {
 }
 
 /// FET gain in dB for a control voltage above the bias offset.
+///
+/// The law is [`gain_fet::attenuation_db`]. What this file supplies is the
+/// machine's own choice of slope: it is set equal to the plateau, so
+/// `v0 = G_max / S` is one volt in every mode and the diode-bias ladder can
+/// be read straight off the target ratio.
 #[inline]
 fn fet_db(v_eff: f32, g_max: f32) -> f32 {
-    let s = g_max; // v0 = 1 V for every mode
-    -g_max * (1.0 - (-s * v_eff / g_max).exp())
+    gain_fet::attenuation_db(v_eff, g_max, g_max)
 }
 
 #[inline]
@@ -369,8 +409,9 @@ pub struct Compressor {
     a_rel: f32,
     a_sag: f32,
     attack_off: bool,
-    a2: f32,
-    a3: f32,
+    /// The gain FET's channel nonlinearity as the current settings leave it
+    /// (all buttons in lifts the even-order term).
+    fet: Nonlinearity,
     /// The selected revision's circuit and the revision whose filters are built.
     circuit: Circuit,
     circuit_rev: Option<Revision>,
@@ -410,8 +451,7 @@ impl Compressor {
             a_rel: 0.0,
             a_sag: coefficient(fs_p, 0.1),
             attack_off: false,
-            a2: 0.0,
-            a3: 0.0,
+            fet: Nonlinearity::LINEAR,
             circuit: circuit(s.revision),
             circuit_rev: None,
             noise_gain: 0.0,
@@ -488,8 +528,17 @@ impl Compressor {
         self.a_rel = coefficient(self.fs_p, release_seconds(s.release));
         let circ = circuit(s.revision);
         self.circuit = circ;
-        self.a2 = if self.all { circ.a2 * 5.0 } else { circ.a2 };
-        self.a3 = circ.a3;
+        // All buttons in drives the FET five times harder into its
+        // even-order term: a bias shift the machine makes, expressed in the
+        // part's own parameter.
+        self.fet = Nonlinearity {
+            even_order: if self.all {
+                circ.fet.even_order * 5.0
+            } else {
+                circ.fet.even_order
+            },
+            ..circ.fet
+        };
         let os: f32 = if self.oversample { 2.0 } else { 1.0 };
         // RMS at the output = noise_dbfs with Output at 24 (the preamp adds
         // G_PRE_DB, the output pot takes it away, the line amp gives it
@@ -498,8 +547,8 @@ impl Compressor {
         if snap || self.circuit_rev != Some(s.revision) {
             self.circuit_rev = Some(s.revision);
             let fs = self.fs_p / os;
-            let in_hp = Biquad::highpass(fs, circ.in_hp.0, circ.in_hp.1);
-            let out_hp = Biquad::highpass(self.fs_p, circ.out_hp.0, circ.out_hp.1);
+            let in_hp = Biquad::highpass(fs, circ.in_hp.hz, circ.in_hp.q);
+            let out_hp = Biquad::highpass(self.fs_p, circ.out_hp.hz, circ.out_hp.q);
             let tilt = Biquad::highshelf(self.fs_p, TILT_HZ, circ.tilt_db);
             for c in &mut self.ch {
                 c.in_hp.set_from(&in_hp);
@@ -559,10 +608,9 @@ impl Compressor {
         let bypass = self.settings.bypass || !powered;
         let attack_off = self.attack_off;
         let all = self.all;
-        let a2 = self.a2;
-        let a3 = self.a3;
+        let fet = self.fet;
         let circ = self.circuit;
-        let u_scale = if circ.ln { 0.5 / X0 } else { 1.0 / X0 };
+        let u_scale = gain_fet::swing_scale(X0, circ.ln);
         let noise_gain = self.noise_gain;
         let g_pre = 10f32.powf(G_PRE_DB / 20.0);
         let g_line = 10f32.powf(G_LINE_DB / 20.0);
@@ -643,16 +691,24 @@ impl Compressor {
                 for c in 0..2 {
                     let ch = &mut self.ch[c];
                     let x = up[c][j];
-                    // FET divider with signal-dependent resistance
-                    let g_lin = 10f32.powf(g_db[c] / 20.0);
-                    let w = 1.0 / g_lin - 1.0;
+                    // FET divider with signal-dependent resistance: the
+                    // channel's conductance and how the swing across it
+                    // moves them are the part's, the divider is this
+                    // machine's 27 kΩ series resistor.
+                    let w = gain_fet::conductance_ratio(g_db[c]);
                     let u = ch.x2_prev * u_scale;
-                    let a2_eff = if all {
-                        a2 * (1.0 + 0.5 * self.det[if link { 0 } else { c }].v)
+                    // The supply sag of all-buttons mode keeps lifting the
+                    // even-order term as the capacitor charges.
+                    let shape_terms = if all {
+                        Nonlinearity {
+                            even_order: fet.even_order
+                                * (1.0 + 0.5 * self.det[if link { 0 } else { c }].v),
+                            ..fet
+                        }
                     } else {
-                        a2
+                        fet
                     };
-                    let shape = (1.0 + a2_eff * u + a3 * u * u).clamp(0.5, 2.0);
+                    let shape = gain_fet::conductance_modulation(u, shape_terms);
                     let g_inst = if attack_off {
                         1.0
                     } else {

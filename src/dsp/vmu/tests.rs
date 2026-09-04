@@ -514,22 +514,22 @@ fn t5_the_ratio_is_progressive() {
 /// it is the one that would catch a wrong tube model before anything else
 /// did.
 ///
-/// | | published | this model |
-/// |---|---|---|
-/// | gm at the class-A₁ point | 4000 µmho | **2309 µmho** |
-/// | gm at −16 V | 100 µmho | **114 µmho** |
-/// | range | **32.0 dB ± 3** | **26.1 dB** |
+/// | | published | this model | Raffensperger as published |
+/// |---|---|---|---|
+/// | gm at the class-A₁ point | 4000 µmho | **2606 µmho** | 2309 µmho |
+/// | gm at −16 V | 100 µmho | **124 µmho** | 114 µmho |
+/// | range | **32.0 dB ± 3** | **26.44 dB** | 26.12 dB |
 ///
-/// The law is Raffensperger's and it is the only published fit of this tube
-/// that exists. It reproduces the datasheet's *transfer characteristics* to
-/// within the width of the printed curve at three points across two decades
-/// of current (test 7), which is the dossier's own check of it. What it does
-/// not reproduce is the **slope** at the shallow, low-plate-voltage corner
-/// GE's table quotes: at `Eb` = 100 V the fit is about 30 % flat near
-/// `Vgk` = 0, and 30 % on the slope at one end of a ratio is most of the
-/// 6 dB. Refitting the law would mean substituting my own numbers for a
-/// sourced one, so the constants stay and the gap is recorded here, in the
-/// README and in the benchmark. It is also the root of test 9's miss.
+/// The law is Raffensperger's, refitted in one parameter against GE's own
+/// plate characteristics, and the component crate carries the argument. The
+/// refit fixed the current across the working range and most of the slope
+/// with it; what it does not close is this ratio, because GE tabulate its two
+/// ends at 100 V of plate while this stage runs at 216 to 230, and anchoring
+/// an exponential on two points at the wrong plate voltage and extrapolating
+/// it gives about 110 dB of control authority where the unit has 20. So the
+/// gap is recorded here, in the README and in the benchmark rather than
+/// closed with a constant chosen to make a test pass. It is also the root of
+/// test 9's miss.
 ///
 /// What is asserted instead is what both readings agree on, and what makes
 /// this a remote-cutoff tube at all: the transconductance falls
@@ -555,7 +555,7 @@ fn t6_the_tubes_gain_control_range() {
     assert!(
         range >= 20.0,
         "the control range is {range:.2} dB over the datasheet's own interval; GE publish \
-         32.0 dB and this model reaches 26.1, so what is asserted here is a decade of \
+         32.0 dB and this model reaches 26.4, so what is asserted here is a decade of \
          transconductance rather than the published figure"
     );
 }
@@ -599,9 +599,9 @@ fn t7_the_tube_law_reproduces_the_curve_it_was_fitted_to() {
     // The fit was done in double precision and the engine runs in single, so
     // the allowance is a quarter of a decibel over the recorded residual.
     assert!(
-        rms <= super::triode::FIT_RESIDUAL_DB + 0.25,
+        rms <= t.params().fit_residual_db + 0.25,
         "the fit residual is {rms:.2} dB against the {:.2} dB recorded at the constants",
-        super::triode::FIT_RESIDUAL_DB
+        t.params().fit_residual_db
     );
 }
 
@@ -625,14 +625,13 @@ fn t7_the_tube_law_reproduces_the_curve_it_was_fitted_to() {
 /// range and not a tail.
 #[test]
 fn t7b_the_published_equation_cuts_off_far_too_early() {
-    let p8 = super::triode::P8_AS_PUBLISHED;
-    let p1 = 3.981e-8;
+    let t = RemoteCutoffTriode::new(super::triode::ValveParams::GE_6386_AS_PUBLISHED);
     for (vgk, want, least_db) in [
         (-40.0f32, 3.61f32, 3.0f32),
         (-50.0, 1.60, 6.0),
         (-70.0, 0.60, 20.0),
     ] {
-        let got = RemoteCutoffTriode::anode_current_with(vgk, 250.0, p1, p8) * 1e3;
+        let got = t.anode_current(vgk, 250.0) * 1e3;
         let err = 20.0 * (got / want).log10();
         assert!(
             err < -least_db,
@@ -642,7 +641,7 @@ fn t7b_the_published_equation_cuts_off_far_too_early() {
     // And it is not low where it was checked: shallow of about −30 V the
     // exponential term is negligible and the published fit is good, which is
     // exactly why three points on a linear plot did not catch this.
-    let got = RemoteCutoffTriode::anode_current_with(-20.0, 250.0, p1, p8) * 1e3;
+    let got = t.anode_current(-20.0, 250.0) * 1e3;
     assert!(
         (20.0 * (got / 8.85f32).log10()).abs() < 2.0,
         "as published the equation gives {got:.3} mA at −20 V against GE's 8.85; the error is          supposed to be confined to the deep end"

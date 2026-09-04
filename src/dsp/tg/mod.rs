@@ -11,17 +11,22 @@
 //! two branches of two diodes in series, both the same way up, sharing the
 //! +20 V rail as their common node, and as drawn it is in reverse
 //! breakdown rather than forward conduction. The dossier's section 4.5
-//! lists thirteen rows of comparison and six of them are structural. So
-//! [`element`] is built here, and the right-hand column of the dossier's
-//! own constants table — the one headed "from the shared diode-bridge
-//! component crate" — is empty. That empty table is the finding.
+//! lists thirteen rows of comparison and six of them are structural, so
+//! the two are two components: the element is
+//! `noob-electrical-components-diode-arm-pair` and the Neve's is
+//! `noob-electrical-components-diode-bridge`. The right-hand column of the
+//! dossier's own constants table — the one headed "from the shared
+//! diode-bridge component crate" — is still empty, and that empty table is
+//! still the finding. What this module now takes from a shared crate it
+//! takes from its own.
 //!
-//! What generalises is one level up, and [`element::Element`] is written
-//! as that generalisation: *n* junctions per arm with a bulk resistance,
+//! What generalises is one level up, and the component's law is written as
+//! that generalisation: *n* junctions per arm with a bulk resistance,
 //! which becomes the Neve's law exactly at *n* = 1 and *r_b* = 0. Test 8
-//! asserts that identity against the shipped crate to 1 × 10⁻⁹ relative,
-//! which is the argument for a re-drawn component made executable rather
-//! than argued.
+//! asserts that identity against the shipped bridge crate to 1 × 10⁻⁹
+//! relative, which is the argument for a re-drawn component made
+//! executable rather than argued. [`element`] itself is now only the
+//! machine around the part: R14, the divider it makes, and the node solve.
 //!
 //! **Distortion goes the other way from the Neve's, because the element is
 //! transparent when it is idle.** The Neve's bridge shunts a divider and

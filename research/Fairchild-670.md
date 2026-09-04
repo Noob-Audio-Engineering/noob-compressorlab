@@ -2690,6 +2690,15 @@ oversampling, run at 44.1, 48 and 96 kHz.
 
 ## 12. Reuse: does a variable-mu element belong in the components crate?
 
+> **Settled on 2026-09-04: it was extracted.** The components repository's rule changed — every
+> electrical component a plug-in models belongs there, whatever its user count — and the part moved
+> out whole as `noob-electrical-components-remote-cutoff-triode`. Everything below about *shape* is
+> what the crate was built to, and all of it survived the move: the parameters are a set per valve
+> type, a second type must be fitted by one documented procedure using the same class of anchor
+> points on curves measured in the same topology, and the accuracy figure is a fit residual rather
+> than a measured floor because this valve has exactly one datasheet. What did not survive is 12.1's
+> conclusion that it should wait for a second user.
+
 The components crate holds a photocell and a diode bridge, and its README states the rule plainly: *"A
 component earns a place **once something real shares it, or is about to**. I am not trying to atomise a
 codebase into parts that each have one caller. An abstraction pulled out of a single user is usually the

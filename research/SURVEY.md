@@ -606,6 +606,46 @@ public measured ground truth, and the survey's blanket statement that none exist
 **Two smaller corrections to the emulation notes.** Waves' relevant Neve plug-in models the 2254
 rather than the 33609, and the dossier could not confirm that two other vendors named here ship a
 33609 model at all.
+**The Fairchild is not thin on ground truth, and this was the survey's largest single error.** The
+text above says its documentation is "deep on circuit and thin on ground truth: we would be checking
+a model against a model", because the only published model validates against a simulation rather
+than against hardware. Two Fairchild factory measurement charts were then found in the archive this
+survey itself lists: a five-curve input-against-output plot dated December 1959, and an
+intermodulation-distortion-against-gain-reduction chart dated March 1959. They are manufacturer
+measurements of real units and they are now the anchors for the build.
+
+**The two program-dependent time-constant positions are quantified after all.** The survey records
+them as described qualitatively in the manual and nowhere quantitatively. The 660 factory drawing
+numbers its time-constant switch positions, which yields fourteen component values across all six,
+including one the 670 redraw marks unreadable. The release network is three real capacitors rather
+than six switched coefficients, and one constant reproduces five of the six published release times
+to within 13 per cent. That also recovers what Fairchild meant by "release time from 10 dB of
+limiting": recovery to within three quarters of a decibel.
+
+**The Fairchild's manual is wrong about its own attack times.** Attack is slew-limited, at 0.10 ms
+per microfarad of timing capacitance, which reproduces the six independently published attack times
+exactly and disagrees with the manual's table at position 4.
+
+**A variable-mu unit does not want the 610's tube stage**, which the components repository's README
+asserted and has had corrected. A remote-cutoff triode differs from a 12AX7-class triode in
+functional form, not merely in parameters, so they are two components and not one with two parameter
+sets.
+
+**The dbx 160's service manual is a complete schematic set.** The survey's caveat that it is "a test
+and alignment manual, not a full schematic set" is true of its extracted text and false of the
+document: two of its leaves are the full 160 and 161 drawings, and the same sheets exist elsewhere at
+a resolution that gives component values, module part numbers and trim designations directly.
+
+**The dbx 160 has one time constant and no attack or release controls, and that is a consequence
+rather than an omission.** A true-RMS detector's attack and release are one control. The constant
+falls out of two parts the drawing marks as a factory-matched pair, and that single number reproduces
+all seven of dbx's published ballistics figures.
+
+**A Blackmer gain cell is shared and a "VCA" is not.** The survey treats VCA as a family. Two units
+in it are documented on their manufacturers' own drawings to contain the same named part, while the
+third's cell is an inference from behaviour with no schematic behind it. The part has been extracted;
+the category has not, because "VCA" covers three circuits that share a word rather than an equation.
+
 ## 8. Sources
 
 Everything below was fetched during this survey. Manufacturer documents are cited as manufacturer

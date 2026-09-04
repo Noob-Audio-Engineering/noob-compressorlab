@@ -601,6 +601,37 @@ The Blackmer cell's law is exponential in decibels, and THAT publish it with tol
 | Output noise | −98 dBV typical | 20 Hz–20 kHz, ROUT = 20 kΩ, 0 dB gain |
 | Output noise | −88 dBV typical | +15 dB gain |
 
+> **The three rows cannot settle where the distortion sits, and the build's argument that they do is
+> wrong.** Measured out of tree, driving a sine through the component and reading the second harmonic
+> by correlation, the two candidate placements are exact mirrors of each other against this table:
+>
+> | condition | published | shaping the input | shaping the output |
+> |---|---|---|---|
+> | 0 dBV in, 0 dB gain | 0.0050 % | 0.0050 | 0.0050 |
+> | +10 dBV in, −15 dB gain | 0.0200 % | 0.0158 | 0.0028 |
+> | −5 dBV in, +15 dB gain | 0.0200 % | 0.0028 | 0.0158 |
+>
+> The reason is arithmetic once seen. The second row raises the input 10 dB and lowers the output 5;
+> the third does exactly the reverse. The two rows are mirrored in precisely the quantity that
+> separates the two hypotheses, and they carry the **same** published figure. So each hypothesis fits
+> whichever row favours it and misses the other by a factor of seven. Mean absolute log error over the
+> two off-unity rows is identical either way.
+>
+> The engine's comment claims the datasheet settles this by a factor of seven. It settles it by a
+> factor of one, and only because the third row is quoted nowhere: it is absent from test 24 and from
+> the benchmark, and the crate checks it structurally rather than numerically. Choosing the second row
+> as the discriminating one is what does the work.
+>
+> **Two arguments survive and are worth separating from the one that does not.** The observation that
+> the second row has a *lower* output than the first and four times the distortion is a genuine
+> one-row result and rules out a plain output-level dependence. And the mechanism argument — a
+> current-mode cell driven through a resistor — is independent of this table and untouched.
+>
+> What the table does say cleanly is what neither placement predicts: two conditions fifteen decibels
+> either side of unity gain, at opposite input levels, published with the same figure. That is
+> symmetric in gain deviation and flat in level, which is the one shape the component deliberately
+> declines to model.
+
 The 2150 datasheet adds the symmetry specification the console's `DISTORTION NULL` trimmer exists to
 set: **symmetry control voltage −1.6 to +1.6 mV** for the A grade at 0 dB gain with THD below 0.07 %
 [26], and typical THD of 0.004 % once trimmed.

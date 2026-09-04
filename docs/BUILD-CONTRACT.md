@@ -125,7 +125,22 @@ different disguises, so it is written down. I wrote the rule and then broke it i
 arguing that two tubes shared a law because the ratio between their tapers was a constant, which is
 an average of averages and is the same inadmissible statistic one layer up. A researcher caught me.
 That is the reason this paragraph is phrased as a standing rule rather than as a war story: knowing
-it does not protect you from it. Three datasheets agreeing that a tube's amplification factor is 33
+it does not protect you from it.
+
+**And a linear axis cannot constrain a law over a range where the quantity spans two orders of
+magnitude.** This is the third of the family and the one that cost the most. Two manufacturers plot
+the same tube's transconductance on linear axes; below a fiftieth of full scale the curve is a few
+pixels off the baseline, the two makers disagree by up to sixty per cent where they can be read at
+all, and a fitted exponent came out anywhere from 1.58 to 2.16 depending on whose curve and which
+points. A third datasheet plotted the same quantity on a **logarithmic** axis and settled the shape
+in five minutes, because an exponential is a straight line on one. Before fitting anything to a
+graph, look at what its axes can resolve where you intend to read it.
+
+The companion trick is to find a quantity that grows where the one you want shrinks. Transconductance
+becomes unreadable as a valve cuts off; plate resistance is the reciprocal ratio and climbs without
+limit, so at an operating point where the first is eleven pixels off the baseline the second sits high
+on its own scale at 180 kilohms. Reading the well-conditioned quantity and converting is not a
+workaround, it is the measurement. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

@@ -909,10 +909,42 @@ which is the family Raffensperger's Fig. 2 reproduces:
 | 250 V | −50 V | **0.56 mA** | ≈ 0.5–1 mA |
 
 Three points across two decades of current, agreeing to within the width of the printed curve. (**Derived**:
-the equation values are my arithmetic; the curve values are my eye on GE's graph, ±20 %.) **The model is
-sound and I will use it.** It is also the only published fit of this tube that exists, and the fact that it
+the equation values are my arithmetic; the curve values are my eye on GE's graph, ±20 %.) **That check was
+too easy, and the next two paragraphs say why** — it was read off a linear plot in the region where a linear
+plot resolves nothing, so it could hardly have failed. The equation is sound in the upper part of its range
+and I will use it there. It is also the only published fit of this tube that exists, and the fact that it
 reproduces a 1953 GE plot to that accuracy is a better validation than Raffensperger himself gives it — his
 paper validates the *circuit* against SPICE, not the tube against the datasheet.
+
+**A second deficiency, at the deep end, which is worse than the slope problem and which I found only after
+the 176 research suggested the technique.** Their point is that a fitted law can be badly wrong exactly where
+the plot you validated it on cannot resolve anything. GE's per-section *transfer* curves (page 4) are linear
+in plate current from 0 to 40 mA, so below about −30 V the whole family is squashed into the bottom few per
+cent of the paper — which is where I did my original three-point check, and it is why that check passed too
+easily. GE's **plate characteristics** (page 5) plot the same tube as curves of constant grid voltage against
+plate voltage, with curves drawn down to **−70 V**, and there the deep end is legible. Reading them at
+Va = 250 V and comparing:
+
+| Vg | GE page 5 | eq. 1 | error |
+|---|---|---|---|
+| −8 V | 24.7 mA | 25.7 mA | +0.3 dB |
+| −10 V | 21.5 mA | 19.9 mA | −0.7 dB |
+| −20 V | 10.2 mA | 7.9 mA | −2.2 dB |
+| −30 V | 5.2 mA | 4.1 mA | −2.0 dB |
+| −40 V | 3.1 mA | 2.1 mA | −3.5 dB |
+| −50 V | 1.5 mA | 0.56 mA | **−8.6 dB** |
+| −70 V | 0.5 mA | 0.01 mA | **−35.7 dB** |
+
+(GE figures read by eye off a calibrated overlay, `ref/fairchild-6386-plate-curves-calibrated.png`; the last
+two rows sit within 50 px of the baseline and are soft, ±20 % at −50 V and worse at −70 V. The trend from
+−8 V to −40 V is well outside reading error.)
+
+**The equation cuts the tube off far too early.** GE's 6386 is still passing half a milliamp at −70 V — that
+is what a remote-cutoff tube *is* — and eq. 1 has it at one hundredth of that. **And this is not an academic
+region for the Fairchild.** Raffensperger's own simulation swings the control voltage to about −80 V
+(his Fig. 10), and the 670's cathodes sit well above ground on the 680 Ω resistors (3.2), so the model
+operates squarely in the range where its own tube law is 8 to 36 dB wrong. **Use eq. 1 inside roughly
+0 to −30 V and treat anything below −40 V as unmodelled**; section 10.4 records the range.
 
 **A deficiency in it that matters more than the divergence, and that I only found when the shared-component
 question forced me to differentiate it (12.3a).** The equation is fitted to plate *current*, and it
@@ -2186,6 +2218,7 @@ published value [18]; D = my derivation; E = my estimate.
 | p7 | −0.03922 | **R** |
 | p8 | 0.2 | **R** |
 | `Vgk` clamp | −0.5 V | **D**, eq. 1 diverges at +5 V (4.3) |
+| eq. 1 usable range | **0 to −30 V of grid**; −8.6 dB at −50 V, −35.7 dB at −70 V | **D** (4.3) |
 | checked against GE curves at (250 V, −10/−30/−50 V) | 19.9 / 4.15 / 0.56 mA | **D** (4.3) |
 | eq. 1's gm at the class-A1 point | 2309 µmho against GE's 4000 — **do not use its derivative** | **D** (4.3) |
 | gm law from GE's logarithmic plot | at or below exponential, **n = 0.59 to 1.00** across GE's four plotted conditions | **D** (12.3a) |

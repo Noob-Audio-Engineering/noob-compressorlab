@@ -140,7 +140,16 @@ The companion trick is to find a quantity that grows where the one you want shri
 becomes unreadable as a valve cuts off; plate resistance is the reciprocal ratio and climbs without
 limit, so at an operating point where the first is eleven pixels off the baseline the second sits high
 on its own scale at 180 kilohms. Reading the well-conditioned quantity and converting is not a
-workaround, it is the measurement. Three datasheets agreeing that a tube's amplification factor is 33
+workaround, it is the measurement.
+
+**So: validate a law at both ends of its working range, against a plot that resolves both ends.**
+That rule has two independent confirmations and each one cost a wrong model. A fitted valve law was
+checked at three points on a linear plate-current plot where everything past a third of the range is
+squashed into the bottom few per cent of the paper; the reading agreed and the law turned out to be
+8.6 dB wrong at one end of the real operating range and 35.7 dB wrong at the other. A check made on a
+plot that cannot resolve the region it is checking can hardly fail, which is what makes it worse than
+no check: it produces a validated-looking model. If the region you cannot read is the region the unit
+actually works in, that is not a tail to be waved off, it is the behaviour. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

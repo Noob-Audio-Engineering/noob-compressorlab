@@ -646,6 +646,19 @@ in it are documented on their manufacturers' own drawings to contain the same na
 third's cell is an inference from behaviour with no schematic behind it. The part has been extracted;
 the category has not, because "VCA" covers three circuits that share a word rather than an equation.
 
+**The API 2500's Thrust slope is 10 dB per decade, not the two figures this survey took from a
+review.** That is 3.01 dB per octave, one filter rather than a shallow and a steep one. API's own
+manuals give 10 dB per decade for both units, API's original manual states the Loud setting is down
+15 dB at 20 Hz and up 15 dB at 20 kHz, and the patented network's printed component values evaluate
+to 9.77 dB per decade. Three sources and one arithmetic check agree against the review. The survey's
+other Thrust claim is worse than imprecise: the Med position is not a shallower Loud, it is a pair of
+shelves with a flat mid-band, so the two settings differ in kind rather than degree.
+
+**And this survey could not reach API's site, which was a hostname problem rather than a closed
+door.** The bare domain answers; only the `www` alias refuses the handshake. Behind it were API's
+manuals for all three variants, their specification and block-diagram sheet, and a vector recall
+chart of the panel accurate enough to read knob centres out of its path coordinates.
+
 ## 8. Sources
 
 Everything below was fetched during this survey. Manufacturer documents are cited as manufacturer

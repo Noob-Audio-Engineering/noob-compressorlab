@@ -220,6 +220,28 @@ what you killed. If more than one process matches and you cannot tell them apart
 than guess. Rebuilding to a different `--target-dir` is almost always cheaper than clearing a lock,
 and you should already be using your own one.
 
+## Verify an edit by what it landed in, not by whether it applied
+
+Two different edits failed the same way in one day and neither was caught by a test, because both
+left a file that still compiled and still passed.
+
+**A substitution that appears to have done nothing must be checked by reading the whole file**, not
+the part you expected it to touch. One agent ran a perl substitution using `|` as its delimiter on a
+pattern full of Markdown table pipes. It reported success, the tail of the file looked unchanged, so
+the edit was redone properly — and the first one had in fact applied, at the top of the file, leaving
+two duplicated rows above the heading. The delimiter trap is already in the rules below; the point
+here is the recovery, because believing "it did nothing" is what created the duplicate.
+
+**And an insertion anchored on text that ends mid-sentence lands mid-sentence.** I did this to a
+research file: two correction blocks went in inside the material they were annotating, and one
+swallowed half of a test's definition, leaving a stimulus with no criterion. The file was still valid
+Markdown and nothing failed.
+
+So after any scripted edit, read the surrounding lines, not the diff summary. Anchor on something
+that ends at a boundary — a blank line, a heading, a closing brace — rather than on a convenient
+substring. With several agents in one tree this is much easier to hit than usual, because the text
+you anchored on may have moved since you read it.
+
 ## Rules
 
 Names only as `noob-vst-webgui-framework` and `Noob Audio Engineering`, never a bare fragment; check

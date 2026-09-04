@@ -194,6 +194,23 @@ model at 900x520, 1100x620 and 1900x1000, and the benchmark regenerated.
 library without it and leaves a stripped artefact of the same name with no `GetPluginFactory`. That
 has installed a broken bundle three times. Verify the installed size and exports afterwards.
 
+## Never kill a process by name
+
+**Identify the exact process first, in its own step, and match on more than the image name.** A file
+lock on a build artefact is the usual reason to want this, and `taskkill /IM <name>.exe` is the usual
+mistake: it matches every process wearing that name, not the one holding your lock.
+
+This has now cost something twice. Once a standalone build of this plug-in was killed that belonged to
+somebody else's session, along with the one that held the lock. Before that, and worse, a kill and the
+listing that should have identified its target were issued in a single command, so the name was read
+only after the kill had gone out; the second match was the user's digital audio workstation with a
+plug-in loaded, and unsaved work was lost.
+
+So: list, read the list, pick the process identifier, kill that identifier, and say in your report
+what you killed. If more than one process matches and you cannot tell them apart, stop and ask rather
+than guess. Rebuilding to a different `--target-dir` is almost always cheaper than clearing a lock,
+and you should already be using your own one.
+
 ## Rules
 
 Names only as `noob-vst-webgui-framework` and `Noob Audio Engineering`, never a bare fragment; check

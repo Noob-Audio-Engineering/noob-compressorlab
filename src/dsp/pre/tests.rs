@@ -10,9 +10,15 @@ const SR: f32 = 48_000.0;
 const TAIL: usize = 16_384;
 
 fn stage(f: impl FnOnce(&mut Settings)) -> Stage {
+    stage_at(SR, f)
+}
+
+/// The same, at a chosen rate, for the figures that must hold at all of
+/// them.
+fn stage_at(sr: f32, f: impl FnOnce(&mut Settings)) -> Stage {
     let mut s = Settings::default();
     f(&mut s);
-    let mut st = Stage::new(SR);
+    let mut st = Stage::new(sr);
     st.configure(&s);
     st.reset();
     st
@@ -65,6 +71,68 @@ fn bin(buf: &[f32], hz: f32) -> f32 {
         sw += win;
     }
     (2.0 * (re * re + im * im).sqrt() / sw) as f32
+}
+
+/// `run` and `bin` above both take their timebase from [`SR`], which is
+/// right for every figure measured at the one rate and wrong for anything
+/// compared across rates: the generator would emit a tone scaled by the
+/// ratio of the rates and the analysis would look for it in the wrong
+/// place. These take the rate explicitly.
+fn run_at(st: &mut Stage, sr: f32, amp: f32, hz: f32, seconds: f32) -> Vec<f32> {
+    let n = ((sr * seconds) as usize).max(TAIL);
+    let block = 256;
+    let (mut lb, mut rb) = (vec![0.0; block], vec![0.0; block]);
+    let mut out = Vec::with_capacity(TAIL + block);
+    let mut phase = 0.0f32;
+    let mut done = 0;
+    while done < n {
+        let m = block.min(n - done);
+        for i in 0..m {
+            let v = amp * (TAU * hz * phase / sr).sin();
+            phase += 1.0;
+            lb[i] = v;
+            rb[i] = v;
+        }
+        st.process_block(&mut lb[..m], &mut rb[..m]);
+        if done + m > n - TAIL {
+            out.extend_from_slice(&lb[..m]);
+        }
+        done += m;
+    }
+    out
+}
+
+fn bin_at(buf: &[f32], sr: f32, hz: f32) -> f32 {
+    let n = buf.len();
+    let (mut re, mut im, mut sw) = (0.0f64, 0.0f64, 0.0f64);
+    for (i, x) in buf.iter().enumerate() {
+        let win = 0.5 - 0.5 * (TAU as f64 * i as f64 / n as f64).cos();
+        let w = TAU as f64 * hz as f64 * i as f64 / sr as f64;
+        re += *x as f64 * win * w.cos();
+        im += *x as f64 * win * w.sin();
+        sw += win;
+    }
+    (2.0 * (re * re + im * im).sqrt() / sw) as f32
+}
+
+/// The stage's magnitude at `hz`, in dB relative to 1 kHz, at `sr`.
+fn tilt_at(sr: f32, hz: f32) -> f32 {
+    let mut st = stage_at(sr, |s| {
+        s.gain = 0;
+        s.level = 5.0;
+    });
+    let top = db(bin_at(
+        &run_at(&mut st, sr, db_to_lin(-40.0), hz, 1.0),
+        sr,
+        hz,
+    ));
+    st.reset();
+    let mid = db(bin_at(
+        &run_at(&mut st, sr, db_to_lin(-40.0), 1000.0, 1.0),
+        sr,
+        1000.0,
+    ));
+    top - mid
 }
 
 /// Output level of a 1 kHz sine, in dBFS.
@@ -423,41 +491,79 @@ fn the_output_transformer_bends_only_the_bottom() {
     );
 }
 
-/// 9.1, the other end of the same published figure.
+/// 9.1, the other end of the same published figure, and the rates it holds at.
 ///
-/// **A recorded divergence, not a widened bound.** The specification is
-/// +0 / −1 dB from 20 Hz to 20 kHz [1 p.40], and the low end meets it in
-/// the test above. The top end does not: this stage measures about −2.3 dB
-/// at 20 kHz. Nothing asserted the top end at all until a benchmark of the
-/// published figures went looking for it, which is why it went unnoticed.
+/// The specification is +0 / −1 dB from 20 Hz to 20 kHz [1 p.40]. This end
+/// of it used to miss, at about −2.3 dB, and nothing asserted the top end
+/// at all until a benchmark of the published figures went looking. Two
+/// faults were behind it and both are fixed, so the figure is now asserted
+/// rather than pinned as a divergence.
 ///
-/// **It is not the antiderivative anti-aliasing**, which would have been
-/// the obvious suspect, because the shaper is exact in its linear region
-/// and this is measured at −40 dBFS. Driving the two modelled transformer
-/// low-passes through the published corners accounts for about 1.6 dB of
-/// it on their own, and those corners are estimates in the research rather
-/// than measured values, so the design was over its own budget before
-/// anything else was added.
+/// The corners of the two modelled transformer roll-offs were estimates
+/// that the research says were "chosen to keep the B response within
+/// +0 / −1 dB", which the arithmetic never reached: they spent 1.61 dB of a
+/// 1 dB budget between them. They now sit where that stated purpose puts
+/// them.
 ///
-/// The figure is pinned here so a regression is caught, and the README's
-/// table of missed figures carries the row.
+/// The second fault was the rate. The stage stopped oversampling at and
+/// above 88.2 kHz, which dropped the shaper's own rate and made the
+/// anti-aliasing droop worse at high rates than at low ones. The factor now
+/// follows the host, so this is checked at every rate the plug-in supports.
+///
+/// 44.1 kHz is excluded deliberately and is not a hidden failure: 20 kHz is
+/// 91 % of Nyquist there, inside any anti-aliasing filter's transition
+/// band, so no amount of modelling reaches the figure at that rate. The
+/// README carries that as the remaining divergence.
 #[test]
-fn the_top_end_falls_outside_the_published_response() {
-    let mut st = stage(|s| {
-        s.gain = 0;
-        s.level = 5.0;
-    });
-    let mut at = |hz: f32| -> f32 {
-        st.reset();
-        let o = run(&mut st, db_to_lin(-40.0), hz, 1.0);
-        db(bin(&o, hz))
-    };
-    let top = at(20_000.0) - at(1000.0);
+fn the_top_end_meets_the_published_response_at_every_rate() {
+    // The rates where the anti-aliasing leaves room for it.
+    for sr in [48_000.0f32, 96_000.0, 192_000.0] {
+        let top = tilt_at(sr, 20_000.0);
+        assert!(
+            (-1.0..=0.0).contains(&top),
+            "the published response is +0 / −1 dB at 20 kHz, measured {top:.2} at {sr} Hz"
+        );
+    }
+
+    // **A recorded divergence, not a widened bound.** The 44.1 kHz family
+    // cannot reach the figure and no choice of transformer corner would fix
+    // it, because what spends the rest of the budget is the resampler's own
+    // passband droop: 20 kHz sits at 91 % of Nyquist at 44.1 kHz and at
+    // 45 % of the half-band's cutoff at 88.2 kHz, against 42 % at 96 kHz.
+    // Buying it back means a longer half-band filter and more latency, in
+    // code the 1176 engine shares, which is a trade rather than a fix. The
+    // figures are pinned so a regression is still caught and the README
+    // carries the rows.
+    let coarse = tilt_at(44_100.0, 20_000.0);
     assert!(
-        (-3.0..=-1.5).contains(&top),
-        "the model measures about −2.3 dB at 20 kHz against a published +0 / −1 dB; \
-         measured {top:.2}, which is outside the range this divergence is pinned to"
+        (-2.6..=-1.7).contains(&coarse),
+        "44.1 kHz is expected to miss by about 2.2 dB at 20 kHz; measured {coarse:.2}"
     );
+    let mid = tilt_at(88_200.0, 20_000.0);
+    assert!(
+        (-1.4..=-1.0).contains(&mid),
+        "88.2 kHz is expected to miss by about 0.14 dB at 20 kHz; measured {mid:.2}"
+    );
+}
+
+/// The response must not depend on the host's rate.
+///
+/// A 12 Hz corner at 192 kHz used to put a cookbook biquad's poles closer to
+/// the unit circle than single precision could resolve, and the stage came
+/// out **24 dB up at 100 Hz**. The error grew with the rate and was already
+/// visible at 96 kHz, so a single-rate test would never have caught it.
+#[test]
+fn the_response_is_the_same_at_every_rate() {
+    for hz in [100.0f32, 1000.0, 10_000.0] {
+        let reference = tilt_at(48_000.0, hz);
+        for sr in [88_200.0f32, 96_000.0, 192_000.0] {
+            let here = tilt_at(sr, hz);
+            assert!(
+                (here - reference).abs() < 0.25,
+                "{hz} Hz reads {here:.2} dB at {sr} Hz against {reference:.2} at 48 kHz"
+            );
+        }
+    }
 }
 
 #[test]

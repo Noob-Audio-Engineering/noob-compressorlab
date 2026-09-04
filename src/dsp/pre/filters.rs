@@ -83,16 +83,45 @@ impl Shelf {
 /// First-order low-pass, for the transformer roll-offs.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Lp1 {
-    a: f32,
+    g: f32,
     z: f32,
 }
 
 impl Lp1 {
+    /// Set the corner, prewarped so the pole lands where the circuit puts
+    /// it at every sample rate.
+    ///
+    /// This used to take the impulse-invariant coefficient
+    /// `1 − exp(−2π·f/sr)`, which is a good match to the analogue pole only
+    /// while the corner sits well below Nyquist. The transformer roll-offs
+    /// do not: at 40 kHz they are a fifth of the rate when the stage
+    /// oversamples and nearly half of it when it does not, so the same
+    /// printed corner produced a different response at every rate, and the
+    /// 20 kHz figure moved by more than 3 dB across the rates we support.
+    /// A prewarped bilinear pole gives the analogue response at all of
+    /// them.
+    ///
+    /// A corner at or above Nyquist cannot be represented, and prewarping
+    /// it would diverge, so it is clamped just below. That is the right
+    /// behaviour rather than a compromise: a pole above Nyquist does
+    /// essentially nothing inside the audio band, which is what the clamped
+    /// filter also does. The voicings stay distinct where it matters,
+    /// because the rate is oversampled whenever the base rate is low enough
+    /// for a clamp to reach into the band.
     pub fn set(&mut self, hz: f32, sr: f32) {
-        // Stable for any positive corner, including the transformer
-        // roll-offs that sit above Nyquist; clamping here would erase the
-        // difference between the voicings.
-        self.a = 1.0 - (-2.0 * PI * (hz / sr).max(0.0)).exp();
+        let g = (PI * (hz / sr).clamp(0.0, 0.4999)).tan();
+        self.g = g / (1.0 + g);
+    }
+
+    /// Exact pass-through, for a position that has no roll-off at all.
+    ///
+    /// Standing in for that with a corner far above the rate used to be
+    /// harmless, but a prewarped pole clamps at Nyquist, so two different
+    /// "very high" corners land in the same place and the switch between
+    /// them does nothing. Saying pass-through outright avoids relying on a
+    /// number that no longer means what it did.
+    pub fn bypass(&mut self) {
+        self.g = 1.0;
     }
 
     pub fn reset(&mut self) {
@@ -101,13 +130,10 @@ impl Lp1 {
 
     #[inline]
     pub fn process(&mut self, x: f32) -> f32 {
-        self.z = flush(self.z + self.a * (x - self.z));
-        self.z
-    }
-
-    /// The low-passed value alone (the flux of the output core).
-    pub fn value(&self) -> f32 {
-        self.z
+        let v = (x - self.z) * self.g;
+        let y = v + self.z;
+        self.z = flush(y + v);
+        y
     }
 }
 
@@ -143,54 +169,67 @@ impl Hp1 {
 /// and the optional 75 Hz low cut.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Hp2 {
-    b0: f32,
-    b1: f32,
-    b2: f32,
+    g: f32,
+    k: f32,
     a1: f32,
     a2: f32,
-    z1: f32,
-    z2: f32,
+    a3: f32,
+    ic1: f32,
+    ic2: f32,
     active: bool,
 }
 
 impl Hp2 {
+    /// Design the high-pass, in a form that survives a 12 Hz corner at
+    /// 192 kHz.
+    ///
+    /// This was a cookbook biquad in transposed direct form, and at high
+    /// rates it fell apart. A 12 Hz corner at 192 kHz puts the poles about
+    /// three ten-thousandths inside the unit circle, and the direct form's
+    /// `a1` and `a2` then differ from ±2 and 1 by less than a single-precision
+    /// mantissa can resolve, so rounding moved the poles by an appreciable
+    /// fraction of their own distance from the circle. Measured, the stage
+    /// came out **24 dB up at 100 Hz** at 192 kHz, and the error grew with
+    /// the rate: it was already visible at 96 kHz.
+    ///
+    /// The state-variable form below keeps its coefficients away from those
+    /// cancellations, so the same corner is accurate at every rate we
+    /// support. It is the standard remedy for exactly this failure.
     pub fn new(sr: f32, fc: f32, q: f32) -> Self {
-        let w0 = 2.0 * PI * (fc / sr).clamp(1e-6, 0.49);
-        let (s, c) = w0.sin_cos();
-        let alpha = s / (2.0 * q);
-        let a0 = 1.0 + alpha;
+        let g = (PI * (fc / sr).clamp(1e-9, 0.4999)).tan();
+        let k = 1.0 / q.max(1e-4);
+        let a1 = 1.0 / (1.0 + g * (g + k));
         Hp2 {
-            b0: (1.0 + c) / 2.0 / a0,
-            b1: -(1.0 + c) / a0,
-            b2: (1.0 + c) / 2.0 / a0,
-            a1: -2.0 * c / a0,
-            a2: (1.0 - alpha) / a0,
-            z1: 0.0,
-            z2: 0.0,
+            g,
+            k,
+            a1,
+            a2: g * a1,
+            a3: g * (g * a1),
+            ic1: 0.0,
+            ic2: 0.0,
             active: true,
         }
     }
 
     pub fn bypassed() -> Self {
         Hp2 {
-            b0: 1.0,
             active: false,
             ..Default::default()
         }
     }
 
     pub fn set_from(&mut self, other: &Hp2) {
-        self.b0 = other.b0;
-        self.b1 = other.b1;
-        self.b2 = other.b2;
+        self.g = other.g;
+        self.k = other.k;
         self.a1 = other.a1;
         self.a2 = other.a2;
+        self.a3 = other.a3;
         self.active = other.active;
     }
 
     pub fn reset(&mut self) {
-        self.z1 = 0.0;
-        self.z2 = 0.0;
+        self.ic1 = 0.0;
+        self.ic2 = 0.0;
     }
 
     #[inline]
@@ -198,10 +237,12 @@ impl Hp2 {
         if !self.active {
             return x;
         }
-        let y = self.b0 * x + self.z1;
-        self.z1 = flush(self.b1 * x - self.a1 * y + self.z2);
-        self.z2 = flush(self.b2 * x - self.a2 * y);
-        y
+        let v3 = x - self.ic2;
+        let v1 = self.a1 * self.ic1 + self.a2 * v3;
+        let v2 = self.ic2 + self.a2 * self.ic1 + self.a3 * v3;
+        self.ic1 = flush(2.0 * v1 - self.ic1);
+        self.ic2 = flush(2.0 * v2 - self.ic2);
+        x - self.k * v1 - v2
     }
 }
 

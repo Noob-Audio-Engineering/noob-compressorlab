@@ -16,7 +16,7 @@ A row whose published column reads *(none published)* is deliberate. Knowing tha
 |---|---|
 | sample rate | 48000 Hz |
 | block size | 256 samples |
-| generated | 2026-09-04 |
+| generated | see the commit that carries this file |
 
 Every measurement drives the real engine offline with generated signal and reads the same accessors the plug-in does. Nothing here is computed from a formula the model also uses.
 
@@ -28,9 +28,9 @@ Every measurement drives the real engine offline with generated signal and reads
 | LA-2A | Teletronix LA-2A Leveling Amplifier | 10 | 0 | 1 |
 | LA-3A | UREI LA-3A Audio Leveler | 4 | 1 | 1 |
 | Distressor | Empirical Labs EL8 Distressor | 12 | 0 | 1 |
-| 6176 | Universal Audio 6176 (610B preamp into the 1176LN) | 10 | 2 | 1 |
+| 6176 | Universal Audio 6176 (610B preamp into the 1176LN) | 11 | 1 | 1 |
 | CL-1B | Tube-Tech CL 1B | 9 | 1 | 1 |
-| **all** | | **57** | **7** | **6** |
+| **all** | | **58** | **6** | **6** |
 
 The misses are the honest part of this table, and none of them is a widened tolerance. Five of them match the README's own list of figures these models do not reach; the other three do not appear there, and the section below says which and what to do about it.
 
@@ -151,20 +151,20 @@ Figures from [`research/610.md`](research/610.md).
 | Mic 500 offset above Line | 35 ± 0.5 dB | 35.000 dB | meets | research/610.md §9.4, from [13 p.496][5 p.22] |
 | Hi-Z 2.2M offset above Line | 8 ± 0.5 dB | 8.000 dB | meets | research/610.md §9.4, from [13 p.496][5 p.22] |
 | pad on a microphone input | -15 ± 0.2 dB | -15.000 dB | meets | research/610.md §9.5, from [1 p.4] |
-| response at 20 Hz | -1 to 0 dB | -0.916 dB | meets | research/610.md §9.1, from the +0 / −1 dB specification [1 p.40] |
-| response at 20 kHz | -1 to 0 dB | -2.286 dB | **misses** | research/610.md §9.1, from [1 p.40] |
+| response at 20 Hz | -1 to 0 dB | -0.855 dB | meets | research/610.md §9.1, from the +0 / −1 dB specification [1 p.40] |
+| response at 20 kHz | -1 to 0 dB | -0.991 dB | meets | research/610.md §9.1, from [1 p.40] |
 | high shelf at its printed corner, +9 dB step | 4.5 ± 0.5 dB | 4.500 dB | meets | research/610.md §9.10, from [1 p.5] |
 | low shelf at its printed corner, +9 dB step | 4.5 ± 0.5 dB | 4.514 dB | meets | research/610.md §9.10, from [1 p.5] |
 | THD at the +5 dBu equivalent output | below 0.150 % | 0.136 % | meets | research/610.md §9.9, from [32] |
-| THD at the +15 dBu equivalent output | 3 to 8 % | 4.135 % | meets | research/610.md §9.9, from [32] |
-| worst in-band alias, 15 kHz into a hot microphone setting | below −80 dB | -34.6 dB | **misses** | research/610.md §9.12 |
+| THD at the +15 dBu equivalent output | 3 to 8 % | 4.157 % | meets | research/610.md §9.9, from [32] |
+| worst in-band alias, 15 kHz into a hot microphone setting | below −80 dB | -34.7 dB | **misses** | research/610.md §9.12 |
 | 610A versus 610B voicing | *(none published)* | 610A 0.129 % against 610B 0.020 % at the same output | no figure | — |
 
 Notes:
 
 - **Gain switch, worst step of the five positions**: the step furthest from 5 dB is reported, so one bad position cannot hide behind four good ones
 - **high shelf at its printed corner, +9 dB step**: the corner is the half-gain point, which is where a feedback shelf's label conventionally sits
-- **THD at the +5 dBu equivalent output**: driven to -14.00 dBFS peak, the +5 dBu equivalent
+- **THD at the +5 dBu equivalent output**: driven to -14.01 dBFS peak, the +5 dBu equivalent
 - **THD at the +15 dBu equivalent output**: driven to -4.04 dBFS peak, the +15 dBu equivalent
 - **worst in-band alias, 15 kHz into a hot microphone setting**: known miss, recorded in README. **The method matters, so it is stated here.** This is the worst single product anywhere below 10 kHz, found by sweeping the band in 25 Hz steps, because the question an aliasing figure answers is whether anything audible got in, not whether one particular product did. The worst is the third harmonic of the 15 kHz tone folded to 3 kHz, and it is a discrete tone sitting 48 dB above its own neighbourhood rather than a noise floor. A narrower measurement had put this at −51 dB and missed it; the README now carries this figure
 - **610A versus 610B voicing**: the manufacturer describes the two voicings with adjectives; no measurement of one against the other exists

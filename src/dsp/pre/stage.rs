@@ -44,6 +44,19 @@ pub struct Voicing {
     pub x2: f32,
     /// Input transformer: high-pass corner and quality, and the top-end
     /// roll-off.
+    ///
+    /// The research gives the two transformer roll-offs as 40 kHz and
+    /// 50 kHz and says in as many words that they were "chosen to keep the
+    /// B response within +0 / −1 dB from 20 Hz to 20 kHz". They never did:
+    /// two first-order poles there spend 1.61 dB of that 1 dB budget at
+    /// 20 kHz between them, before the anti-aliasing and the resamplers
+    /// have taken their own share. So these are estimates picked for a
+    /// stated purpose, by arithmetic that does not reach it, and the
+    /// purpose is the better guide. They now sit where the published
+    /// response puts them with the rest of the chain accounted for, which
+    /// is what the research was trying to do. The A voicing keeps its own
+    /// much lower corners: it is the 1958 module, it is meant to be darker,
+    /// and the +0 / −1 dB figure is the 6176's rather than its.
     pub in_hp_hz: f32,
     pub in_hp_q: f32,
     pub in_lp_hz: f32,
@@ -84,11 +97,11 @@ pub const B: Voicing = Voicing {
     x2: 0.8,
     in_hp_hz: 7.0,
     in_hp_q: 0.6,
-    in_lp_hz: 40_000.0,
+    in_lp_hz: 80_000.0,
     out_hp_hz: 6.0,
     flux_hz: 10.0,
     flux_sat: 0.085,
-    out_lp_hz: 50_000.0,
+    out_lp_hz: 100_000.0,
     sag: 0.3,
     fixed_eq: false,
 };
@@ -157,6 +170,32 @@ pub const INPUT_TILT: [(f32, f32, f32, f32); 5] = [
 /// specification. The cost is the resamplers' round trip, which the plug-in
 /// reports to the host.
 pub const OVERSAMPLE: usize = 4;
+
+/// The processing rate the stage aims for, Hz.
+///
+/// What matters to the anti-aliasing droop above is the rate the shaper
+/// actually runs at, not the factor, so the factor has to follow the host.
+/// This used to be a flag that simply stopped oversampling at and above
+/// 88.2 kHz, which quietly made the response *worse* at high rates than at
+/// low ones: it dropped the shaper to 88.2 kHz, below even the 2x case this
+/// documentation rejects, and measured 4.9 dB down at 20 kHz where 48 kHz
+/// was 2.1 dB down. Picking the factor from the rate keeps the shaper
+/// between 176 and 192 kHz whatever the host runs at, so the response is
+/// the same at every rate and no transformer corner has to be clamped
+/// against a low Nyquist.
+pub const TARGET_RATE_HZ: f32 = 176_400.0;
+
+/// How far to oversample at `sr`: 4, 2 or 1, whichever first reaches
+/// [`TARGET_RATE_HZ`].
+pub fn oversample_factor(sr: f32) -> usize {
+    if sr >= TARGET_RATE_HZ {
+        1
+    } else if sr * 2.0 >= TARGET_RATE_HZ {
+        2
+    } else {
+        OVERSAMPLE
+    }
+}
 
 /// The low cut of the LA-6176 and SOLO/610, Hz.
 pub const HPF_HZ: f32 = 75.0;
@@ -267,7 +306,7 @@ pub struct Stage {
     sag_down: f32,
     vu: Vu,
     /// 2x below 88.2 kHz.
-    oversample: bool,
+    factor: usize,
     /// The PRE meter reading of the last block, in dB against 0 VU.
     pre_vu_db: f32,
     /// Peak drive of the input stage over the last block, 0..1-ish.
@@ -291,7 +330,7 @@ impl Stage {
             sag_up: 0.0,
             sag_down: 0.0,
             vu: Vu::default(),
-            oversample: sr < 88_200.0,
+            factor: oversample_factor(sr),
             pre_vu_db: -60.0,
             drive: 0.0,
         };
@@ -304,12 +343,8 @@ impl Stage {
 
     pub fn set_sample_rate(&mut self, sr: f32) {
         self.sr = sr;
-        self.oversample = sr < 88_200.0;
-        let sr_p = if self.oversample {
-            sr * OVERSAMPLE as f32
-        } else {
-            sr
-        };
+        self.factor = oversample_factor(sr);
+        let sr_p = sr * self.factor as f32;
         self.level.set(sr, LEVEL_SMOOTH_S);
         // The self-rectification follower lives inside the oversampled
         // region, so its coefficients belong to that rate.
@@ -392,11 +427,7 @@ impl Stage {
         // Blocks 3 to 8 run at the oversampled rate, so their sections are
         // designed there; the input transformer's high-pass and everything
         // after the resampler stay at the base rate.
-        let sr_p = if self.oversample {
-            self.sr * OVERSAMPLE as f32
-        } else {
-            self.sr
-        };
+        let sr_p = self.sr * self.factor as f32;
         let lf = Shelf::new(sr_p, lf_hz, SHELF_GAIN_DB[s.lf_gain.min(10)], true);
         let hf = Shelf::new(sr_p, hf_hz, SHELF_GAIN_DB[s.hf_gain.min(10)], false);
         let in_hp = Hp2::new(self.sr, v.in_hp_hz, v.in_hp_q);
@@ -423,20 +454,28 @@ impl Stage {
             ch.out_lp.set(v.out_lp_hz, sr_p);
             ch.flux.set(v.flux_hz, sr_p);
             ch.out_hp.set(v.out_hp_hz, sr_p);
-            ch.load_lp.set(
-                if s.load == 1 {
-                    LOAD_600_LP_HZ
-                } else {
-                    self.sr * 4.0
-                },
-                self.sr,
-            );
+            // The 600 Ω roll-off is a real in-band effect, about 2 dB down
+            // at 20 kHz, but its corner sits above Nyquist at 48 kHz, so it
+            // has to be designed at the oversampled rate to be placed at
+            // all. The 15 kΩ position is no roll-off rather than a distant
+            // one, which now matters: two corners past Nyquist would
+            // prewarp to the same place and the switch would do nothing.
+            if s.load == 1 {
+                ch.load_lp.set(LOAD_600_LP_HZ, sr_p);
+            } else {
+                ch.load_lp.bypass();
+            }
         }
     }
 
     /// The round trip of the resamplers, when they are running.
     pub fn latency(&self) -> usize {
-        if self.oversample { 2 * LATENCY } else { 0 }
+        // One resampler pair per doubling.
+        match self.factor {
+            4 => 2 * LATENCY,
+            2 => LATENCY,
+            _ => 0,
+        }
     }
 
     /// Small-signal gain of the whole stage in dB, which is what the
@@ -464,7 +503,7 @@ impl Stage {
             return;
         }
         let v = self.v;
-        let oversample = self.oversample;
+        let factor = self.factor;
         let x1_scale = v.x1 * self.f_rel;
         let mut drive = 0.0f32;
         let mut abs_sum = 0.0f32;
@@ -485,18 +524,27 @@ impl Stage {
                 // Everything from here to the output transformer is where
                 // the nonlinearities are, so it runs at twice the rate.
                 let mut subs = [0.0f32; OVERSAMPLE];
-                let count = if oversample {
-                    let half = ch.up.process(y);
-                    let a = ch.up2.process(half[0]);
-                    let b = ch.up2.process(half[1]);
-                    subs[0] = a[0];
-                    subs[1] = a[1];
-                    subs[2] = b[0];
-                    subs[3] = b[1];
-                    OVERSAMPLE
-                } else {
-                    subs[0] = y;
-                    1
+                let count = match factor {
+                    4 => {
+                        let half = ch.up.process(y);
+                        let a = ch.up2.process(half[0]);
+                        let b = ch.up2.process(half[1]);
+                        subs[0] = a[0];
+                        subs[1] = a[1];
+                        subs[2] = b[0];
+                        subs[3] = b[1];
+                        4
+                    }
+                    2 => {
+                        let a = ch.up.process(y);
+                        subs[0] = a[0];
+                        subs[1] = a[1];
+                        2
+                    }
+                    _ => {
+                        subs[0] = y;
+                        1
+                    }
                 };
                 let mut shaped = [0.0f32; OVERSAMPLE];
                 for k in 0..count {
@@ -535,16 +583,20 @@ impl Stage {
                     let excess = phi - v.flux_sat * s_curve(phi / v.flux_sat, 4.0);
                     let mut y4 = y3 - excess;
                     y4 = ch.out_hp.process(y4);
-                    shaped[k] = ch.out_lp.process(y4);
+                    // The 1176 section's input loading sits after the
+                    // output transformer, and inside the oversampled block
+                    // because its corner is above Nyquist at 48 kHz.
+                    shaped[k] = ch.load_lp.process(ch.out_lp.process(y4));
                 }
-                let mut y4 = if oversample {
-                    let a = ch.down2.process([shaped[0], shaped[1]]);
-                    let b = ch.down2.process([shaped[2], shaped[3]]);
-                    ch.down.process([a, b])
-                } else {
-                    shaped[0]
+                let mut y4 = match factor {
+                    4 => {
+                        let a = ch.down2.process([shaped[0], shaped[1]]);
+                        let b = ch.down2.process([shaped[2], shaped[3]]);
+                        ch.down.process([a, b])
+                    }
+                    2 => ch.down.process([shaped[0], shaped[1]]),
+                    _ => shaped[0],
                 };
-                y4 = ch.load_lp.process(y4);
                 y4 = ch.cut.process(y4) * self.polarity;
 
                 ch.out_abs += y4.abs();

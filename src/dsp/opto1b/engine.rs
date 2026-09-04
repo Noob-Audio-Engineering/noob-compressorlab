@@ -35,7 +35,7 @@ use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
 use crate::dsp::opto::filters::{Biquad, OnePole, flush};
 // Deliberately narrow: `Cell` is *not* imported, and `tests::the_t4_cell_was_not_imported`
 // exists to catch a future refactor that makes importing it look convenient.
-use crate::dsp::opto::model::{R_DARK, SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS};
+use crate::dsp::opto::model::{R_DARK, SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS, distortion};
 
 /// 0 VU, in dBFS. Shared with every other model, and Softube publish the
 /// same reference for their own CL 1B.
@@ -813,11 +813,7 @@ impl Compressor {
                 // Audio node, and the photocell's own small odd term. A
                 // photoresistor distorts in proportion to the voltage
                 // across it, which is why it is scaled by the reduction.
-                let mut att = xh * a_c;
-                let kc = k::CELL_CUBIC * (1.0 - a_c);
-                let q = att / k::CELL_CUBIC_V0;
-                let q2 = q * q;
-                att *= 1.0 - kc * q2 / (1.0 + q2);
+                let att = distortion(xh * a_c, a_c, k::CELL_CUBIC, k::CELL_CUBIC_V0);
                 // Detector: node B, not the audio node. This is the whole
                 // mechanism of the Ratio control.
                 let mut sc = xh * a_b;

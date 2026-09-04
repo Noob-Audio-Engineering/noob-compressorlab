@@ -99,6 +99,38 @@ pub mod source;
 pub mod vca;
 pub mod vu;
 
+/// Flush a state to zero once it has decayed far enough that arithmetic on
+/// it is a cost rather than a signal.
+///
+/// Every filter and follower here decays exponentially, so without this a
+/// state creeps into the subnormal range and sits there, where arithmetic
+/// is slow on some hardware. It is not theoretical: an envelope follower
+/// in the equaliser next door parked on a subnormal permanently after
+/// eleven seconds of silence.
+///
+/// **One threshold, and it is the smaller one.** This used to exist in
+/// four copies across the engines with two different cutoffs, 1e-9 in
+/// three of them and 1e-12 in the optical one, so a decaying tail parked
+/// at different points depending on which engine held it. They now agree
+/// on 1e-12, and the choice is not a count of which was more common.
+///
+/// The guard exists solely to keep a state out of the subnormal range,
+/// which for `f32` begins near 1e-38. 1e-12 clears that by twenty-six
+/// orders of magnitude, so it prevents the stall completely; a larger
+/// threshold buys nothing against stalls and can only zero more state that
+/// was genuinely non-zero. For a guard, the conservative direction is
+/// therefore the smaller number.
+///
+/// That matters most where it was already smallest. The optical engines'
+/// cell carries trapped-carrier state that decays over seconds and is the
+/// mechanism behind the programme dependence an LA-2A is known for, so a
+/// guard that clamps it early is exactly the wrong place to be generous.
+/// None of the three engines that used 1e-9 gave a reason for it.
+#[inline]
+pub fn flush(x: f32) -> f32 {
+    if x.abs() < 1e-12 { 0.0 } else { x }
+}
+
 use noob_vst_webgui_framework::{
     AudioHandle, NoobVstWebguiFramework, ParamSpec, StreamKind, StreamSpec,
 };

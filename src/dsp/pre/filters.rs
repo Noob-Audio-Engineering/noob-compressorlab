@@ -271,8 +271,5 @@ impl Vu {
     }
 }
 
-/// Flush denormals and tiny values to zero.
-#[inline]
-pub fn flush(x: f32) -> f32 {
-    if x.abs() < 1e-9 { 0.0 } else { x }
-}
+/// The one flush, defined in [`crate::dsp::flush`].
+pub use crate::dsp::flush;

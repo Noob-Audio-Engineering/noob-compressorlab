@@ -171,9 +171,5 @@ impl Biquad {
     }
 }
 
-/// Flush a state variable that has decayed below `1e-12` to exactly zero, so
-/// long silence after heavy compression cannot leave a denormal behind.
-#[inline]
-pub fn flush(x: f32) -> f32 {
-    if x.abs() < 1e-12 { 0.0 } else { x }
-}
+/// The one flush, defined in [`crate::dsp::flush`].
+pub use crate::dsp::flush;

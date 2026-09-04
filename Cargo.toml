@@ -18,6 +18,13 @@ crate-type = ["cdylib", "lib"]
 name = "noob-compressorlab-standalone"
 path = "src/bin/standalone.rs"
 
+# Measures every model against its research document's published figures and
+# writes `docs/BENCHMARK.md`. A binary rather than a test, because it drives
+# minutes of audio through six engines and `cargo test` should stay fast.
+[[bin]]
+name = "benchmark"
+path = "src/bin/benchmark.rs"
+
 [features]
 default = []
 # Build the real VST3 / CLAP plugin (pulls nih-plug from git and embeds

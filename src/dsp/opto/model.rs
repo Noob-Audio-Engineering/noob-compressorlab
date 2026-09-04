@@ -43,7 +43,7 @@ use super::filters::{Biquad, OnePole, Shelf};
 /// it, which are this machine's and not the part's.
 pub use noob_electrical_components::photocell::{
     CELL_GAMMA, CELL_SPEEDS, Cell, CellParams, EL_B, K_G, LA2_FAST_SHARE, LA2_FAST_SPEED, R_DARK,
-    R_MIN, cell_params_for, resistance_for,
+    R_MIN, cell_params_for, distortion, resistance_for,
 };
 
 /// The divider's series resistance, `R6 + R7` of the schematic (ohms).
@@ -146,11 +146,15 @@ impl Divider {
 }
 
 /// Divider gain for a cell resistance, normalised so a dark cell is unity.
+///
+/// This unit's own divider, spelled without its parameters for the hot
+/// path. It defers to [`Divider::LA2A`] rather than repeating the
+/// arithmetic: there used to be two implementations of one divider here,
+/// this one in use and the parameterised one used only by the LA-3A, which
+/// is how two copies of a thing drift apart.
 #[inline]
 pub fn attenuation_for(r_cell: f32) -> f32 {
-    let r_p = r_cell * R_POT / (r_cell + R_POT);
-    let a_raw = r_p / (R_SERIES + r_p);
-    a_raw / A_DARK
+    Divider::LA2A.attenuation(r_cell)
 }
 
 /// The divider gain with a dark cell (the normalisation).
@@ -494,9 +498,9 @@ impl Compressor {
                 let xh = ch.in_hp.hp(x[c]);
                 let mut att = xh * a[c];
                 // Photocell cubic: odd-order distortion growing with GR.
-                let k = CELL_CUBIC * (1.0 - a[c]);
-                let q2 = (att / CELL_CUBIC_V0) * (att / CELL_CUBIC_V0);
-                att *= 1.0 - k * q2 / (1.0 + q2);
+                // The law is the photoconductor's; these two constants are
+                // this unit's, fitted to its own published distortion.
+                att = distortion(att, a[c], CELL_CUBIC, CELL_CUBIC_V0);
                 // Sidechain tap and shaping.
                 let tap = (1.0 - self.beta) * att + self.beta * xh;
                 let mut sc = ch.sc_hpf.process(tap) * self.pr_gain;

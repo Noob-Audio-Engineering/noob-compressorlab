@@ -27,7 +27,7 @@ use super::{METER_GR, METER_OFF, METER_OUT};
 use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
 use crate::dsp::opto::filters::{Biquad, OnePole, Shelf, flush};
 use crate::dsp::opto::model::{
-    Cell, CellParams, Divider, EL_B, SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS,
+    CELL_GAMMA, Cell, CellParams, Divider, EL_B, SINE_MEAN_ABS, VU_REF_AMP, VU_REF_DBFS, distortion,
 };
 
 /// 0 VU in dBFS: the same reference the rest of the lab uses.
@@ -342,7 +342,9 @@ impl Compressor {
         // Light for those carriers, and the drive that produces that light
         // (the inverse of the electroluminescent law).
         let params = cell_params(0);
-        let light = (n / params.k_gen).powf(1.0 / 0.8);
+        // The photoconductor's gamma, by name: it is the component's
+        // constant, and a second copy of it here would be free to drift.
+        let light = (n / params.k_gen).powf(1.0 / CELL_GAMMA);
         let u = (EL_B / -light.ln()).powi(2);
         self.v_sat = u * k::V_SAT_OVER_ONSET;
         // What the sidechain sees for the specified input: the attenuated
@@ -508,9 +510,7 @@ impl Compressor {
                 let mut att = xh * a[c];
                 // The photocell's own odd-order distortion, a third of the
                 // LA-2A's.
-                let kc = k::CELL_CUBIC * (1.0 - a[c]);
-                let q2 = (att / k::CELL_CUBIC_V0) * (att / k::CELL_CUBIC_V0);
-                att *= 1.0 - kc * q2 / (1.0 + q2);
+                att = distortion(att, a[c], k::CELL_CUBIC, k::CELL_CUBIC_V0);
                 // Sidechain: the tap, the user's high-pass, the pot, the
                 // two high-passes the hardware has, the contour and the
                 // fixed tilt, and the driver's clip last of all, because on

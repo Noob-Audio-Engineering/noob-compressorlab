@@ -6,8 +6,8 @@ G Series stereo bus compressor. It is not a product, it is not a parity replacem
 use the SSL, Solid State Logic, G Series or Bus Compressor names as its own name. Trademarks below
 belong to their owners and are used only to identify the device and the products discussed. This
 model sits behind the same per-instance `model` switch that already selects the 1176, LA-2A, LA-3A,
-CL 1B, 6176 and Distressor behaviours; see [[Distressor]], which is its nearest relative in the lab,
-and [[Neve-33609]], which is the dossier this one is written to match.
+CL 1B, 6176 and Distressor behaviours; see [[Distressor]] [56], which is its nearest relative in the
+lab, and [[Neve-33609]] [57], which is the dossier this one is written to match.
 
 Conventions, kept the same as the six existing dossiers so they read alike:
 

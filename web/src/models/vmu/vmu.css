@@ -612,22 +612,66 @@
 
 /* ------------------------------------------------------- the charts panel */
 
-.lab-model--vmu .lab-bench.has-charts {
-  grid-template-columns: 292px 1fr 300px;
+/*
+ * **This model's drawer is two rows, and it is the only one that is.**
+ *
+ * The history runs full width across the top; beneath it sit the timing
+ * network, Fairchild's two 1959 charts and the shared transfer panel. The
+ * three chart blocks used to share one 292 px column, where the capacitor
+ * bars were a few pixels wide and neither chart was readable at any window
+ * size.
+ *
+ * It is `.lab-bench-vmu` rather than `.lab-bench` on purpose. The shared
+ * row is a single-row grid with a 366 px ceiling, which is exactly tall
+ * enough for one row of panels and would crush two. This one carries its
+ * own ceiling, 560, which is the same arithmetic done twice over: a 90 px
+ * history, a lower row deep enough for the transfer panel's 300 px square
+ * and its 42 px of chrome, and three 12 px gaps.
+ */
+.lab-model--vmu .lab-bench-vmu {
+  flex: 1;
+  min-height: 0;
+  max-height: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
 }
-@media (max-height: 640px) {
-  .lab-model--vmu .lab-bench.has-charts {
-    grid-template-columns: 1fr;
+
+/*
+ * The history takes a fixed share off the top rather than half the drawer:
+ * it is one trace against a time grid and reads perfectly well short, while
+ * the blocks below it carry axes, captions and a note each.
+ */
+.lab-model--vmu .lab-bench-vmu > .lab-panel--history {
+  flex: 0 0 auto;
+  height: clamp(96px, 26%, 150px);
+}
+
+.lab-model--vmu .lab-bench-vmu__row {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 12px;
+}
+
+/*
+ * Below about 1180 px there is not room for four blocks side by side, so
+ * the two charts fold away and the network and the transfer stay. Their
+ * curves are Fairchild's own measurements and a 200 px column makes them
+ * a picture of a chart rather than a chart.
+ */
+@media (max-width: 1180px) {
+  .lab-model--vmu .lab-bench-vmu__row {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
-  .lab-model--vmu .lab-bench .lab-panel--charts {
+  .lab-model--vmu .fairchart--io,
+  .lab-model--vmu .fairchart--im {
     display: none;
   }
-}
-@media (max-width: 1180px) {
-  .lab-model--vmu .lab-bench.has-charts {
-    grid-template-columns: 1fr 300px;
-  }
-  .lab-model--vmu .lab-bench .lab-panel--charts {
+  .lab-model--vmu .lab-bench-vmu__row > .lab-panel--charts:nth-of-type(2),
+  .lab-model--vmu .lab-bench-vmu__row > .lab-panel--charts:nth-of-type(3) {
     display: none;
   }
 }
@@ -637,13 +681,22 @@
   height: 100%;
   min-height: 0;
 }
+/*
+ * The bars fill the block rather than sitting 58 px tall in a column that
+ * was too narrow for them. They are the whole of this panel now.
+ */
 .fairchart__bars {
   display: flex;
-  gap: 16px;
+  gap: clamp(12px, 8%, 40px);
   align-items: flex-end;
   justify-content: center;
-  height: 58px;
-  flex: none;
+  /*
+   * A zero basis, so the bars yield to the note beneath them. With a basis
+   * of auto they claimed their content height first and pushed the note out
+   * of the block, which is where the explanation of positions 5 and 6 lives.
+   */
+  flex: 1 1 0;
+  min-height: 0;
 }
 .fairchart__bar {
   display: flex;
@@ -654,7 +707,7 @@
   justify-content: flex-end;
 }
 .fairchart .bar {
-  width: 12px;
+  width: clamp(12px, 2.2vw, 26px);
   flex: 1;
   min-height: 0;
   border-radius: 2px;
@@ -677,9 +730,17 @@
   background: #8fb98a;
 }
 .fairchart__barlabel {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 0.08em;
-  color: rgba(230, 226, 221, 0.5);
+  color: rgba(230, 226, 221, 0.6);
+}
+
+/* What each capacitor is, which the old compound panel had no room for. */
+.fairchart__barhint {
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  color: rgba(230, 226, 221, 0.35);
 }
 .fairchart__note {
   font-size: 10px;
@@ -687,26 +748,16 @@
   color: rgba(230, 226, 221, 0.4);
   margin: 6px 0 0;
 }
-.fairchart__plots {
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 6px;
-  flex: 1;
-  min-height: 0;
-  margin-top: 6px;
-}
+/*
+ * One plot per block, so it takes the whole of it. The caption that used to
+ * sit above each chart is now the panel's own title.
+ */
 .fairchart__plot {
   margin: 0;
   min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-}
-.fairchart__plot figcaption {
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(230, 226, 221, 0.45);
-  margin-bottom: 2px;
 }
 .fairchart__plot svg {
   /*
@@ -718,6 +769,14 @@
   min-height: 0;
   height: 0;
   width: 100%;
+}
+/*
+ * The axis type is in the SVG's own units, so it shrinks with the block.
+ * These sizes hold it near nine screen pixels across the range of block
+ * widths the two-row drawer produces.
+ */
+.fairchart__plot .axis text {
+  font-size: 10px;
 }
 .fairchart__plot .grid line {
   stroke: rgba(255, 255, 255, 0.07);
@@ -806,3 +865,27 @@
     display: none;
   }
 }
+
+/*
+ * **The explanatory note is the first thing to go when a block is short.**
+ *
+ * Each of these blocks carries a title, its drawing and a sentence saying
+ * what the drawing means. On a tall window all three fit. On a shorter one
+ * the sentence does not, and it was being clipped by the panel rather than
+ * dropped, which looks like a bug rather than a decision. The block still
+ * says what it is: the network keeps its three labels and their values, and
+ * each chart keeps its axes.
+ *
+ * The panel is a size container so the question can be asked of the block
+ * height, which is what decides this, rather than of the window.
+ */
+.lab-model--vmu .lab-panel--charts {
+  container-type: size;
+}
+
+@container (max-height: 260px) {
+  .fairchart__note {
+    display: none;
+  }
+}
+

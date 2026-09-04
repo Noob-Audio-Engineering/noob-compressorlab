@@ -1,8 +1,16 @@
 <script setup>
 /**
- * The bench panel this model adds beside the two shared ones: the state of
- * the three timing capacitors, and Fairchild's own two 1959 measurement
- * charts with the unit's live operating point on them.
+ * The three blocks this model adds to its drawer: the state of the three
+ * timing capacitors, and Fairchild's own two 1959 measurement charts with
+ * the unit's live operating point on them.
+ *
+ * **One component, three parts, chosen by the `part` prop.** They began as
+ * a single panel holding all three, which at 292 px wide drew the bars a
+ * few pixels across and both charts as unreadable thumbnails. They are now
+ * three panels of their own, each with its own title, which is what a user
+ * asked for and the only way any of them is legible. The data and the
+ * geometry stay here in one place rather than being copied three times, so
+ * a curve transcribed once is drawn once.
  *
  * It is here because the dossier's 10.6 asks for exactly this and gives the
  * reason: **positions 5 and 6 are incomprehensible without seeing the
@@ -30,6 +38,11 @@
 import { computed } from 'vue';
 import { useStreamFrame, useStreamValue } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 import { PUBLISHED_CURVES, PUBLISHED_IM } from './useVmu.js';
+
+const props = defineProps({
+  /** Which block to draw: `network`, `io` or `im`. */
+  part: { type: String, default: 'network' },
+});
 
 const cell = useStreamFrame('cell');
 const inPeak = useStreamValue('meter', { index: 0, unit: 'linear', initial: 0 });
@@ -103,23 +116,25 @@ const imLive = computed(() => {
 </script>
 
 <template>
-  <div class="fairchart">
-    <div class="bench-label mb-2">The timing network, and Fairchild’s own charts</div>
-
-    <div class="fairchart__bars">
-      <div v-for="b in bars" :key="b.label" class="fairchart__bar">
-        <div class="bar" :class="b.cls"><div class="fill" :style="{ height: pct(b.v) }"></div></div>
-        <div class="fairchart__barlabel">{{ b.label }}</div>
+  <div class="fairchart" :class="`fairchart--${props.part}`">
+    <template v-if="props.part === 'network'">
+      <div class="bench-label mb-2">The timing network</div>
+      <div class="fairchart__bars">
+        <div v-for="b in bars" :key="b.label" class="fairchart__bar">
+          <div class="bar" :class="b.cls"><div class="fill" :style="{ height: pct(b.v) }"></div></div>
+          <div class="fairchart__barlabel">{{ b.label }}</div>
+          <div class="fairchart__barhint">{{ b.hint }}</div>
+        </div>
       </div>
-    </div>
-    <p class="fairchart__note">
-      The two slow legs charge on their own clock. Empty, they pull the release fast; full, they hold the
-      node up for tens of seconds. That is the whole of positions 5 and 6.
-    </p>
+      <p class="fairchart__note">
+        The two slow legs charge on their own clock. Empty, they pull the release fast; full, they hold the
+        node up for tens of seconds. That is the whole of positions 5 and 6.
+      </p>
+    </template>
 
-    <div class="fairchart__plots">
-      <figure class="fairchart__plot">
-        <figcaption>Input vs output, December 1959</figcaption>
+    <template v-else-if="props.part === 'io'">
+      <div class="bench-label mb-2">Input against output, December 1959</div>
+      <div class="fairchart__plot">
         <svg :viewBox="`-22 -8 ${IO.w + 34} ${IO.h + 26}`" role="img" aria-label="Published input versus output curves with the live operating point">
           <g class="grid">
             <line v-for="v in [-10, 0, 10, 20]" :key="'gx' + v" :x1="iox(v)" :y1="0" :x2="iox(v)" :y2="IO.h" />
@@ -133,10 +148,15 @@ const imLive = computed(() => {
           </g>
           <circle v-if="live.show" class="live" :cx="live.x" :cy="live.y" r="4" />
         </svg>
-      </figure>
+      </div>
+      <p class="fairchart__note">
+        Grey is Fairchild&rsquo;s, measured in 1959; the dot is where this unit is now.
+      </p>
+    </template>
 
-      <figure class="fairchart__plot">
-        <figcaption>IM against limiting, March 1959</figcaption>
+    <template v-else>
+      <div class="bench-label mb-2">Intermodulation against limiting, March 1959</div>
+      <div class="fairchart__plot">
         <svg :viewBox="`-22 -8 ${IM.w + 34} ${IM.h + 26}`" role="img" aria-label="Published intermodulation curves with the live operating point">
           <g class="grid">
             <line v-for="v in [0, 5, 10, 15, 20]" :key="'ix' + v" :x1="imx(v)" :y1="0" :x2="imx(v)" :y2="IM.h" />
@@ -150,12 +170,11 @@ const imLive = computed(() => {
           </g>
           <circle v-if="imLive.show" class="live" :cx="imLive.x" :cy="imLive.y" r="4" />
         </svg>
-      </figure>
-    </div>
-    <p class="fairchart__note">
-      Grey is Fairchild’s, measured in 1959; the dot is where this unit is now. On the right it sits on the
-      published curve for the output level in force — what the hardware did at this much limiting — rather
-      than on a measurement of our own.
-    </p>
+      </div>
+      <p class="fairchart__note">
+        The dot sits on the published curve for the output level in force, at the limiting in force &mdash; what
+        the hardware did &mdash; rather than on a measurement of our own.
+      </p>
+    </template>
   </div>
 </template>

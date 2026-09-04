@@ -36,6 +36,7 @@ browser client, gestures, needle ballistics and charts) comes from noob-vst-webg
 | `src/dsp/vca/` | the Distressor: the dB-domain feedback loop, its eight curves and its distortion generator |
 | `src/dsp/pre/` | the 610 preamp stage, which with the 1176 behind it makes the 6176 |
 | `src/dsp/opto1b/` | the CL 1B: its own optical element, the three-node attenuator and the three timing modes |
+| `src/dsp/rms/` | the dbx 160: the Blackmer gain cell, the true-RMS log-domain detector, the static curve and both units' limits |
 | `src/dsp/source.rs` | the standalone's demo signals (vocal, bass, drums, noises, tones) |
 | `src/dsp/tests.rs` | tests of the lab itself: the contract, the switch, the telemetry |
 | `src/plugin.rs` | the nih-plug VST3 / CLAP plug-in (feature `plugin`) |
@@ -118,7 +119,7 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 
 ## The model switch
 
-`model` is a non-automatable parameter of the instance, and it has seven positions:
+`model` is a non-automatable parameter of the instance, and it has one position per model:
 
 | position | what it is | engine |
 |---|---|---|
@@ -129,6 +130,9 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 | `6176` | the 610 tube preamp in front of the 1176 | `dsp::pre` and `dsp::fet` |
 | `CL-1B` | the tube optical one whose timing is on the panel, not in the cell | `dsp::opto1b` |
 | `33609` | the diode-bridge limiter and compressor, with two detectors and one gain element | `dsp::bridge` |
+| `TG12413` | the console module: four diodes in reverse breakdown, three switches and no threshold | `dsp::tg` |
+| `160` | the true-RMS one: a Blackmer cell fed forward from a log-domain detector, with no attack or release | `dsp::rms` |
+| `4000 G` | the bus compressor: a feedback VCA whose ratio rises as it works, with a two-section automatic release | `dsp::gbus` |
 
 The first two keep the positions they had, so a project saved before the lab grew still loads.
 
@@ -136,7 +140,9 @@ The `Processor` owns every engine; only the active one runs. When the switch fli
 that becomes active starts from rest and takes over through a 20 ms crossfade while the outgoing
 engine keeps running, so the change does not click. The active model's latency is reported to the
 host and updated on a switch: 15 samples for the 1176 and for the 6176 (the 1176's 2x
-oversampler), 31 for the 33609 below 88.2 kHz and none above it, none for the others. The 6176's latency does not change with its routing switch,
+oversampler), 31 for the 33609 and for the dbx 160 below 88.2 kHz and none above (the dbx adds its look-ahead on
+top, so a host puts the track back where it belongs while the compression still arrives before the
+transient), 30 or 45 for the TG12413 depending on its oversampling switch and none at 1x, none for the others. The 6176's latency does not change with its routing switch,
 because the 1176 engine runs in all three positions. The transfer curve is republished for the new
 model, and the `cell` and `lamps` streams are zeroed once when a model that does not use them
 takes over.
@@ -144,14 +150,15 @@ takes over.
 Every knob of every model is a parameter, so a project saves the whole lab. The prefixes are
 `fet_` for the 1176, `opto_` for the LA-2A, `la3a_` for the LA-3A, `dist_` for the Distressor and
 `pre_` for the 610 section of the 6176, whose compressor half reuses the 1176's `fet_` parameters,
-`cl1b_` for the CL 1B and `neve_` for the 33609.
+`cl1b_` for the CL 1B, `neve_` for the 33609, `tg_` for the TG12413, `dbx_` for the 160 and
+`ssl_` for the 4000 G.
 The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever engine is active.
 
 ## Parameters
 
 | id | range / labels | default | group | automatable |
 |---|---|---|---|---|
-| `model` | 1176, LA-2A, LA-3A, Distressor, 6176, CL-1B, 33609 | 1176 | lab | no |
+| `model` | 1176, LA-2A, LA-3A, Distressor, 6176, CL-1B, 33609, 160, … | 1176 | lab | no |
 | `fet_input` | 0..48 mark (= −48..0 dB) | 24 | 1176 | yes |
 | `fet_output` | 0..48 mark | 24 | 1176 | yes |
 | `fet_attack` | 0 (OFF)..7 | 4 | 1176 | yes |
@@ -219,6 +226,17 @@ The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever e
 | `neve_meter_select` | In, Control, Out (the 2254/E only) | Control | 33609 | no |
 | `neve_drive` | 0..100 % (not on the hardware) | 0 | 33609 | yes |
 | `neve_power` | toggle | on | 33609 | no |
+| `dbx_model` | 160, 160A | 160 | dbx 160 | no |
+| `dbx_threshold` | −40..+20 dBu (the original's pot stops at −37.8 and +11.8) | 0 | dbx 160 | yes |
+| `dbx_ratio` | α = 1 − 1/R, 0..2 along the dial's own measured taper | 0.75 (4:1) | dbx 160 | yes |
+| `dbx_output` | −20..+20 dB | 0 | dbx 160 | yes |
+| `dbx_knee` | Hard, OverEasy (the 160A only) | Hard | dbx 160 | yes |
+| `dbx_meter` | Input, Output, Gain Change | Gain Change | dbx 160 | no |
+| `dbx_meter_cal` | −15..+10 dBu, the rear-panel trimmer | +4 | dbx 160 | no |
+| `dbx_knee_width` | 0..12 dB (ours; dbx published none) | 6 | dbx 160 | yes |
+| `dbx_tau` | 20..60 ms (ours; the one number the box is made of) | 35.32 | dbx 160 | yes |
+| `dbx_lookahead` | 0..10 ms (ours; dbx documented the trick in 1995) | 0 | dbx 160 | yes |
+| `dbx_headroom` | 4..28 dB, the level 0 dBFS stands for | 22 | dbx 160 | no |
 | `link` | toggle | on | extras | yes |
 | `mix` | 0..100 % | 100 | extras | yes |
 | `sc_hpf` | 0 (off)..300 Hz | 0 | extras | yes |
@@ -577,13 +595,346 @@ factory preset whose position no drawing states. And the auto-release platform's
 fitted to the published behaviour, "rapid for transient peaks but slower for persistent high levels",
 because no resistor list fixes its charge path.
 
+## The EMI TG12413
+
+The limiter from the transfer console at Abbey Road, and the odd one in the lab: a **console module**
+about one fifth as wide as it is tall, with three switches, one internal preset, and no threshold and
+no ratio anywhere. `research/TG12413.md` is what it is built from, and four findings out of it shape
+the whole engine.
+
+**It is not a bridge, and it does not use the bridge crate.** Neve's element is a four-diode ring
+with two floating common nodes, forward-biased by an injected current, one junction per arm. EMI's is
+two branches of two diodes in series, both the same way up, whose common node is the +20 V supply
+rail, and as drawn they sit in reverse breakdown rather than forward conduction. Six of the thirteen
+rows in the dossier's side-by-side table are structural rather than differences of value. So the
+element is built in `dsp::tg::element` and the dossier's own constants table has an empty row headed
+"from the shared diode-bridge component crate". **That empty row is the finding**, and the
+`diode-bridge` crate now says in its own documentation what it models and what it does not.
+
+What generalises is one level up, and the element here is written as that generalisation: *n*
+junctions per arm with a bulk resistance,
+
+```text
+u(i) = 2·r_b·i + 2·V_n·artanh( i / I )
+```
+
+which becomes the Neve's law exactly at *n* = 1 and *r_b* = 0. A test asserts that identity against
+the shipped crate to the limit of what f32 can represent, which is the argument for a re-drawn
+component made executable rather than argued.
+
+**Distortion goes the other way from the Neve's, because the element is transparent when it is
+idle.** The Neve's bridge shunts a divider and the voltage across it falls as the control current
+rises, so its own distortion falls as it works harder. This element carries no current at all until
+the sidechain drives it, and an element carrying no current cannot bend a waveform. Measured across
+the same input sweep, the TG's third harmonic climbs 15.8 dB and stays 16.9 to 26.8 dB above the
+Neve's at every point. That is the difference a listener hears, and it is asserted. What is **not**
+asserted is the dossier's claim that the two move in opposite directions: both rise, for a reason
+that is arithmetic rather than implementation, and the misses table below carries the derivation.
+
+**Everything on the panel is a switch, and one of them is not calibrated.** OUTPUT LEVEL is −10 to
++10 dB and the twenty-one resistors on the drawing really do deliver it: every step is within 0.09 dB
+of a decibel except the last, which is 0.83, and the span is 19.76 against a nominal 20. RECOVERY is
+marked 1 to 6 with no times, because none is printed on the drawing or published anywhere; Waves, who
+had the console, say the times are "very hard to put in terms of exact milliseconds". The engine keeps
+the contrast: the output ladder is stored as resistances and the recovery switch as bare numerals.
+
+**OUT is not a bypass.** The mode wafer selects a resistor rather than opening the path, so in OUT the
+audio still passes through the gain element and only the control is neutralised. The model has a
+separate true bypass for A/B and the page marks it as an addition.
+
+### Where the sidechain listens, which is a ruling and not a reading
+
+The dossier's section 11.4 says the detector reads the "post-element, post-output-ladder" signal.
+Its own test 4 says gain reduction must not move by more than 0.1 dB when the output ladder is swept,
+and calls that a circuit identity. Both cannot be true, because a detector behind the ladder is moved
+by the ladder. **The engine taps after the element and its post amplifier and before the ladder**,
+which is still the feedback topology the dossier argues for and satisfies the identity. The identity
+is the tighter statement and identities have no tolerances, so it wins. The measured spread across
+the whole output switch is under a tenth of a decibel.
+
+### The one place the engine reverses the dossier
+
+The law network's two segments. Section 11.6 starts them at 1.0 and 0.35, steep and then shallow;
+this engine keeps the ratio and inverts the direction, shallow and then steep. The drawing carries
+six resistors in two rows of three, the dossier reads them as two law segments with two selected
+components each, and it says plainly that **no value is given for any of the four adjust-on-test
+parts**. So the slopes are unknown and nothing on the sheet fixes which segment is the steep one.
+What does bear on it is behaviour: the dossier's own list of the six differences it stakes the model
+on includes "germanium rectification, so a softer onset — the TG should start compressing earlier and
+more gradually", and the four manufacturer quotes are consistent about "smooth", "squishy" and "warm
+open". Steep-then-shallow gives the opposite, a hard grab at the threshold that relaxes. The reversal
+is recorded at `LAW_A` with this reasoning.
+
+### What is fitted rather than derived
+
+More than for any other model here, and the reason is worth stating once: **no factory handbook, no
+specification and no measurement of any kind has ever been published for this unit.** Three constants
+are fitted and each is named at its definition. Where the unit starts working is a choice, because
+there is no threshold control and no published threshold. The control-current constant is fitted so
+that a full-scale sine settles at 20 dB of reduction, which is the dossier's instruction rather than
+a figure about the hardware. And the element's drive level is fitted to the two ends of the THD scale
+Chandler print on the TG1's input knob, `.04%` to `2%`, which is a figure about a licensed recreation
+with its own added stages and not about EMI's module — EMI printed no level annotation anywhere on
+the sheet, which the dossier calls the single biggest gap in its evidence base.
+
+## The dbx 160
+
+`model` position **7**, engine `dsp::rms`, face `web/src/models/dbx/`, parameters `dbx_*`. **The
+module and the directory are deliberately named differently**, and it reads as a mistake otherwise:
+the Rust module is named for the technique that makes this box what it is, a true-RMS detector, while
+the face is named for the unit whose panel it draws. The lab already does this once — the LA-3A's face
+lives in `web/src/models/la3a/` and its engine in `src/dsp/opto3/` — and the registry in
+`web/src/composables/useLab.js` is what ties a `key` to a view either way.
+
+The one in the lab that listens to **power** rather than peaks. `research/dbx-160.md` is what it is
+built from, and it is a deliberate composite that says so on the tin: the face, the ballistics and
+the hard knee are the original 1976 unit's, and the two behaviours it does not have — OverEasy and
+Infinity+ — arrive with the 160A panel that `dbx_model` selects. Both faces drive the same three
+controls, because both units are the same three controls.
+
+**The detector is a true-RMS log-domain filter, and that is the identity of the box.** Every other
+detector in this lab is a rectifier followed by a time constant. This one is David Blackmer's: a
+bilateral log converter whose two diode junctions square the signal for free, a capacitor charged
+through a junction and discharged by a constant current, and a square root that is never computed
+because in the log domain it is a division by two. Three published behaviours follow and none of them
+is a choice. A falling signal is **rate-limited**, decaying a fixed number of decibels per second
+rather than exponentially. A rising one **attacks faster the bigger the step**, because a bigger step
+opens the charging junction harder. And the two **cannot be separated**, which is why a dbx 160 has no
+attack knob and no release knob; the successor company say in as many words that separate attack and
+release adjustments are not possible within the constraint of rms response.
+
+One number generates all of it. `TAU_DEFAULT_S` is 35.3 ms and it comes from two components printed
+on dbx's own drawing which the drawing marks as a factory-matched pair, R35 at 909 kΩ and C15 at
+22 µF, through the junction ideality the datasheet's own 6.1 mV/dB implies. Fed back through the
+filter's equations that one constant gives a release rate of 123.0 dB/s against dbx's published
+120 dB/s for the 160 and 125 for the 160A, their three release times to within 2 %, and two of their
+three attack times.
+
+**The thermal decibel is `10/ln 10` exactly, and this is the model's one departure from its research
+document's arithmetic.** The research divides the datasheet's 25.9 mV by its 6.1 mV/dB and gets 4.246.
+Those two figures do not correspond: 6.1 is a measured typical carrying the junctions' ideality with
+it while 25.9 is bare `kT/q`. Doing the algebra instead, the log converter puts `2·n·V_T·ln(I/I_S)` on
+the charging junction whose own current is `exp((v_in − v_C)/(n·V_T))`, so the capacitor settles where
+`⟨(I/I_S)²⟩ = exp(v_C/(n·V_T))` — the true mean of the square, with the ideality and the temperature
+both cancelling because the same kind of junction does the logarithm and the averaging. The filter's
+decibel unit is then `10/ln 10` whatever the ideality and whatever the temperature. It is not a
+measurement to be rounded: at any other value the detector reads a slightly different mean, and at
+4.246 it reads **high** on peaky material, which is the wrong sign against the datasheet's own
+crest-factor table. What it costs is the 20 dB attack point, and that is recorded below.
+
+**The ratio is one multiplication and the knee is a diode.** Both the detector and the gain cell are
+logarithmic with the same 6.1 mV/dB constant, so a volt is a decibel everywhere in the sidechain and
+the COMPRESSION pot is simply the fraction α of the rectifier's output that reaches the control port:
+`R = 1/(1 − α)`, exactly, with no gain computer and no lookup. Infinity is not a mode, it is where α
+reaches 1 and the pot passes through it the way it passes through 4:1; past it α exceeds 1, the cell
+pulls down more decibels than the input rose, and the ratio goes negative. dbx trademarked that as
+Infinity+ and it needed no new circuit, only a longer pot. The knee is the rectifier's diode: inside
+an operational amplifier's feedback loop its softness is divided by the open-loop gain and the corner
+collapses to under a ten-thousandth of a decibel, which is the original's hard knee; moved outside the
+loop its own exponential is exposed and becomes OverEasy. So one function serves both and the button
+is a knee-width switch, which is a pleasing correspondence with a circuit where the button also moves
+one component rather than switching a path.
+
+**The ∞ mark is 120:1, not infinity, and dbx published the number twice.** The model leaves the
+residual slope in, so 40 dB of input rise above threshold still lifts the output by a third of a
+decibel. It is inaudible on programme and it is the difference between modelling the circuit and
+modelling the silkscreen.
+
+**The low-frequency third harmonic is the detector showing through, not a waveshaper.** The detector's
+output ripples at twice the input frequency, that ripple modulates the cell's gain, and gain
+modulation at 2f on a carrier at f makes a third harmonic. So it falls as 1/f, scales with the ratio,
+falls with a slower time constant and is absent at 1:1 — every clause of dbx's own two footnotes, from
+one equation. The model produces it because the detector's excursion at every zero crossing is left
+alone; smoothing that away would remove the sound. **There is no third-harmonic waveshaper anywhere in
+this engine**, and the test that would catch one asserts a *ratio* between two of the model's own
+measurements against dbx's published law, so it needs no absolute calibration and a waveshaper's
+frequency-independent third harmonic fails it immediately.
+
+The **second** harmonic is the gain cell's own, and it is a **constant**. The two halves of the signal
+go through different transistors, so a matching error amplifies them differently and an asymmetric
+transfer curve is an even-order one; that is what the part's symmetry trim pin is for and what dbx's
+factory procedure adjusts R27 against. It is modelled as `y = x + ε·|x|` with ε fitted to the one
+magnitude dbx published, 0.075 % at +4 dBm at infinite compression, and being a gain difference
+between the two halves it does not vary with level, with ratio, with time constant or with frequency.
+**It does not vary with gain reduction either.** An earlier reading of the datasheet suggested it rose
+fourfold with reduction; that claim has since been withdrawn by its author, because the rows it rested
+on change input level and gain together and so read a two-variable comparison as a one-variable trend.
+The constant here was never a function of reduction and stays one.
+
+**Two units, two pots, one parameter.** The original's THRESHOLD runs 10 mV to 3 V, which is −37.8 to
++11.8 dBu, while the 160A's runs −40 to +20 dBu; the original's COMPRESSION stops at the ∞ mark where
+the 160A's carries on to −1:1. Each parameter carries the union of its pair so that one control has
+one meaning for a host, and each faceplate maps its own pot's rotation onto the part of it that unit
+has, so neither face gains a range dbx did not give it. `Settings::clamped` applies the same limits in
+the engine, so a preset written on one face cannot smuggle the other's range in.
+
+**What is on the panel and what is ours.** Every control the hardware has is live and in its real
+place. The 160A's BYPASS and SLAVE buttons drive the lab's shared `bypass` and `link`, because those
+are exactly what the relay and the strapping jack are, and the original's POWER switch drives the same
+bypass because a plug-in has no mains. Stereo linking is dbx's True RMS Power Summing: one detector
+fed `s_L² + s_R²`, energies added rather than signals, which is why two matched channels read 3.01 dB
+higher than one and the effective threshold drops by 3 dB when the link goes in. That is what the
+hardware does and the model does not compensate for it.
+
+On the extras strip, behind the marker that says which controls are ours: the rear-panel meter
+trimmer, and then three numbers dbx never gave anyone. The **OverEasy width** because they never
+published one for any model in the family and it cannot be derived from the drawing — it is
+`V_θ/(G·K)`, and the difference amplifier's gain G could not be read, which bounds it to roughly 2 to
+9 dB and makes the 6 dB default an estimate. The **detector's time constant** because dbx's whole
+argument is that you cannot adjust it, and dragging it to hear the release rate change while every
+attack time changes with it is the clearest demonstration of that there is. And **look-ahead**, which
+is not a modern liberty: dbx documented feeding the programme straight to the detector and delaying
+the audio, and drew it as Figure 5 in 1995, so that the compressor finishes reducing the gain before
+the leading edge of the loud passage arrives.
+
+**There is no detector-input switch**, and that is a refusal rather than an omission. The 160A has a
+rear-panel DETECTOR INPUT jack; this plug-in declares no side-chain bus, so a control selecting it
+would write nowhere, and this repository has removed that kind of ornament twice. What the jack is for
+— a filter or an equaliser in front of the detector, and the anticipation trick — is covered by the
+shared side-chain high-pass and by `dbx_lookahead`, and the README says so instead of drawing a dead
+switch.
+
+**The face.** Two panels, and their provenances differ. The original's geometry is measured off dbx's
+own front-panel figure: the drawing's long runs give the wood cheeks' four edges and the panel's top,
+its knobs were found by scoring rings against it and fit exactly, its two indicators the same way, and
+the silkscreen's cap heights come out at 20 to 21 px against a 1627.5 px panel, which is where every
+type size on that face comes from. Its **colours are ours**, because the figure is monochrome and no
+colour photograph of a 160 is anywhere in the reference set; what the manual does establish is that
+the original is **amber** below threshold and **red** above, unlike every later model, and that a
+steady tone exactly at the threshold leaves both dimly lit, which the engine publishes as one
+comparator's two sides. The 160A's geometry and colours are both measured, from dbx's own product
+photograph.
+
+The ratio dial's taper is the one thing on either face that is deliberately uneven, and it is measured
+rather than fitted: dbx shaped the pot for "scale expansion at the subtle lower ratios", so the nine
+printed marks sit at 0, 0.099, 0.194, 0.364, 0.507, 0.698, 0.858, 0.939 and 1 of its own travel, read
+as angular clusters of dark pixels in the annulus outside the knob's fitted circle. Separating them
+from the figure's callout arrow needed a second pass on a wider annulus where only an arrow's shaft
+survives. Nothing here was read off a plotted curve, so the caution about linear axes does not apply:
+these are tick angles and edge positions on a line drawing, and the quantities that are not geometric
+come from specification tables, printed component values and datasheet constants.
+
+## The SSL 4000 G
+
+The bus compressor, drawn as the 500-series module and behaving as the console card. Three things
+about it are the model, and each is the difference between this and a generic VCA compressor wearing
+an SSL faceplate.
+
+**It is a feedback compressor.** SSL's own card 82E27 splits the detector's control voltage through
+three 100 kΩ resistors: R26 carries it to the amplifier driving the audio VCAs, R27 carries the same
+voltage to the amplifier driving the sidechain VCA, and only the threshold pot's offset is added to
+the second one. So the detector hears a signal already attenuated by exactly the amount the
+compressor is attenuating the audio. The audio path is still topologically feedforward, which is why
+the latency is zero and no detector noise reaches the signal, but the *control law* is a closed loop.
+A team fitting grey-box models to 2528 hours of recordings from a real module found their residual
+concentrated exactly where a missing feedback path would put it, which is corroboration from outside
+SSL entirely.
+
+**The ratio rises with gain reduction and never straightens.** A linear rectifier inside a feedback
+loop around a decibel-domain VCA gives `ratio(GR) = 1 + 0.11513·(GR + V_d/k)`. There is no fixed
+slope anywhere on the curve and no corner at all: it bends for its whole length. **So the knee cannot
+be a width parameter and this model does not have one.** A model that exposes `knee_width_db` and
+blends two straight lines can be tuned to match this box at one setting and will be wrong at the
+next, which is the failure the same team measured in models that lacked the feedback term.
+
+**The automatic release is a two-section ladder whose charge is shared unevenly.** Not one envelope
+with an adaptive coefficient: two RC sections in series, 91 kΩ with 0.47 µF and 750 kΩ with 6.8 µF,
+charged by the same current and decaying independently. A short peak puts `C2/C1 = 14.5` times as
+much voltage on the fast section, so it releases in about 43 ms; sustained compression lets the slow
+section reach its own equilibrium, where the resistors put 89.2 % of the voltage on it and it
+releases over about 5.1 s. Both numbers fall out of four component values and neither appears
+anywhere in the engine. The most-cited document about this compressor pairs those components the
+other way round, which would give 619 ms and 353 ms, two nearly equal constants and no programme
+dependence at all; the drawing and the physics agree with each other against that sentence.
+
+### The controls, and where their numbers come from
+
+| control | positions | source |
+|---|---|---|
+| `ssl_in` | in / out | the hardware IN switch |
+| `ssl_threshold` | −20 to +20 dB, a 50 kΩ linear pot | printed on every modern unit |
+| `ssl_makeup` | −5 to +15 dB, a 25 kΩ linear pot | SSL's own plug-in specification |
+| `ssl_attack` | .1 .3 1 3 10 30 ms | R1–R6 on card 82E27 |
+| `ssl_release` | .1 .3 .6 1.2 s and Auto | R9–R12 and the two-section network on card 82E27 |
+| `ssl_ratio` | 2:1 4:1 10:1 | the console's three positions |
+| `ssl_hpf` | Off 30 60 105 125 185 Hz | the module's sidechain filter |
+| `ssl_link`, `ssl_drive`, `ssl_range`, `ssl_oversample` | — | **ours**, on the extras strip |
+
+**The IN switch is not a bypass**, and it is the one control here whose behaviour SSL state and a
+plug-in author would guess wrong. It removes the *sidechain*. The audio still passes through the VCA
+and the make-up gain is still applied, which is why a bypassed unit has excess gain. The plug-in's
+own bypass is a separate, sample-exact thing on the extras strip.
+
+**The panel is the module and the values on it are the console's.** SSL publish a high-resolution
+render and a dimensioned recall sheet of the 500-series module and nothing legible of the G Series
+console's centre section, while card 82E27 gives the console's component values and nothing gives the
+module's. Drawing a panel nobody can photograph, or inventing resistors for the module's ladder,
+would both be worse than saying this plainly. So the release switch prints `.1 .3 .6 1.2 AUTO` where
+a real module prints `.1 .2 .4 .8 1.6 AUTO`, and the ratio prints three positions where a module
+prints six.
+
+### What is estimated, and what it rests on
+
+Four things, all named at their definitions in `src/dsp/gbus/mod.rs`.
+
+`ratio_scaling` is the control-bus volts per decibel. SSL publish no measured transfer point for any
+ratio position, so it cannot be calibrated against a figure, and the research offers it as a table of
+three loose numbers. It is derived here from one convention instead — that the printed ratio is the
+ratio at the knee — which gives `k = 0.11513·V_d/(r − 1)` and reproduces all three of those numbers
+exactly. One estimate rather than three, and the whole ratio law follows from it.
+
+`DETECTOR_SCALE` is where the knee sits in absolute terms, anchored to the level the only measured
+recordings of this unit were made at: songs normalised to −12 dB through a real module. SSL's nominal
++4 dBu was tried first and is wrong for the job, because it is a VU reference and this detector is a
+peak rectifier; anchoring one to the other put the knee about 12 dB low and left the threshold
+control usable over its top third only.
+
+`V_DIODE` and `SOFTPLUS_V` are a silicon small-signal diode's drop and turn-on width. The
+second-harmonic coefficient of the gain cell comes from the THAT 2180A datasheet's own THD table.
+
+### Three places the engine departs from the research
+
+Each is grounded in a figure the research itself cites, and each is argued where it happens.
+
+**The threshold's sense is inverted from the research's equations**, which write the sidechain gain
+as `T − GR` and make a higher setting compress more. The panel prints THRESHOLD in decibels, and the
+only published statement of the equivalence is SSL's own: the sidechain trims "increase the side
+chain level by 10dB — effectively reducing the threshold on that channel by 10dB". A threshold
+reading and a sidechain gain run in opposite directions, so the engine uses `−Θ − GR` and the knob
+reads as its legend does.
+
+**The gain cell distorts on its input, not its output.** The research writes it as
+`x·gain + d2·(x·gain)²`. The datasheet gives two THD points and they settle it: 0.005 % at 0 dBV with
+0 dB of gain, and 0.020 % at +10 dBV with −15 dB of gain. The second has a *lower* output than the
+first and four times the distortion, so the distortion cannot be a function of the output. Shaping
+the input fits the first exactly and the second to within 27 %; shaping the output misses the second
+by a factor of seven, which is well outside the ±50 % the research's own test allows.
+
+**Oversampling offers 1× and 2×, not the 4× the parameter table lists.** Both nonlinearities in this
+audio path are exactly second order — a squarer, and a product of two signals — so their output
+bandwidth is exactly twice their input bandwidth and 2× already contains it with nothing left to
+fold. A 4× position could not differ audibly from 2×, and a control that cannot do anything is the
+dead ornament this repository has removed twice.
+
+Three parameters in that table are not implemented and the reasons differ. `ssl_revision` would need
+a dead detent on the release switch, since the console has five positions and the module six, and the
+panel decision above settles which set is live. `ssl_bypass` and `ssl_mix` are the lab's shared
+`bypass` and `mix`. `ssl_sc_ext` would need an external sidechain input, and the plug-in declares no
+such bus, so it would be a control that writes nowhere.
+
 ## Where the models miss their published figures
 
 Three audits went through these engines against their research documents and found tests that had
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Eleven remain, four of them the 33609's.
+
+The table also carries a second kind of row: a **control the research specifies that the model does
+not have**. Those are not missed figures, but they are the other way a model can quietly fall short
+of its document, and the reason each one is absent belongs where people look for gaps rather than
+buried in the model's own section.
+Twenty-one remain, four of them the 33609's, four the TG12413's, four the dbx 160's and two the
+4000 G's.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -598,6 +949,16 @@ Eleven remain, four of them the 33609's.
 | 33609 | compress recovery A1 800 ms, no tolerance published | 1488 ms under the limit recovery's borrowed ±50 % | the same disagreement on the compressor's switch: the /N manual gives the constants as "a1 (auto): 100ms/2000ms" and the handbook lists 800 ms for the position. The constants are kept and the settling figure is the miss. The four fixed positions all meet their published times |
 | 33609 | attack settling time falls as the step size rises, and a 20 dB step settles in under half a 3 dB step's time | it rises: 2.50 ms at 3 dB against 3.83 ms at 10 dB | the direction is the dossier's own derivation rather than a published figure, and it does not follow from the circuit it cites. A follower whose charging rate is proportional to the difference is an exponential, and the time for an exponential to close a **fixed** 1 dB window grows like the logarithm of the step. The published 10 dB point is met in both attack positions, and the measured direction is asserted so a future change to the envelope cannot pass unnoticed |
 | 33609 | distortion 0.03 % at 0 dBu and 0.2 % at +15 dBu on the 2254 | 0.000 % and 0.004 % | these are published **maxima**, so passing them is legitimate, but the model is far cleaner than the hardware rather than merely inside the limit. Two things are missing: the four transformers are not modelled at all, and the bridge's drive level is the one constant that could not be derived. The block diagram's annotation puts about 30 mV across the bridge and a `tanh` argument near 0.34, where the bridge's own third harmonic is about 0.96 % — more than ten times the 0.075 % the handbook publishes for the through path — so the drive is calibrated against the distortion instead and the ~20 dB gap between the two readings is recorded at `BRIDGE_DRIVE_V` rather than split |
+| dbx 160 | attack 5 ms for a 20 dB step | 6.7 ms, 34 % slow | **structural, and dbx's own three attack figures cannot be reconciled**: they imply time constants of 33.3, 26.2 and 37.6 ms, and the hardware is a single-constant detector. Every quantity in this one is pinned by something published — the decibel unit is `10/ln 10` exactly, because at any other value the averaging stops being an average of the square and the box's whole claim is true RMS, and the time constant is R35 and C15 off dbx's own drawing, which puts the release rate between dbx's own two published rates. Meeting this row would mean giving up one of those. The 10 dB and 30 dB points are met, and the test asserts the figure this model's own components imply and then states the gap to dbx's 5 ms so it cannot drift unnoticed |
+| dbx 160 | detector under-reads by 0.5 dB at a crest factor of 5 and 1.0 dB at 8 | 0.06 and 0.08 dB | the direction and the ordering are right and the magnitudes are not. With the decibel unit at `10/ln 10` the log-domain filter's steady reading of a pulse train **is** the true mean square by construction, so what is left in the real part is its own input bandwidth, which the datasheet gives as four corner frequencies against input current rather than as a transfer function; the research declined to model it and so does this. The figures are the descendant part's, not dbx's, who publish no crest-factor figure at all, and the test says so at the assertion. The 3.5 point is met |
+| 4000 G | `ssl_sc_ext`, an external sidechain input, in the research's parameter table | not implemented | **this is a fact about our plug-in and not about the hardware.** The unit takes an external key and every modern version and plug-in of it offers one; `src/plugin.rs` declares no sidechain bus in its `AUDIO_IO_LAYOUTS`, so the parameter would be a control that writes nowhere. It is the dead ornament this repository has removed twice. Adding the bus is a change to the plug-in's IO rather than to this model, and the day it lands this parameter should follow |
+| 4000 G | `ssl_revision`, switching the panel between the console and the module | not implemented | the console's release switch has five positions and the module's six, and the ratio three against six, so one parameter cannot serve both without a dead detent. The research's section 2.5 settles which set is live: draw the module, because SSL publish a render and a dimensioned recall sheet of it and nothing legible of the console, and print the console's values on it, because card 82E27 gives those and nothing gives the module's |
+| 4000 G | `ssl_bypass` and `ssl_mix`, in the research's parameter table | not implemented | both duplicate a control the lab already shares. The research's own note calls `ssl_bypass` "the plug-in's own sample-exact bypass", which is `bypass`, and `ssl_mix` is `mix`. The hardware's IN switch is a separate thing and does have its own parameter, because it is not a bypass: it removes the sidechain and leaves the VCA and the make-up gain in circuit |
+| 4000 G | `ssl_oversample`'s 4x position | not implemented | both nonlinearities in this audio path are exactly second order, a squarer and a product of two signals, so their output bandwidth is exactly twice their input bandwidth and 2x already contains it with nothing left to fold. A 4x position could not differ audibly from 2x. 1x and 2x are offered |
+| 4000 G | the panel's 0.1 ms attack at 4:1, within the research's ±30 % | +30.2 % | **0.2 percentage points outside a tolerance the research itself calls wide on purpose.** The loop gain is `0.11513·d/k` and equals 3 only at the knee, so the harder the box is driven the faster it grabs, while the panel prints one number. Measured at one fixed input level giving 7 to 9.5 dB of reduction, which is how this box is used; the other five positions meet it, and at 12 dB of reduction the slowest runs 41 % fast while at 5 dB the fastest runs 176 % slow. Widening the window to 31 % to collect a green tick is the move this repository's standard forbids, so the figure stands and the miss is recorded |
+| 4000 G | the ratio rising 0.11513 per dB of gain reduction, at 4:1 and 10:1 | 0.130 and 0.180, +13 % and +56 % | that derivation treats D6 as an ideal 0.6 V drop, while the same document insists — correctly — that D6's soft turn-on **is** the knee. Both cannot hold: a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages, and the release resistor loads the loop by the remainder. `k` is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is only 154 mV of control voltage and the diode never leaves its knee, which is the same observation the research makes from the other end when it notices that 10:1's `k` lands near the VCA's own 6.1 mV/dB. The 2:1 position meets the figure at +2.6 %. Nothing is calibrated away, because `k` is an estimate and the ratio calibration is the one test the research explicitly refuses to write |
+| dbx 160 | third harmonic 0.07 % below threshold on the 160X | 0.000 % | with no gain reduction there is no detector ripple, and the third harmonic in the hardware at that point belongs to an output stage dbx publish no distortion figure for, so anything here would be invented. The second-harmonic figure in the same row is met, because that one is the gain cell's and the cell is modelled |
+| dbx 160 | OverEasy "will therefore emphasize the slap at the beginning of the note" | the body is more compressed; the slap is not louder | **two of dbx's own statements cannot both hold.** They define the THRESHOLD control as pointing midway between the onset of processing and the point where the ratio is attained, which puts the knee centred on the threshold; a curve of that shape lies at or below the hard-knee curve everywhere, so it can never pass more of a transient than the hard knee does. Where a definition and a sentence of application prose disagree the model follows the definition. The companion clause, that OverEasy reduces the boominess of the body, holds and is asserted at dbx's own kick-drum settings |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes
 for this symptom in preference to a bigger oversampling factor. It was right about the mechanism: the
@@ -615,6 +976,11 @@ in `src/dsp/vca/compressor.rs`, and the LA-3A's HF Contour direction (its 4.5 ag
 cannot both hold, 3 to 8 % distortion at +15 dBu and a 30 Hz figure at +18 dBu that is both three
 times the 1 kHz figure and under 5 %; the ratio is what says something about the transformer, so the
 ratio is what is asserted, and the note is at the test.
+
+| TG12413 | the LIMIT knee is "much harder" than COMPRESS's, and the two curves cross rather than scale | the two are one law at two thresholds: LIMIT's knee sits 5.7 dB lower and its slope runs 0.232, 0.243, 0.259, 0.304, 0.382 against COMPRESS's 0.216, 0.228, 0.246, 0.294, 0.376 | **arithmetic, not implementation.** The dossier reads the mode wafer as re-scaling the detector's drive. Write the loop as `q = p·A(K·e(g·q))` and substitute `q' = g·q`, `p' = g·p`: the mode's `g` vanishes, so changing mode translates the transfer curve along the diagonal in log-log and cannot bend it. What survives is the six-to-one asymmetry between the two polarities, which halves the conducting duty near LIMIT's own knee and makes it very slightly *softer*. Asserted instead is the part that is true and worth guarding, that the modes are one law at two thresholds and not two ratios, which is the change the dossier says would make an emulation stop being a model. Settling it needs a measured pair of transfer curves from a real module, or the item list's values for AOT 3 to AOT 6 |
+| TG12413 | the Neve's third harmonic falls across an input sweep while the TG's rises | both rise: the TG by **+15.8 dB** and the Neve by **+5.9 dB** over the same sweep, from the onset of gain reduction to 20 dB of it | **the dossier's sign split does not follow from its own equations, and this bears on the Neve dossier too.** Both units are the same shape of circuit: a nonlinear element shunting a divider whose series arm is `R_s`. Expand either law to its cubic term and the third-harmonic ratio at the node goes as `(1 − g)·û²`, with `û` the peak voltage across the element and `g` the normalised gain. The sign of the trend is therefore set by what the loop does to `û`, which is the loop's ratio, not by which element sits in the divider. At a *fixed input* the two do disagree as both dossiers say, and the Neve's own test measures exactly that on its bridge alone and passes. Across a rising input with a compressor holding the output, `û` is roughly constant and `(1 − g)` climbs, so both rise. `research/TG12413.md` §12 test 17 and `research/Neve-33609.md` are the two files that disagree. Asserted instead: the TG's rises, and it stays more than 15 dB above the Neve's at every point. Measured at −24, −18, −12, −6 and 0 dBFS in, the TG runs −73.5, −69.0, −66.0, −62.3 and −57.7 dBc against the Neve's −90.4, −85.7, −85.5, −85.4 and −84.5, a gap of 16.9 to 26.8 dB. That gap is the audible content of the claim |
+| TG12413 | germanium rectification gives a softer onset than the Neve's silicon sidechain | the TG spreads its first decibel of gain reduction over 1.6 dB of input and the Neve over 3.1 | **the claim does not survive its own component values.** The rectifier's soft knee is one diode drop wide, about 250 mV, and the threshold it is compared against is a string of **three** of the same diodes. So the reference sits 3.7 knee-widths up and the rectifier has been straight for a factor of ten in level by the time the signal reaches it; measured at the threshold, a soft rectifier and a hard one agree to better than a tenth of a per cent, and that identity is what the test asserts. Settling it needs the three-diode string's drop at its working current, which means the item list or a probe on a real module |
+| TG12413 | the generalised law reproduces the Neve's to 1 × 10⁻⁹ relative | 4 × 10⁻⁶ in the well-conditioned direction | f32's epsilon is 1.2 × 10⁻⁷, so the dossier's figure is below what the representation can hold. The test asserts the identity at the limit instead, with the bound derived rather than chosen: near its asymptote the logarithm's argument is a difference of two nearly equal currents, so a relative error is amplified by 1/(1 − (i/I)²), which at the top of the dossier's range is a hundredfold |
 
 ## Tests
 

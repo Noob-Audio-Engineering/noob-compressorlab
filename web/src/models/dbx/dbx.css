@@ -1,0 +1,743 @@
+/*
+ * The dbx 160 and 160A's look.
+ *
+ * **Two panels, two provenances, and the difference matters.**
+ *
+ * The 160A's colours are *measured*. dbx's own product photograph is in the
+ * reference set as `dbx-160a-front-big.jpg`, so the panel field, the three
+ * knob caps, the blue dividing rules and the three indicator colours below
+ * are median samples taken from it, and `Faceplate160a.vue` records where.
+ *
+ * The original 160's colours are *ours*. dbx's front-panel figure is a line
+ * drawing, no colour photograph of a 160 is in the reference set, and the
+ * research says in as many words that it will not state a panel colour for
+ * it. So the warm grey face and the walnut cheeks below are this plug-in's
+ * invention. What is not invented is the indicator behaviour: the manual is
+ * explicit that the original is **amber** below threshold and **red** above,
+ * where every later model prints green, yellow and red, and that is the one
+ * colour fact the drawing's own text supplies.
+ *
+ * Nothing here belongs in the framework, which holds no colours.
+ */
+
+/*
+ * The palette is set on the faceplates as well as on the page, because the
+ * browse view mounts them as card previews outside any `.lab-model--dbx`
+ * wrapper.
+ */
+.lab-model--dbx,
+.face160,
+.face160a {
+  /* Sampled from dbx's 160A photograph. */
+  --dbx-panel: #3d3b3c;
+  --dbx-panel-deep: #333132;
+  --dbx-red: #c13c37;
+  --dbx-blue: #446c87;
+  --dbx-green: #436c4d;
+  --dbx-rule: #148ebf;
+  --dbx-print: #eef1f2;
+  --dbx-led-red: #dd3533;
+  --dbx-led-amber: #c6b53a;
+  --dbx-led-green: #c7df37;
+  --dbx-led-off: #2b2a2a;
+
+  /* Ours: the original has no colour reference anywhere. */
+  --dbx-face: #8f8a80;
+  --dbx-face-deep: #7d786f;
+  --dbx-ink: #23211e;
+  --dbx-knob: #efece5;
+  --dbx-knob-rim: #55514a;
+  --dbx-wood: #6b4526;
+  --dbx-wood-dark: #4a2e17;
+  --dbx-amber: #e6a01f;
+
+  --noob-vst-webgui-framework-accent: var(--dbx-red);
+  background: #14100d;
+}
+
+.lab-model--dbx.lab-model {
+  background: #14100d;
+}
+
+/* =========================================================== the original */
+
+.face160 {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  aspect-ratio: 2.816;
+  filter: drop-shadow(0 10px 26px rgb(0 0 0 / 0.55));
+  container-type: inline-size;
+}
+
+.face160.off .face160__panel {
+  filter: brightness(0.72) saturate(0.7);
+}
+
+/* The wood cheeks, 3.53 % and 3.87 % of the plate as measured. */
+.face160__cheek {
+  flex: 0 0 3.53%;
+  background:
+    repeating-linear-gradient(
+      177deg,
+      rgb(255 255 255 / 0.06) 0 2px,
+      rgb(0 0 0 / 0.1) 2px 5px,
+      rgb(255 255 255 / 0.03) 5px 9px
+    ),
+    linear-gradient(90deg, var(--dbx-wood-dark), var(--dbx-wood) 40%, var(--dbx-wood-dark));
+  border-radius: 4px 0 0 4px;
+}
+.face160__cheek.right {
+  flex-basis: 3.87%;
+  border-radius: 0 4px 4px 0;
+}
+
+.face160__panel {
+  position: relative;
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, var(--dbx-face), var(--dbx-face-deep) 70%, #6f6a62);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), inset 0 -1px 0 rgb(0 0 0 / 0.3);
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  color: var(--dbx-ink);
+}
+
+/*
+ * No added tracking anywhere on this face. The drawing's own words are
+ * narrower than Helvetica sets them: INPUT spans 0.0485 of the panel over
+ * five characters and BELOW clears the indicator beside it by 0.0018, and
+ * both of those only come out right with the tracking at zero. With 0.06em
+ * of it the meter captions ran into each other and BELOW ran into its lamp.
+ */
+.face160__legend,
+.face160__caption,
+.face160__sub,
+.face160__ledlabel {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  text-transform: uppercase;
+  font-weight: 600;
+  pointer-events: none;
+}
+/*
+ * Every size here is the cap height measured off dbx's drawing, divided by
+ * 0.716 to get a font size: the legends, the indicator labels, the switch
+ * captions and METER all measure 20 to 21 px against a 1627.5 px panel, so
+ * they are one size, 1.76 % of the panel width. The logo's cap is 94 px and
+ * the COMPRESSOR/LIMITER line's 51, but that last window catches the meter
+ * bezel's edge, so it is sized to its measured *width* of 0.288 instead.
+ */
+.face160__legend {
+  font-size: 1.76cqw;
+}
+.face160__legend.two,
+.face160__caption.two {
+  line-height: 1.12;
+  text-align: center;
+}
+.face160__caption {
+  font-size: 1.76cqw;
+}
+/*
+ * Sized by its measured **width** rather than by the cap height the same
+ * window gives, because that window catches the meter bezel's bottom edge:
+ * the line spans 0.2878 of the panel over nineteen characters.
+ */
+.face160__sub {
+  font-size: 1.95cqw;
+}
+
+.face160__logo {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 8.07cqw;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* the two indicators, flanking the word THRESHOLD */
+.face160__ledlabel {
+  font-size: 1.76cqw;
+}
+.face160__led {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.35cqw;
+  height: 1.35cqw;
+  border-radius: 50%;
+  background: var(--dbx-led-off);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.45);
+}
+.face160__led.below {
+  background: var(--dbx-amber);
+  box-shadow: 0 0 0.7cqw rgb(230 160 31 / 0.6), inset 0 0 0 1px rgb(0 0 0 / 0.35);
+}
+.face160__led.above {
+  background: var(--dbx-led-red);
+  box-shadow: 0 0 0.7cqw rgb(221 53 51 / 0.6), inset 0 0 0 1px rgb(0 0 0 / 0.35);
+}
+
+.face160__knob {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+}
+
+.face160__power {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 5.5cqw;
+  height: 2.4cqw;
+  border: 0;
+  border-radius: 0.5cqw;
+  background: linear-gradient(180deg, #b9b3a8, #8c867c);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 1px 2px rgb(0 0 0 / 0.4);
+  cursor: pointer;
+  padding: 0;
+}
+.face160__power.on {
+  background: linear-gradient(180deg, #6f6a60, #57534b);
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.5);
+}
+
+.face160__buttons {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: 0.35cqw;
+}
+.face160__button {
+  width: 7.4cqw;
+  height: 2.4cqw;
+  border: 0;
+  border-radius: 0.3cqw;
+  background: linear-gradient(180deg, #b9b3a8, #8c867c);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.4), 0 1px 2px rgb(0 0 0 / 0.4);
+  cursor: pointer;
+  padding: 0;
+}
+.face160__button.on {
+  background: linear-gradient(180deg, #6f6a60, #57534b);
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.5);
+}
+
+/* the drawn bracket joining the three buttons to the word METER */
+.face160__bracket {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 23.6cqw;
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+  font-size: 1.76cqw;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  pointer-events: none;
+}
+.face160__bracket::before,
+.face160__bracket::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.75;
+}
+
+/*
+ * The meter's measured share of the panel: 0.3284 of its width, centred at
+ * 0.799 across and 0.397 down. The bezel's own aspect comes from the same
+ * measurement (see `VuFaceDbx.vue`), so its height follows from the width
+ * and nothing here has to state it twice.
+ */
+.face160__meter {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 32.84%;
+}
+
+/* ---------------------------------------------------------- the VU face -- */
+
+.dbxvu {
+  width: 100%;
+}
+.dbxvu__num,
+.dbxvu__pct,
+.dbxvu__top,
+.dbxvu__legend {
+  /* The face's own type, in the SVG's units, so it scales with the panel. */
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+.dbxvu__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dbxvu__bezel {
+  fill: #2a2724;
+  stroke: #14120f;
+  stroke-width: 2;
+}
+.dbxvu__glass {
+  fill: #efe6cf;
+}
+.dbxvu.dark .dbxvu__glass {
+  fill: #9b968a;
+}
+.dbxvu__arc {
+  fill: none;
+  stroke: #1b1a17;
+  stroke-width: 3;
+}
+.dbxvu__arc.red {
+  stroke: #b4231d;
+  stroke-width: 5;
+}
+.dbxvu__tick {
+  stroke: #1b1a17;
+  stroke-width: 3;
+}
+.dbxvu__tick.minor {
+  stroke-width: 2;
+}
+.dbxvu__tick.red {
+  stroke: #b4231d;
+}
+.dbxvu__tick.pct {
+  stroke: #1b1a17;
+  stroke-width: 2;
+}
+.dbxvu__num {
+  font: 600 20px 'Helvetica Neue', Arial, sans-serif;
+  fill: #1b1a17;
+}
+.dbxvu__num.red {
+  fill: #b4231d;
+}
+.dbxvu__pct {
+  font: 500 14px 'Helvetica Neue', Arial, sans-serif;
+  fill: #4a463d;
+}
+.dbxvu__top {
+  font: 700 15px 'Helvetica Neue', Arial, sans-serif;
+  fill: #4a463d;
+  letter-spacing: 3px;
+}
+.dbxvu__legend {
+  font: 600 15px 'Helvetica Neue', Arial, sans-serif;
+  fill: #4a463d;
+  letter-spacing: 2px;
+}
+.dbxvu__needle {
+  stroke: #16150f;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+.dbxvu__screw {
+  fill: #3b3833;
+}
+.dbxvu__slot {
+  stroke: #17150f;
+  stroke-width: 2.5;
+}
+
+/* =============================================================== the 160A */
+
+.face160a {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  aspect-ratio: 10.857;
+  filter: drop-shadow(0 10px 26px rgb(0 0 0 / 0.55));
+  container-type: inline-size;
+}
+.face160a.bypassed .face160a__panel {
+  filter: brightness(0.8);
+}
+
+.face160a__ear {
+  position: relative;
+  flex: 0 0 2.6%;
+  background: linear-gradient(180deg, #46443f, #353331);
+  border-radius: 3px 0 0 3px;
+}
+.face160a__ear.right {
+  border-radius: 0 3px 3px 0;
+}
+.face160a__ear .slot {
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: 46%;
+  height: 16%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #17161a;
+}
+.face160a__ear .slot.low {
+  top: 62%;
+}
+
+.face160a__panel {
+  position: relative;
+  flex: 1 1 auto;
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.014) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #444243, var(--dbx-panel) 40%, var(--dbx-panel-deep));
+  color: var(--dbx-print);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  overflow: hidden;
+}
+
+.face160a__rule {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  width: 1px;
+  background: var(--dbx-rule);
+  opacity: 0.85;
+}
+
+.face160a__brand,
+.face160a__model,
+.face160a__caption,
+.face160a__tiny,
+.face160a__sub {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.face160a__brand {
+  font-size: 3.3cqw;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.face160a__model {
+  font-size: 2.1cqw;
+  letter-spacing: 0.3em;
+  font-weight: 400;
+  line-height: 1;
+}
+/*
+ * The 160A's silkscreen measures 4 to 5 px against a 107 px panel, which is
+ * a cap height of 0.0039 of the panel width and a font of 0.54cqw. **These
+ * are larger than that**, by about half for the captions and a third for the
+ * small labels, and the reason is stated rather than hidden: a 1U panel's
+ * type is about 1.4 mm tall, and at true size it is five or six pixels in
+ * any window this page opens at. Even enlarged, the smallest of it falls
+ * under eight pixels below about a 1500 px window; the default face is the
+ * original's, which is clean at every size.
+ */
+.face160a__caption {
+  font-size: 0.95cqw;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+.face160a__caption.two {
+  line-height: 1.15;
+  text-align: center;
+}
+.face160a__tiny {
+  /*
+   * **This size is bounded, not chosen.** Measured on dbx's photograph,
+   * BELOW spans 0.0143 of the panel and ABOVE 0.0126, which is 0.0027 per
+   * character and a font of 0.38cqw; their centres are 0.0312 apart with
+   * the OverEasy leader line between them. Anything above about 0.76cqw
+   * makes the two words meet, so 0.74 is as far up as the panel's own
+   * spacing goes — already about twice life size.
+   *
+   * These are the control **names**, so unlike the numerals around the
+   * knobs and along the level row they are not dropped when they fall under
+   * the legibility floor: an unlabelled button says less than a small
+   * label. They clear it from about a 1250 px window up. The original 160's
+   * face, which is the default, is legible at every size.
+   */
+  font-size: 0.74cqw;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  line-height: 1;
+}
+.face160a__tiny.left {
+  transform: translate(0, -50%);
+}
+/*
+ * OVEREASY sits on the leader line that runs from its lamp to its button,
+ * so it needs the panel behind it rather than the line through it.
+ */
+.face160a__tiny.boxed {
+  padding: 0 0.35cqw;
+  background: var(--dbx-panel);
+}
+.face160a__sub {
+  font-size: 1.5cqw;
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+/* The rule from the OverEasy lamp down to its button. */
+.face160a__leader {
+  position: absolute;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--dbx-print);
+  opacity: 0.55;
+}
+
+.face160a__led {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 0.72cqw;
+  height: 0.72cqw;
+  border-radius: 50%;
+  background: var(--dbx-led-off);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6);
+}
+.face160a__led.red.on {
+  background: var(--dbx-led-red);
+  box-shadow: 0 0 0.6cqw rgb(221 53 51 / 0.7);
+}
+.face160a__led.yellow.on {
+  background: var(--dbx-led-amber);
+  box-shadow: 0 0 0.6cqw rgb(198 181 58 / 0.7);
+}
+.face160a__led.green {
+  background: var(--dbx-led-green);
+  box-shadow: 0 0 0.6cqw rgb(199 223 55 / 0.6);
+}
+.face160a__led.amber {
+  background: var(--dbx-led-amber);
+  box-shadow: 0 0 0.6cqw rgb(198 181 58 / 0.6);
+}
+.face160a__led.red {
+  background: var(--dbx-led-red);
+}
+
+.face160a__button {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.5cqw;
+  height: 1.5cqw;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: radial-gradient(circle at 35% 30%, #3b3939, #17161a 70%);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.7), 0 1px 2px rgb(0 0 0 / 0.5);
+  cursor: pointer;
+}
+.face160a__button[aria-pressed='true'] {
+  background: radial-gradient(circle at 35% 30%, #22201f, #0d0c0e 70%);
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.7);
+}
+
+.face160a__knob {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+}
+
+/*
+ * Anchored at the level row's own measured left edge, 0.6421 of the panel,
+ * rather than centred on a guess: the row is nineteen lamps on a 0.0105
+ * pitch, so it ends at 0.831 and its caption follows. Centring it put its
+ * printed scale under the INPUT and OUTPUT labels.
+ */
+.face160a__display {
+  position: absolute;
+  transform: translate(0, -50%);
+  width: 26%;
+}
+
+/* ------------------------------------------------------- the LED display -- */
+
+.dbxleds {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35cqw;
+}
+.dbxleds__row {
+  display: flex;
+  align-items: center;
+  gap: 0.55cqw;
+}
+.dbxleds__row.gr {
+  /* The gain-reduction row sits under the −40 to −1 marks and shares that
+     half of the scale, so it starts where the level row does. */
+  justify-content: flex-start;
+}
+.dbxleds__led {
+  flex: 0 0 auto;
+  width: 0.72cqw;
+  height: 0.72cqw;
+  border-radius: 50%;
+  background: var(--dbx-led-off);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.6);
+}
+.dbxleds__led.on {
+  background: var(--dbx-led-red);
+  box-shadow: 0 0 0.55cqw rgb(221 53 51 / 0.7);
+}
+.dbxleds__led.yellow.on {
+  background: var(--dbx-led-amber);
+  box-shadow: 0 0 0.55cqw rgb(198 181 58 / 0.7);
+}
+.dbxleds__caption {
+  font-size: 0.72cqw;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 0.4cqw;
+}
+.dbxleds__scale {
+  display: flex;
+  gap: 0.55cqw;
+  font-size: 0.62cqw;
+  color: #b9bcbd;
+}
+.dbxleds__scale span {
+  flex: 0 0 auto;
+  width: 0.72cqw;
+  text-align: center;
+}
+.dbxleds__spacer {
+  flex: 1 1 auto;
+}
+/* Dropped rather than drawn illegibly; the row keeps its height so the two
+   lamp rows stay where the panel puts them. */
+.dbxleds__scale.blank {
+  min-height: 0.62cqw;
+}
+
+/* ================================================================ the knob */
+
+.dbxknob {
+  position: relative;
+  aspect-ratio: 1;
+}
+.dbxknob__dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+.dbxknob__dial:focus-visible {
+  filter: drop-shadow(0 0 3px var(--noob-vst-webgui-framework-accent, #c13c37));
+}
+.dbxknob__body {
+  fill: var(--dbx-knob);
+}
+.dbxknob__rim {
+  fill: none;
+  stroke: var(--dbx-knob-rim);
+  stroke-width: 1.6;
+}
+.dbxknob__index {
+  stroke: #2a2724;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.dbxknob__pointer {
+  fill: #f4f6f6;
+}
+.dbxknob__marks line {
+  stroke: currentColor;
+  stroke-width: 1.1;
+  opacity: 0.75;
+}
+.dbxknob__marks line.long {
+  stroke-width: 1.6;
+  opacity: 0.95;
+}
+.dbxknob__marks text {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 600;
+  fill: currentColor;
+  opacity: 0.95;
+}
+.dbxknob__value {
+  position: absolute;
+  left: 50%;
+  bottom: -1.4em;
+  transform: translateX(-50%);
+  padding: 0 0.35em;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.72);
+  color: #f2f4f4;
+  font: 600 11px/1.5 'Helvetica Neue', Arial, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ============================================================ the strip */
+
+.extrasdbx__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.extrasdbx__caption {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #cbd0d1;
+}
+.extrasdbx__value {
+  font-size: 11px;
+  color: #eef1f2;
+}
+.extrasdbx__hint {
+  font-size: 10px;
+  color: #9aa0a2;
+  max-width: 15ch;
+  text-align: center;
+  line-height: 1.2;
+}
+.extrasdbx__tag {
+  align-self: center;
+  padding: 1px 6px;
+  border: 1px solid #6b5a3a;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #d7c08a;
+  white-space: nowrap;
+}
+
+/*
+ * The bar's segmented chip. Without these rules the framework's buttons keep
+ * their bare defaults and the two unit names run together as "160160A" - the
+ * same failure the 33609's bar records, and the reason its own chips are
+ * dressed there.
+ */
+.extrasdbx .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #16110d;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+.extrasdbx .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(240 236 230 / 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extrasdbx .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #4a3a33, #2a201c);
+  color: var(--dbx-red);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+@container (max-width: 1150px) {
+  .extrasdbx__hint {
+    display: none;
+  }
+}

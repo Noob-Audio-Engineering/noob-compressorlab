@@ -32,6 +32,9 @@ import VcaFace from '../models/vca/Faceplate.vue';
 import Pre6176Face from '../models/pre6176/Faceplate.vue';
 import Cl1bFace from '../models/cl1b/Faceplate.vue';
 import BridgeFace from '../models/bridge/Faceplate.vue';
+import DbxFace from '../models/dbx/Faceplate.vue';
+import TgFace from '../models/tg/Faceplate.vue';
+import GbusFace from '../models/gbus/Faceplate.vue';
 
 const props = defineProps({
   modelKey: { type: String, required: true },
@@ -53,6 +56,9 @@ const FACES = {
   pre6176: Pre6176Face,
   cl1b: Cl1bFace,
   bridge: BridgeFace,
+  dbx: DbxFace,
+  tg: TgFace,
+  gbus: GbusFace,
 };
 const face = computed(() => FACES[props.modelKey] || null);
 

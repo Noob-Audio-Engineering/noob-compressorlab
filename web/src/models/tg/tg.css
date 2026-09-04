@@ -1,0 +1,484 @@
+/*
+ * The EMI TG12413's look.
+ *
+ * **Nothing here is sampled from a photograph of this module, because no
+ * photograph of one exists.** Section 2.9 of the dossier says so plainly and
+ * this file inherits that. What the colours are is stated at each variable:
+ * the field is between the two sources that disagree, the knobs are the two
+ * families the console photographs show unambiguously, and the silkscreen is
+ * white, which both sources agree on. Nothing here belongs in the framework,
+ * which holds no colours.
+ */
+
+.lab-model--tg,
+.tgframe {
+  /*
+   * The field. Two sources disagree: the restored TG12345 recording console
+   * measures #69767E and #656969, a mid grey with a blue-green cast, while
+   * Waves draw the TG12410 transfer console's modules in a slate blue
+   * between #47647C and #42576D. They are different consoles and there is no
+   * reason their modules were finished alike, so this sits between them
+   * rather than picking a side.
+   */
+  --tg-field: #5a6771;
+  --tg-field-lit: #68757f;
+  --tg-field-dark: #46525b;
+  /* White silkscreen throughout, which both sources agree on. */
+  --tg-print: #eef3f5;
+  --tg-print-dim: #a9b7be;
+  /*
+   * The console's red skirted knob with its cream pointer cap, which the
+   * photographs call the most distinctive object on the desk. Waves measure
+   * their mode knob at #9F3D32; the console's reads #AC3E40 under flash and
+   * is "almost certainly a brighter red in the paint", so this is a little
+   * brighter than either measurement and says so.
+   */
+  --tg-red: #b53c3c;
+  --tg-cream: #e8e2d3;
+  /* The black skirted knobs, with a bright machined boss. */
+  --tg-knob: #23272b;
+  --tg-knob-lit: #3a4046;
+  --tg-boss: #b8bcbd;
+  --tg-frame: #171d21;
+
+  --noob-vst-webgui-framework-accent: var(--tg-red);
+  background: #0e1316;
+}
+
+/* ---------------------------------------------------------------- frame -- */
+
+.tgframe {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  width: 100%;
+  container-type: inline-size;
+}
+
+/* ---------------------------------------------------------------- strip -- */
+
+/*
+ * One to five, which is what a console module is. The height comes from the
+ * view, so the strip takes what the window gives it and the frame beside it
+ * takes the width.
+ */
+.tgstrip {
+  /*
+   * A size container, so the strip's own rules can key off the height it was
+   * given. Nothing else on the page knows how tall it is: the view hands it
+   * `--tg-strip-h` and the width follows from that, so the question "is there
+   * room to print the legends around the knobs" can only be asked here.
+   */
+  container-type: size;
+  container-name: tgstrip;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--tg-strip-h, 420px);
+  width: calc(var(--tg-strip-h, 420px) / 5);
+  min-width: 92px;
+  padding: 0.6rem 0.4rem;
+  /* A backstop: nothing the module draws may spill onto the bench below. */
+  overflow: hidden;
+  border-radius: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--tg-field-lit),
+    var(--tg-field) 30%,
+    var(--tg-field) 70%,
+    var(--tg-field-dark)
+  );
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.35),
+    0 10px 26px rgb(0 0 0 / 0.55);
+}
+
+/*
+ * The head. The console silkscreens EMI here on every strip; this must
+ * obviously not, so it carries the lab's name instead.
+ */
+.tgstrip__head {
+  color: var(--tg-print);
+  font: 700 13px/1 var(--font-panel);
+  letter-spacing: 0.22em;
+  padding-bottom: 0.15rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.25);
+  width: 74%;
+  text-align: center;
+}
+
+/*
+ * The three switches share whatever the head and the foot leave, so the
+ * module keeps its proportions in a 520-pixel window as well as in a
+ * thousand-pixel one. Sizing them off the strip's *width* instead, which is
+ * the obvious thing and what the first pass did, overflows the strip as soon
+ * as the window is short: three knobs 86 per cent of 92 pixels across need
+ * 237 pixels of height that a 230-pixel strip has not got.
+ */
+.tgstrip__control {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  width: 100%;
+}
+.tgstrip__control .tgswitch {
+  width: min(86%, calc((var(--tg-strip-h, 420px) - 145px) / 3));
+}
+
+/*
+ * The setting, printed under its switch. A real panel does not need this,
+ * because the pointer against the silkscreen is the read-out. This one does,
+ * because in a short window the knobs come down to about forty pixels and
+ * legends printed round a forty-pixel knob are four pixels tall. Below that
+ * point the arc legends go and this stays, which keeps the control readable
+ * without shrinking type nobody could read anyway.
+ */
+.tgstrip__value {
+  color: var(--tg-print);
+  font: 700 9px/1.1 var(--font-panel);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.tgstrip__legend {
+  color: var(--tg-print);
+  font: 700 9px/1.1 var(--font-panel);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.tgstrip__sub {
+  color: var(--tg-print-dim);
+  font: 600 8px/1 var(--font-panel);
+  letter-spacing: 0.14em;
+}
+
+.tgstrip__foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  width: 74%;
+  padding-top: 0.2rem;
+  border-top: 1px solid rgb(255 255 255 / 0.25);
+  color: var(--tg-print);
+  font: 700 8.5px/1.2 var(--font-panel);
+  letter-spacing: 0.12em;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------- switch -- */
+
+.tgswitch {
+  position: relative;
+  aspect-ratio: 1;
+}
+.tgswitch__dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.tgswitch__dial:focus-visible {
+  outline: 1px solid var(--tg-red);
+  outline-offset: 2px;
+}
+
+.tgswitch__tick {
+  stroke: var(--tg-print-dim);
+  stroke-width: 1.1;
+}
+.tgswitch__tick--long {
+  stroke: var(--tg-print);
+  stroke-width: 1.5;
+}
+.tgswitch__num {
+  fill: var(--tg-print);
+  font: 700 9px var(--font-panel);
+  letter-spacing: 0.04em;
+}
+
+.tgswitch__skirt--black {
+  fill: var(--tg-knob);
+  stroke: rgb(0 0 0 / 0.6);
+  stroke-width: 1;
+}
+.tgswitch__skirt--red {
+  fill: var(--tg-red);
+  stroke: rgb(0 0 0 / 0.55);
+  stroke-width: 1;
+}
+.tgswitch__tooth {
+  stroke: rgb(255 255 255 / 0.16);
+  stroke-width: 0.9;
+}
+.tgswitch__cap--black {
+  fill: var(--tg-knob-lit);
+}
+.tgswitch__cap--red {
+  fill: var(--tg-cream);
+}
+.tgswitch__pointer--black {
+  fill: var(--tg-print);
+}
+.tgswitch__pointer--red {
+  fill: #2a2320;
+}
+.tgswitch__boss {
+  fill: var(--tg-boss);
+}
+
+.tgswitch__value {
+  position: absolute;
+  left: 50%;
+  top: -0.7rem;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #0b1114;
+  color: var(--tg-print);
+  font: 700 10px var(--font-panel);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- rack -- */
+
+.tgrack {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #1b2227, var(--tg-frame));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.05);
+}
+
+.tgrack__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+/* The internal preset, drawn as the screwdriver adjustment it is. */
+.tgpreset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  max-width: 150px;
+}
+.tgpreset__caption,
+.tgreadout__caption,
+.tgmeter__caption {
+  color: var(--tg-print-dim);
+  font: 700 9px/1.2 var(--font-panel);
+  letter-spacing: 0.1em;
+}
+.tgpreset__value {
+  color: var(--tg-print);
+  font: 700 11px var(--font-panel);
+  font-variant-numeric: tabular-nums;
+}
+.tgpreset__note,
+.tgreadout__note {
+  color: #7d8d96;
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
+}
+.tgreadout__note {
+  text-align: left;
+  max-width: 24ch;
+}
+
+/* The live control current. */
+.tgreadout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.tgreadout__value {
+  color: var(--tg-red);
+  font: 700 22px/1.1 var(--font-panel);
+  font-variant-numeric: tabular-nums;
+}
+.tgreadout__value--small {
+  font-size: 15px;
+  color: var(--tg-print);
+}
+.tgreadout__unit {
+  font-size: 12px;
+  color: var(--tg-print-dim);
+}
+
+/* ---------------------------------------------------------------- meter -- */
+
+.tgmeter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+.tgmeter__body {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  height: 128px;
+}
+.tgmeter__column {
+  position: relative;
+  width: 16px;
+  border-radius: 2px;
+  background: #0a0f12;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.09);
+  overflow: hidden;
+}
+.tgmeter__fill {
+  position: absolute;
+  inset: 0 0 auto 0;
+  background: linear-gradient(180deg, #d9dfe2, var(--tg-red));
+  transition: height 40ms linear;
+}
+.tgmeter__scale {
+  position: relative;
+  width: 20px;
+}
+.tgmeter__mark {
+  position: absolute;
+  left: 0;
+  transform: translateY(-50%);
+  color: var(--tg-print-dim);
+  font: 600 9px/1 var(--font-panel);
+  font-variant-numeric: tabular-nums;
+}
+.tgmeter__unit {
+  color: var(--tg-print-dim);
+  font: 600 9px var(--font-panel);
+}
+.tgmeter__ours {
+  color: #7d8d96;
+  font-size: 9px;
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------- notes -- */
+
+.tgnotes {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.2rem 0.8rem;
+  align-items: baseline;
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgb(255 255 255 / 0.07);
+}
+.tgnotes__term {
+  color: var(--tg-print-dim);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.tgnotes__text {
+  margin: 0;
+  color: #8b9aa2;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------- extras -- */
+
+.extrastg__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.extrastg__caption {
+  color: #93a3ac;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.extrastg__value {
+  color: var(--tg-red);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.extrastg__hint {
+  color: #6f7f88;
+  font-size: 10px;
+}
+
+.extrastg .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b1114;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+.extrastg .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(226 236 240 / 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extrastg .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #38434b, #1d262b);
+  color: var(--tg-print);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+/*
+ * Narrow windows: the notes are the first thing to go, then the hints. The
+ * strip and its three switches never shrink below legibility, because they
+ * are the module and everything else on the page is ours.
+ */
+/*
+ * The extras bar is not inside a container, so its rules key off the window
+ * itself; the frame is, so its rules are container queries. Getting that the
+ * wrong way round is why the first pass left the hint showing at 900 pixels
+ * and pushed the module's own foot off the bottom of the page.
+ */
+@media (max-width: 1240px) {
+  .extrastg__hint { display: none; }
+}
+@media (max-width: 1000px) {
+  .extrastg__item .tgswitch { display: none; }
+}
+@container (max-width: 1000px) {
+  .tgreadout__note { display: none; }
+  .tgpreset__note { display: none; }
+}
+@container (max-width: 880px) {
+  .tgnotes { display: none; }
+}
+
+/*
+ * Below this the knobs are too small to carry printed legends. The ticks
+ * stay, because a stepped control has to look stepped, and the read-out
+ * under each switch says where it is.
+ */
+@container tgstrip (max-height: 360px) {
+  .tgswitch__num { display: none; }
+  .tgstrip__legend { font-size: 8px; }
+}
+@container tgstrip (min-height: 360px) {
+  .tgstrip__value { display: none; }
+}

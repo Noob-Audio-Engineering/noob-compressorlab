@@ -17,11 +17,12 @@
  *
  * **Three things the dossier or my first pass had wrong.**
  *
- * 1. *The knob skirt is grey, not black.* The dossier's colour table gives
+ * 1. *The knob skirt is grey, not black.* The dossier's colour table gave
  *    #1B1F20, "near-black, knurled". Sampling radially out from a knob
  *    centre gives the blue cap to 0.9 of the cap radius, then #9BA2A1 at
  *    1.15 and #606B6F from 1.3 to 1.6, and the close crop shows an
- *    unmistakably bright aluminium knurl. The skirts here are grey.
+ *    unmistakably bright aluminium knurl. The skirts here are grey and
+ *    section 2.4 of the dossier now records the correction.
  *
  * 2. *The block rules are at 0.039 and 0.959 of the panel height*, not the
  *    0.075 and 0.925 I first drew. The blocks are taller than I had them.

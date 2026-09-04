@@ -23,6 +23,9 @@
 @import './models/la3a/la3a.css';
 @import './models/cl1b/cl1b.css';
 @import './models/bridge/bridge.css';
+@import './models/dbx/dbx.css';
+@import './models/tg/tg.css';
+@import './models/gbus/gbus.css';
 /*
  * Tailwind scans only this app's sources by default. The shared Vue
  * components live in the linked `@noob-audio-engineering/noob-vst-webgui-framework` package and

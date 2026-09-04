@@ -3,7 +3,9 @@
  * that model not listed loads at its default), and the user presets, which
  * live in the plug-in's UI store under one key per model
  * (`presets.user.fet`, `presets.user.opto`, `presets.user.la3a`,
- * `presets.user.vca`, `presets.user.pre6176`, `presets.user.cl1b`) so they persist with the
+ * `presets.user.vca`, `presets.user.pre6176`, `presets.user.cl1b`, `presets.user.bridge`,
+ * `presets.user.dbx`, `presets.user.gbus`,
+ * `presets.user.tg`) so they persist with the
  * plug-in state and every window of the instance sees them.
  *
  * A preset only ever touches its own model's parameters and the shared
@@ -15,7 +17,7 @@
  */
 import { getClient } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 
-/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b' | 'bridge', Preset[]>} */
+/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b' | 'bridge' | 'dbx' | 'tg' | 'gbus', Preset[]>} */
 export const FACTORY_PRESETS = {
   // fet_ratio: 0 4:1, 1 8:1, 2 12:1, 3 20:1, 4 All. fet_revision: 0 A .. 7 H, 8 LN (see REVISIONS in models/fet/useFet.js).
   fet: [
@@ -200,6 +202,106 @@ export const FACTORY_PRESETS = {
       name: 'Limiter only',
       description: 'The compressor out and the limiter in on its fast attack, which is the way the 2254 was used in front of a tape machine.',
       values: { neve_compress_in: 0, neve_limit_in: 1, neve_limit_attack: 1, neve_limit_threshold: 10, neve_limit_recovery: 1 },
+    },
+  ],
+  // tg_mode: 0 Compress, 1 Out, 2 Limit. tg_recovery is the panel's 1 to 6
+  // as 0 to 5, with no times attached to any of them, deliberately.
+  // tg_output is the printed decibel, -10 to +10; the resistor ladder behind
+  // it delivers 0.83 to 1.06 dB per step, which is the hardware's own error.
+  /*
+   * dbx's own application notes are the source for most of these: their
+   * manual lists a starting point per source, and where it does the
+   * description says so. `dbx_ratio` carries the coefficient the pot sets,
+   * `alpha = 1 - 1/R`, so 4:1 is 0.75 and the infinity mark is 1.
+   */
+  dbx: [
+    {
+      name: 'Kick',
+      description: "dbx's own kick-drum setting: 6:1 in OverEasy with the threshold set for about 15 dB of reduction. Their note says OverEasy takes slightly longer to react and so reduces the boominess of the body.",
+      values: { dbx_model: 1, dbx_knee: 1, dbx_ratio: 5 / 6, dbx_threshold: -18, dbx_output: 6 },
+    },
+    {
+      name: 'Vocal',
+      description: "dbx's vocal starting point: a low-to-medium ratio around 4:1 with the threshold set for six to ten decibels of reduction.",
+      values: { dbx_model: 1, dbx_knee: 1, dbx_ratio: 0.75, dbx_threshold: -10, dbx_output: 4, sc_hpf: 60 },
+    },
+    {
+      name: 'Bass',
+      description: "dbx's bass and electric-guitar setting: 4:1, threshold for ten to twelve decibels of reduction.",
+      values: { dbx_ratio: 0.75, dbx_threshold: -14, dbx_output: 6 },
+    },
+    {
+      name: 'Drum Bus',
+      description: "dbx back the ratio off to 2:1 on a two-channel drum submix, in their words \u201cto avoid an excess of cymbal splattering\u201d. Linked, so the two channels sum their energies rather than their signals.",
+      values: { dbx_ratio: 0.5, dbx_threshold: -12, dbx_output: 3, link: 1 },
+    },
+    {
+      name: 'Sustain',
+      description: "dbx's setting for sustain on a guitar or a synth pad: 10:1 to infinity, threshold to taste. This is the ten.",
+      values: { dbx_ratio: 0.9, dbx_threshold: -20, dbx_output: 10 },
+    },
+    {
+      name: 'Overload Guard',
+      description: "dbx's digital-overload setting: hard knee at the infinity mark with the threshold a couple of decibels below clip. The mark is 120:1 rather than infinity, which dbx published and this model keeps, so a 40 dB overshoot still lifts the output by a third of a decibel.",
+      values: { dbx_knee: 0, dbx_ratio: 1, dbx_threshold: 19, dbx_output: 0 },
+    },
+    {
+      name: 'Line Amp',
+      description: "dbx's own instruction for using it as a line amplifier: ratio fully anticlockwise at 1:1, threshold fully clockwise at 3 V, and the output gain to taste. Nothing compresses; you are hearing the audio path.",
+      values: { dbx_ratio: 0, dbx_threshold: 11.76, dbx_output: 0 },
+    },
+    {
+      name: 'Infinity+',
+      description: "Past the infinity mark the coefficient exceeds one and the cell pulls down more than the input rose, so louder in is quieter out. dbx trademarked it and suggest striking a series of chords into it. The 160A only: the original's pot stops at the infinity mark.",
+      values: { dbx_model: 1, dbx_ratio: 1.5, dbx_threshold: -20, dbx_output: 6 },
+    },
+  ],
+  tg: [
+    {
+      name: 'Mastering',
+      description: 'Waves, who built their model with Abbey Road, name recovery 3, 4 and 5 as the useful ones for mastering. This is the middle of those with the compressor in and nothing else touched.',
+      values: {},
+    },
+    {
+      name: 'Bus, driven',
+      description: 'The module has no threshold, so how hard you drive it is how you set it. Six decibels in and three back out on the ladder, on the slower recovery so it holds between phrases.',
+      values: { tg_input: 6, tg_output: -3, tg_recovery: 4 },
+    },
+    {
+      name: 'Limit',
+      description: 'The mode switch to LIMIT, which is a lower threshold on the same law rather than a harder ratio, and the fastest recovery. It is not a brick-wall limiter and transients are expected to pass.',
+      values: { tg_mode: 2, tg_recovery: 0, tg_output: 2 },
+    },
+    {
+      name: 'Dirty',
+      description: 'Mine, and not the hardware: the drive control winds the gain element past where EMI ever ran it, and the arms are pushed out of balance so the even harmonics the matched pairs were meant to cancel come back.',
+      values: { tg_input: 6, tg_drive: 60, tg_mismatch: 45, tg_recovery: 1, tg_output: -4 },
+    },
+  ],
+  // ssl_attack is the panel's ladder as 0 to 5 (.1 .3 1 3 10 30 ms) and
+  // ssl_release the console's as 0 to 4, with 4 the two-section automatic
+  // network. ssl_ratio is 0 to 2 for 2:1, 4:1 and 10:1. The threshold is
+  // marked as the panel marks it, so more negative compresses more.
+  gbus: [
+    {
+      name: 'Bus',
+      description: "The dossier's own defaults: 4:1 with the 1 ms attack and the automatic release, and the threshold centred. Where the box sits before anyone touches it.",
+      values: {},
+    },
+    {
+      name: 'Glue',
+      description: 'The setting this compressor is famous for. A slow attack lets the transients through and pulls the body up behind them, and the automatic release lets go by programme rather than by clock.',
+      values: { ssl_ratio: 0, ssl_attack: 5, ssl_release: 4, ssl_threshold: -6, ssl_makeup: 3 },
+    },
+    {
+      name: 'Grab',
+      description: 'Mine: the fastest attack and the highest ratio, with a quick release. The ratio rises as it works, so this bites harder the more you feed it.',
+      values: { ssl_ratio: 2, ssl_attack: 0, ssl_release: 1, ssl_threshold: -12, ssl_makeup: 6 },
+    },
+    {
+      name: 'No pumping',
+      description: 'A fast release with the sidechain filter at 105 Hz, which is what the filter is there for: with a fast release a low tone modulates the gain at its own period and the result is intermodulation rather than pumping.',
+      values: { ssl_ratio: 1, ssl_attack: 4, ssl_release: 0, ssl_hpf: 3, ssl_threshold: -8, ssl_makeup: 4 },
     },
   ],
 };

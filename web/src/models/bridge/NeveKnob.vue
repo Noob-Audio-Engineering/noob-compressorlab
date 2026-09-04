@@ -4,13 +4,13 @@
  * knurled aluminium skirt, a white index line across the cap, and its scale
  * printed on the panel around it.
  *
- * **The skirt is grey, not black.** The research's colour table calls the
- * skirt "near-black, knurled" at #1B1F20, and the photograph it was sampled
- * from disagrees. Reading `ref/neve-33609n-front.jpg` radially out from a
- * knob centre gives the blue cap to about 0.9 of the cap radius, then
- * #9BA2A1 at 1.15 and #606B6F through 1.3 to 1.6 before the panel takes
- * over, and the close crop shows an unmistakably bright machined knurl. I
- * have used what the photograph shows and reported the discrepancy.
+ * **The skirt is grey, not black.** The research's colour table used to call
+ * it "near-black, knurled" at #1B1F20. Reading `ref/neve-33609n-front.jpg`
+ * radially out from a knob centre gives the blue cap to about 0.9 of the cap
+ * radius, then #9BA2A1 at 1.15 and #606B6F through 1.3 to 1.6 before the
+ * panel takes over, and the close crop shows an unmistakably bright machined
+ * knurl. The dossier's section 2.4 now carries the measured values and the
+ * correction; this draws what the photograph shows.
  *
  * Sizes, in fractions of the panel's width, from the same photograph: the
  * cap measures 0.0257 across and the skirt 0.0392, so the cap is 0.61 of the

@@ -20,6 +20,7 @@
 //! | [`opto3`] | the LA-3A: the same T4 cell driven hard by a transistor sidechain, with a class-AB amplifier |
 //! | [`vca`] | the Distressor: a feedback VCA compressor in the dB domain, its eight curves, its distortion modes and British mode |
 //! | [`pre`] | the 610 tube preamp, which with the 1176 engine behind it makes the 6176 channel |
+//! | [`rms`] | the dbx 160: a Blackmer cell fed forward from a true-RMS log-domain detector |
 //! | [`source`] | the standalone's demo signals |
 //! | this file | [`Model`], [`Settings`], parameter ids and specs, streams, the bridge builder, the [`Processor`] |
 //!
@@ -68,6 +69,17 @@
 //! | `pre_load` | 15k, 600 | 15k | 6176 |
 //! | `pre_meter` | PRE, GR, COMP | GR | 6176 |
 //! | `pre_phantom` | toggle (+48 V; panel state, nothing audible) | off | 6176 |
+//! | `dbx_model` | 160, 160A | 160 | dbx 160 |
+//! | `dbx_threshold` | −40..+20 dBu | 0 | dbx 160 |
+//! | `dbx_ratio` | α = 1 − 1/R, 0..2 along the dial's own taper | 0.75 (4:1) | dbx 160 |
+//! | `dbx_output` | −20..+20 dB | 0 | dbx 160 |
+//! | `dbx_knee` | Hard, OverEasy (160A only) | Hard | dbx 160 |
+//! | `dbx_meter` | Input, Output, Gain Change | Gain Change | dbx 160 |
+//! | `dbx_meter_cal` | −15..+10 dBu (the rear-panel trimmer) | +4 | dbx 160 |
+//! | `dbx_knee_width` | 0..12 dB (ours; dbx published none) | 6 | dbx 160 |
+//! | `dbx_tau` | 20..60 ms (ours; the one number the box is made of) | 35.32 | dbx 160 |
+//! | `dbx_lookahead` | 0..10 ms (ours; dbx documented the trick in 1995) | 0 | dbx 160 |
+//! | `dbx_headroom` | 4..28 dB | 22 | dbx 160 |
 //! | `link` | toggle | on | extras |
 //! | `mix` | 0..100 % | 100 | extras |
 //! | `sc_hpf` | 0 (off)..300 Hz | 0 | extras |
@@ -81,7 +93,7 @@
 //! | `meter` | meter | 6 | every block | `[in_l, in_r, out_l, out_r, gr_db, meter_vu]`: linear peaks (1.0 = 0 dBFS), the gain change in dB (≤ 0 for every model) and what the active model's panel meter reads in dB (the GR positions: `gr_db`; the output positions: the block's VU reading against −18 dBFS = 0 VU, the 1176's +8 mode 4 dB lower; the 1176's Off and the LA-3A's Off: −60; the 6176's PRE position: the preamp's own meter) |
 //! | `cell` | raw | 3 | every block while the LA-2A or the LA-3A is active | `[light, free_carriers, trapped_carriers]`, 0..1; zeros once when a model without a cell takes over |
 //! | `transfer` | curve, sticky | 128 | on change | the active model's static output level in dBFS for a sine at −60..0 dBFS input |
-//! | `lamps` | raw | 4 | every block while the Distressor or the 6176 is active | `[thd_pct, redline, pre_vu_db, drive]`: the Distressor's estimated generator distortion and its two lamps, and the 610 section's meter reading and input-stage drive; zeros once when another model takes over |
+//! | `lamps` | raw | 4 | every block while the Distressor, the 6176 or the dbx 160 is active | `[thd_pct, redline, pre_vu_db, drive]`: the Distressor's estimated generator distortion and its two lamps, and the 610 section's meter reading and input-stage drive. The dbx 160 fills the same four slots with `[below, above, ghost_gr_db, overeasy]`: its two threshold indicators, what a peak detector would have asked for, and its OverEasy indicator. Zeros once when a model with neither takes over |
 //!
 //! ## Real-time rules
 //!
@@ -92,12 +104,16 @@
 
 pub mod bridge;
 pub mod fet;
+pub mod gbus;
 pub mod opto;
 pub mod opto1b;
 pub mod opto3;
 pub mod pre;
+pub mod rms;
 pub mod source;
+pub mod tg;
 pub mod vca;
+pub mod vmu;
 pub mod vu;
 
 /// Flush a state to zero once it has decayed far enough that arithmetic on
@@ -141,7 +157,7 @@ pub use source::{SOURCE_NAMES, Source};
 
 /// Labels of `model`, in parameter order. The first two keep their places
 /// so that a project saved before the lab grew still loads.
-pub const MODEL_NAMES: [&str; 7] = [
+pub const MODEL_NAMES: [&str; 10] = [
     "1176",
     "LA-2A",
     "LA-3A",
@@ -149,6 +165,9 @@ pub const MODEL_NAMES: [&str; 7] = [
     "6176",
     "CL-1B",
     "33609",
+    "160",
+    "TG12413",
+    "4000 G",
 ];
 /// Points in the `transfer` stream (both engines draw the same grid).
 pub const TRANSFER_POINTS: usize = fet::TRANSFER_POINTS;
@@ -185,11 +204,17 @@ pub enum Model {
     Opto1b,
     /// The Neve 33609 ([`bridge`]).
     Bridge,
+    /// The dbx 160 ([`rms`]).
+    Rms,
+    /// The EMI TG12413 ([`tg`]).
+    Tg,
+    /// The SSL 4000 G bus compressor ([`gbus`]).
+    Gbus,
 }
 
 impl Model {
     /// Every model in parameter order.
-    pub const ALL: [Model; 7] = [
+    pub const ALL: [Model; 10] = [
         Model::Fet,
         Model::Opto,
         Model::Opto3,
@@ -197,6 +222,9 @@ impl Model {
         Model::Pre6176,
         Model::Opto1b,
         Model::Bridge,
+        Model::Rms,
+        Model::Tg,
+        Model::Gbus,
     ];
 
     /// From the parameter value / label index (clamped).
@@ -253,6 +281,9 @@ pub struct Settings {
     pub pre: pre::Settings,
     pub opto1b: opto1b::Settings,
     pub bridge: bridge::Settings,
+    pub tg: tg::Settings,
+    pub rms: rms::Settings,
+    pub gbus: gbus::Settings,
 }
 
 impl Default for Settings {
@@ -266,6 +297,9 @@ impl Default for Settings {
             pre: pre::Settings::default(),
             opto1b: opto1b::Settings::default(),
             bridge: bridge::Settings::default(),
+            tg: tg::Settings::default(),
+            rms: rms::Settings::default(),
+            gbus: gbus::Settings::default(),
         }
         .with_shared(Shared::default())
     }
@@ -303,6 +337,31 @@ impl Settings {
         self.bridge.mix = s.mix;
         self.bridge.sc_hpf = s.sc_hpf_hz;
         self.bridge.bypass = s.bypass;
+        // The TG has no link switch and no bypass of its own: the GANG bus
+        // is a wire rather than a control, and OUT is deliberately not a
+        // bypass, so both come from the lab's shared strip and the panel
+        // says which of its controls are ours.
+        self.tg.link = s.link;
+        self.tg.mix = s.mix;
+        self.tg.sc_hpf = s.sc_hpf_hz;
+        self.tg.bypass = s.bypass;
+        // The dbx's SLAVE button and its BYPASS relay are the
+        // shared link and bypass: the hardware has both and there is
+        // no sense in a second copy of either.
+        self.rms.link = s.link;
+        self.rms.mix = s.mix;
+        self.rms.sc_hpf = s.sc_hpf_hz;
+        self.rms.bypass = s.bypass;
+        // The SSL's own IN switch is **not** the shared bypass and keeps
+        // its own parameter: it removes the sidechain and leaves the VCA
+        // and the make-up gain in circuit, which is the one thing about
+        // this box a plug-in author would guess wrong. Its four-way link
+        // mode is its own too, since the shared link is a toggle; the
+        // toggle still wins when it is off, and forces two detectors.
+        self.gbus.link = s.link;
+        self.gbus.mix = s.mix;
+        self.gbus.sc_hpf = s.sc_hpf_hz;
+        self.gbus.bypass = s.bypass;
         self
     }
 
@@ -365,6 +424,17 @@ pub struct ParamIx {
     pub neve_meter_select: usize,
     pub neve_drive: usize,
     pub neve_power: usize,
+    pub dbx_model: usize,
+    pub dbx_threshold: usize,
+    pub dbx_ratio: usize,
+    pub dbx_output: usize,
+    pub dbx_knee: usize,
+    pub dbx_meter: usize,
+    pub dbx_meter_cal: usize,
+    pub dbx_knee_width: usize,
+    pub dbx_tau: usize,
+    pub dbx_lookahead: usize,
+    pub dbx_headroom: usize,
     pub dist_input: usize,
     pub dist_output: usize,
     pub dist_attack: usize,
@@ -390,6 +460,26 @@ pub struct ParamIx {
     pub pre_load: usize,
     pub pre_meter: usize,
     pub pre_phantom: usize,
+    pub tg_mode: usize,
+    pub tg_recovery: usize,
+    pub tg_output: usize,
+    pub tg_hold: usize,
+    pub tg_region: usize,
+    pub tg_mismatch: usize,
+    pub tg_input: usize,
+    pub tg_drive: usize,
+    pub tg_oversample: usize,
+    pub ssl_in: usize,
+    pub ssl_threshold: usize,
+    pub ssl_makeup: usize,
+    pub ssl_attack: usize,
+    pub ssl_release: usize,
+    pub ssl_ratio: usize,
+    pub ssl_hpf: usize,
+    pub ssl_link: usize,
+    pub ssl_drive: usize,
+    pub ssl_range: usize,
+    pub ssl_oversample: usize,
     pub link: usize,
     pub mix: usize,
     pub sc_hpf: usize,
@@ -440,7 +530,10 @@ pub fn streams(sr: f32) -> Vec<StreamSpec> {
         StreamSpec::new("lamps", LAMPS_LEN)
             .name("Lamps")
             .kind(StreamKind::Raw)
-            .meta(json!({ "layout": "thd_pct,redline,pre_vu_db,drive" })),
+            .meta(json!({
+                "layout": "thd_pct,redline,pre_vu_db,drive",
+                "layout_160": "below,above,ghost_gr_db,overeasy"
+            })),
     ]
 }
 
@@ -808,6 +901,201 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
             .default(1.0)
             .not_automatable()
             .group("33609"),
+        // The dbx's two continuous dials publish what the panel is marked
+        // in, and the ratio publishes the coefficient the circuit actually
+        // sets rather than a ratio, because the ratio runs through infinity
+        // and comes back negative and no numeric range can say that. The
+        // sampled taper is the original's own dial, measured off dbx's
+        // drawing, so the nine printed marks land where they were measured.
+        //
+        // Both dials carry the **union** of the two units' ranges, and each
+        // faceplate maps its own pot's rotation onto the part its hardware
+        // has; `rms::Settings::clamped` gives the original its own limits
+        // back so a preset written on the 160A face cannot smuggle them in.
+        ParamSpec::new("dbx_model", "Unit")
+            .labels(rms::MODEL_NAMES)
+            .default(rms::MODEL_160 as f32)
+            .not_automatable()
+            .group("dbx 160"),
+        ParamSpec::new("dbx_threshold", "Threshold")
+            .range(rms::THRESHOLD_MIN_DBU, rms::THRESHOLD_MAX_DBU)
+            .default(0.0)
+            .unit("dBu")
+            .group("dbx 160"),
+        ParamSpec::new("dbx_ratio", "Compression")
+            .with_table(rms::ratio_table())
+            .default(0.75)
+            .group("dbx 160"),
+        ParamSpec::new("dbx_output", "Output Gain")
+            .range(rms::OUTPUT_MIN_DB, rms::OUTPUT_MAX_DB)
+            .default(0.0)
+            .unit("dB")
+            .group("dbx 160"),
+        ParamSpec::new("dbx_knee", "Threshold Characteristic")
+            .labels(rms::KNEE_NAMES)
+            .default(rms::KNEE_HARD as f32)
+            .group("dbx 160"),
+        ParamSpec::new("dbx_meter", "Meter")
+            .labels(rms::METER_NAMES)
+            .default(rms::METER_GAIN_CHANGE as f32)
+            .not_automatable()
+            .group("dbx 160"),
+        ParamSpec::new("dbx_meter_cal", "Meter Calibration")
+            .range(rms::METER_CAL_MIN_DBU, rms::METER_CAL_MAX_DBU)
+            .default(rms::METER_CAL_DEFAULT_DBU)
+            .unit("dBu")
+            .not_automatable()
+            .group("dbx 160"),
+        // The two dbx never gave anyone. The knee width because they never
+        // published one and it cannot be read off the drawing; the time
+        // constant because dbx's whole point is that you cannot adjust it,
+        // and dragging it to hear the release rate change with the attack
+        // is the clearest demonstration there is that they are one control.
+        ParamSpec::new("dbx_knee_width", "OverEasy Width")
+            .range(0.0, rms::engine::KNEE_WIDTH_MAX_DB)
+            .default(rms::engine::KNEE_WIDTH_DEFAULT_DB)
+            .unit("dB")
+            .group("dbx 160"),
+        ParamSpec::new("dbx_tau", "Detector Time Constant")
+            .range(rms::engine::TAU_MIN_S * 1e3, rms::engine::TAU_MAX_S * 1e3)
+            .default(rms::engine::TAU_DEFAULT_S * 1e3)
+            .unit("ms")
+            .group("dbx 160"),
+        ParamSpec::new("dbx_lookahead", "Look-ahead")
+            .range(0.0, rms::engine::LOOKAHEAD_MAX_MS)
+            .default(0.0)
+            .unit("ms")
+            .group("dbx 160"),
+        ParamSpec::new("dbx_headroom", "Headroom")
+            .range(rms::HEADROOM_MIN_DB, rms::HEADROOM_MAX_DB)
+            .default(rms::HEADROOM_DEFAULT_DB)
+            .unit("dB")
+            .not_automatable()
+            .group("dbx 160"),
+        // The TG12413 is three switches and one internal preset, and
+        // nothing on it is continuous, so every control the hardware has
+        // is stepped here too. `tg_output` is the one with real units: it
+        // publishes the decibels EMI silkscreened, while the engine works
+        // from the twenty-one resistor values behind them, which is what
+        // the hardware does.
+        ParamSpec::new("tg_mode", "Mode")
+            .labels(tg::MODE_NAMES)
+            .default(tg::MODE_COMPRESS as f32)
+            .group("TG12413"),
+        ParamSpec::new("tg_recovery", "Recovery")
+            .labels(tg::RECOVERY_NAMES)
+            .default(2.0)
+            .group("TG12413"),
+        ParamSpec::new("tg_output", "Output Level")
+            .range(-10.0, 10.0)
+            .steps(21)
+            .default(0.0)
+            .unit("dB")
+            .group("TG12413"),
+        // RV1 is a screwdriver preset on EMI's module, not a panel knob.
+        ParamSpec::new("tg_hold", "Hold")
+            .range(0.0, 100.0)
+            .default(0.0)
+            .unit("%")
+            .group("TG12413"),
+        // Not a control at all. The drawing is ambiguous about which side
+        // of the diodes' characteristic the element works on, so the model
+        // carries the choice where the page can say which one is on.
+        ParamSpec::new("tg_region", "Region")
+            .labels(tg::REGION_NAMES)
+            .default(tg::REGION_BREAKDOWN as f32)
+            .not_automatable()
+            .group("TG12413"),
+        ParamSpec::new("tg_mismatch", "Arm Mismatch")
+            .range(0.0, 100.0)
+            .default(0.0)
+            .unit("%")
+            .group("TG12413"),
+        // Not on the hardware. Chandler's recreation adds a continuous
+        // input, and since this module has no threshold control, driving
+        // it is how you choose where it works.
+        ParamSpec::new("tg_input", "Input")
+            .range(-12.0, 12.0)
+            .default(0.0)
+            .unit("dB")
+            .group("TG12413"),
+        ParamSpec::new("tg_drive", "Drive")
+            .range(0.0, 100.0)
+            .default(0.0)
+            .unit("%")
+            .group("TG12413"),
+        ParamSpec::new("tg_oversample", "Oversampling")
+            .labels(tg::OVERSAMPLE_NAMES)
+            .default(1.0)
+            .not_automatable()
+            .group("TG12413"),
+        // The SSL's two continuous controls are 50 kOhm and 25 kOhm linear
+        // pots, so they are plain ranges with no taper table; everything
+        // else on the panel is a rotary switch with detents and is stepped.
+        //
+        // **The panel is the 500-series module and the values are the
+        // console's**, which is what the dossier's section 2.5 instructs:
+        // SSL publish a high-resolution render and a dimensioned recall
+        // sheet of the module and nothing legible of the console, while
+        // card 82E27 gives the console's component values and nothing
+        // gives the module's. Drawing a panel nobody can see, or inventing
+        // resistors for the module's ladder, are both worse. The plug-in's
+        // own help text says so.
+        ParamSpec::new("ssl_in", "Compressor In")
+            .toggle()
+            .default(1.0)
+            .group("4000 G"),
+        // Marked as the panel marks it, so more negative compresses more.
+        // The engine negates it, because the sidechain gain and a
+        // threshold reading run in opposite directions and SSL say so.
+        ParamSpec::new("ssl_threshold", "Threshold")
+            .range(-20.0, 20.0)
+            .default(0.0)
+            .unit("dB")
+            .group("4000 G"),
+        ParamSpec::new("ssl_makeup", "Make-up")
+            .range(-5.0, 15.0)
+            .default(0.0)
+            .unit("dB")
+            .group("4000 G"),
+        ParamSpec::new("ssl_attack", "Attack")
+            .labels(gbus::ATTACK_NAMES)
+            .default(2.0)
+            .group("4000 G"),
+        ParamSpec::new("ssl_release", "Release")
+            .labels(gbus::RELEASE_NAMES)
+            .default(gbus::RELEASE_AUTO as f32)
+            .group("4000 G"),
+        ParamSpec::new("ssl_ratio", "Ratio")
+            .labels(gbus::RATIO_NAMES)
+            .default(1.0)
+            .group("4000 G"),
+        ParamSpec::new("ssl_hpf", "Sidechain HPF")
+            .labels(gbus::HPF_NAMES)
+            .default(0.0)
+            .group("4000 G"),
+        // Ours past the first position. The hardware has one behaviour and
+        // it is `Dominant`; the other three are after the modes SSL put on
+        // THE BUS+ and the extras strip says they are ours.
+        ParamSpec::new("ssl_link", "Detector Link")
+            .labels(gbus::LINK_NAMES)
+            .default(0.0)
+            .group("4000 G"),
+        ParamSpec::new("ssl_drive", "Drive")
+            .range(0.0, 100.0)
+            .default(0.0)
+            .unit("%")
+            .group("4000 G"),
+        ParamSpec::new("ssl_range", "Range")
+            .range(0.0, 20.0)
+            .default(20.0)
+            .unit("dB")
+            .group("4000 G"),
+        ParamSpec::new("ssl_oversample", "Oversampling")
+            .labels(gbus::OVERSAMPLE_NAMES)
+            .default(1.0)
+            .not_automatable()
+            .group("4000 G"),
         ParamSpec::new("link", "Stereo Link")
             .toggle()
             .default(1.0)
@@ -922,6 +1210,17 @@ pub fn param_index(s: &NoobVstWebguiFramework) -> ParamIx {
         neve_meter_select: ix("neve_meter_select"),
         neve_drive: ix("neve_drive"),
         neve_power: ix("neve_power"),
+        dbx_model: ix("dbx_model"),
+        dbx_threshold: ix("dbx_threshold"),
+        dbx_ratio: ix("dbx_ratio"),
+        dbx_output: ix("dbx_output"),
+        dbx_knee: ix("dbx_knee"),
+        dbx_meter: ix("dbx_meter"),
+        dbx_meter_cal: ix("dbx_meter_cal"),
+        dbx_knee_width: ix("dbx_knee_width"),
+        dbx_tau: ix("dbx_tau"),
+        dbx_lookahead: ix("dbx_lookahead"),
+        dbx_headroom: ix("dbx_headroom"),
         dist_input: ix("dist_input"),
         dist_output: ix("dist_output"),
         dist_attack: ix("dist_attack"),
@@ -947,6 +1246,26 @@ pub fn param_index(s: &NoobVstWebguiFramework) -> ParamIx {
         pre_load: ix("pre_load"),
         pre_meter: ix("pre_meter"),
         pre_phantom: ix("pre_phantom"),
+        tg_mode: ix("tg_mode"),
+        tg_recovery: ix("tg_recovery"),
+        tg_output: ix("tg_output"),
+        tg_hold: ix("tg_hold"),
+        tg_region: ix("tg_region"),
+        tg_mismatch: ix("tg_mismatch"),
+        tg_input: ix("tg_input"),
+        tg_drive: ix("tg_drive"),
+        tg_oversample: ix("tg_oversample"),
+        ssl_in: ix("ssl_in"),
+        ssl_threshold: ix("ssl_threshold"),
+        ssl_makeup: ix("ssl_makeup"),
+        ssl_attack: ix("ssl_attack"),
+        ssl_release: ix("ssl_release"),
+        ssl_ratio: ix("ssl_ratio"),
+        ssl_hpf: ix("ssl_hpf"),
+        ssl_link: ix("ssl_link"),
+        ssl_drive: ix("ssl_drive"),
+        ssl_range: ix("ssl_range"),
+        ssl_oversample: ix("ssl_oversample"),
         link: ix("link"),
         mix: ix("mix"),
         sc_hpf: ix("sc_hpf"),
@@ -1039,6 +1358,60 @@ pub fn read_settings(audio: &AudioHandle, ix: &ParamIx) -> Settings {
             power: audio.param(ix.neve_power) >= 0.5,
             ..bridge::Settings::default()
         },
+        rms: rms::Settings {
+            model: audio.param(ix.dbx_model).round().clamp(0.0, 1.0) as usize,
+            threshold_dbu: audio.param(ix.dbx_threshold),
+            // The plain value **is** the coefficient: the taper lives in
+            // the parameter, so the law exists once and the page reads α
+            // from the manifest instead of reimplementing the dial.
+            alpha: audio.param(ix.dbx_ratio),
+            output_db: audio.param(ix.dbx_output),
+            knee: audio.param(ix.dbx_knee).round().clamp(0.0, 1.0) as usize,
+            knee_width_db: audio.param(ix.dbx_knee_width),
+            tau_s: audio.param(ix.dbx_tau) * 1e-3,
+            meter: audio.param(ix.dbx_meter).round().clamp(0.0, 2.0) as usize,
+            meter_cal_dbu: audio.param(ix.dbx_meter_cal),
+            lookahead_ms: audio.param(ix.dbx_lookahead),
+            headroom_db: audio.param(ix.dbx_headroom),
+            ..rms::Settings::default()
+        },
+        // Every control is a switch, so each is read as an index from the
+        // normalised value. `tg_output` steps linearly over its twenty-one
+        // positions, so `norm * 20` is the switch position exactly and the
+        // engine turns it back into a resistance.
+        tg: tg::Settings {
+            mode: audio.param(ix.tg_mode).round().clamp(0.0, 2.0) as usize,
+            recovery: audio.param(ix.tg_recovery).round().clamp(0.0, 5.0) as usize,
+            output: (audio.param_norm(ix.tg_output) * 20.0).round() as usize,
+            hold: (audio.param(ix.tg_hold) / 100.0).clamp(0.0, 1.0),
+            region: audio.param(ix.tg_region).round().clamp(0.0, 1.0) as usize,
+            mismatch: (audio.param(ix.tg_mismatch) / 100.0).clamp(0.0, 1.0),
+            input_db: audio.param(ix.tg_input),
+            drive: (audio.param(ix.tg_drive) / 100.0).clamp(0.0, 1.0),
+            oversample: tg::oversample_factor(
+                audio.param(ix.tg_oversample).round().clamp(0.0, 2.0) as usize,
+            ),
+            ..tg::Settings::default()
+        },
+        // Every switch here is read as an index. The two pots are linear,
+        // so their plain value is the decibels the panel is marked in and
+        // the engine takes it directly.
+        gbus: gbus::Settings {
+            sidechain_in: audio.param(ix.ssl_in) >= 0.5,
+            threshold_db: audio.param(ix.ssl_threshold),
+            makeup_db: audio.param(ix.ssl_makeup),
+            attack: audio.param(ix.ssl_attack).round().clamp(0.0, 5.0) as usize,
+            release: audio.param(ix.ssl_release).round().clamp(0.0, 4.0) as usize,
+            ratio: audio.param(ix.ssl_ratio).round().clamp(0.0, 2.0) as usize,
+            hpf: audio.param(ix.ssl_hpf).round().clamp(0.0, 5.0) as usize,
+            link_mode: gbus::engine::Link::from_index(
+                audio.param(ix.ssl_link).round().clamp(0.0, 3.0) as usize,
+            ),
+            drive: (audio.param(ix.ssl_drive) / 100.0).clamp(0.0, 1.0),
+            range_db: audio.param(ix.ssl_range),
+            oversample: audio.param(ix.ssl_oversample) >= 0.5,
+            ..gbus::Settings::default()
+        },
         vca: vca::Settings {
             input: audio.param(ix.dist_input),
             output: audio.param(ix.dist_output),
@@ -1091,6 +1464,9 @@ pub struct Processor {
     pre: pre::Stage,
     opto1b: opto1b::Compressor,
     bridge: bridge::Compressor,
+    tg: tg::Compressor,
+    gbus: gbus::Compressor,
+    rms: rms::Compressor,
     /// The engine fading out (only meaningful while `xfade > 0`).
     outgoing: Model,
     /// Samples of crossfade left.
@@ -1125,6 +1501,9 @@ impl Processor {
             pre: pre::Stage::new(sr),
             opto1b: opto1b::Compressor::new(sr),
             bridge: bridge::Compressor::new(sr),
+            tg: tg::Compressor::new(sr),
+            gbus: gbus::Compressor::new(sr),
+            rms: rms::Compressor::new(sr),
             outgoing: Model::Fet,
             xfade: 0,
             xfade_len: (XFADE_SECONDS * sr).round() as usize,
@@ -1155,6 +1534,9 @@ impl Processor {
         self.pre.set_sample_rate(sr);
         self.opto1b.set_sample_rate(sr);
         self.bridge.set_sample_rate(sr);
+        self.tg.set_sample_rate(sr);
+        self.gbus.set_sample_rate(sr);
+        self.rms.set_sample_rate(sr);
         self.first = true;
         self.reset();
     }
@@ -1166,6 +1548,10 @@ impl Processor {
         self.opto3.reset();
         self.vca.reset();
         self.pre.reset();
+        self.opto1b.reset();
+        self.bridge.reset();
+        self.rms.reset();
+        self.tg.reset();
         self.xfade = 0;
         self.in_peak = [0.0; 2];
         self.out_peak = [0.0; 2];
@@ -1198,6 +1584,11 @@ impl Processor {
             Model::Opto3 => self.opto3.latency(),
             Model::Opto1b => self.opto1b.latency(),
             Model::Bridge => self.bridge.latency(),
+            Model::Tg => self.tg.latency(),
+            // Zero at 1x: the audio path never touches the detector, so
+            // only the resampler's round trip can cost anything.
+            Model::Gbus => self.gbus.latency(),
+            Model::Rms => self.rms.latency(),
             Model::Opto => 0,
         }
     }
@@ -1244,6 +1635,9 @@ impl Processor {
                 }
                 Model::Opto1b => self.opto1b.reset(),
                 Model::Bridge => self.bridge.reset(),
+                Model::Tg => self.tg.reset(),
+                Model::Gbus => self.gbus.reset(),
+                Model::Rms => self.rms.reset(),
             }
             changed = true;
         }
@@ -1254,6 +1648,8 @@ impl Processor {
         changed |= self.pre.configure(&s.pre);
         changed |= self.opto1b.configure(s.opto1b);
         changed |= self.bridge.configure(s.bridge);
+        changed |= self.tg.configure(s.tg);
+        changed |= self.rms.configure(s.rms);
         self.settings = *s;
         self.first = false;
         if changed {
@@ -1277,6 +1673,9 @@ impl Processor {
             }
             Model::Opto1b => self.opto1b.process_block(l, r),
             Model::Bridge => self.bridge.process_block(l, r),
+            Model::Tg => self.tg.process_block(l, r),
+            Model::Gbus => self.gbus.process_block(l, r),
+            Model::Rms => self.rms.process_block(l, r),
         }
     }
 
@@ -1351,6 +1750,24 @@ impl Processor {
                 self.gr_db = -f[4];
                 f[5]
             }
+            Model::Tg => {
+                let f = self.tg.meter_frame();
+                self.gr_db = -f[4];
+                f[5]
+            }
+            Model::Rms => {
+                let f = self.rms.meter_frame();
+                self.gr_db = -f[4];
+                f[5]
+            }
+            Model::Gbus => {
+                let f = self.gbus.meter_frame();
+                self.gr_db = -f[4];
+                // The needle's target, on a linear 0 to 20 dB scale. The
+                // movement itself runs in `vu` just below, so the page
+                // must not smooth it again.
+                f[5]
+            }
             Model::Vca => {
                 self.gr_db = self.vca.gr_db();
                 self.gr_db
@@ -1410,6 +1827,11 @@ impl Processor {
             // publishes the control voltage its electronics hold, the
             // resistance the element presents, and the drive fraction.
             Model::Opto1b => self.opto1b.cell_state(),
+            // Nor has this one. It publishes the control current in
+            // microamps, the resistance the element presents and the
+            // drive fraction, which are the three quantities the whole
+            // circuit is actually about.
+            Model::Tg => self.tg.cell_state(),
             _ => [0.0; 3],
         }
     }
@@ -1427,6 +1849,12 @@ impl Processor {
                 self.vca.drive(),
             ],
             Model::Pre6176 => [0.0, 0.0, self.pre.pre_vu_db(), self.pre.drive()],
+            // The same four slots, saying something else: the dbx's
+            // two threshold indicators, the peak-detector ghost the
+            // page draws behind its gain reduction, and its OverEasy
+            // indicator. The `cell` stream already carries two
+            // meanings for the same reason.
+            Model::Rms => self.rms.lamps_frame(),
             _ => [0.0; LAMPS_LEN],
         }
     }
@@ -1451,6 +1879,15 @@ impl Processor {
                 .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
             Model::Bridge => self
                 .bridge
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
+            Model::Tg => self
+                .tg
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
+            Model::Rms => self
+                .rms
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
+            Model::Gbus => self
+                .gbus
                 .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
         }
     }
@@ -1488,7 +1925,7 @@ impl Processor {
     pub fn publish(&mut self, audio: &mut AudioHandle) {
         audio.publish_slice(STREAM_IX.meter, &self.meter_frame());
         match self.settings.model {
-            Model::Opto | Model::Opto3 | Model::Opto1b => {
+            Model::Opto | Model::Opto3 | Model::Opto1b | Model::Tg => {
                 audio.publish_slice(STREAM_IX.cell, &self.cell_state());
                 self.cell_zeroed = false;
             }
@@ -1500,7 +1937,7 @@ impl Processor {
             }
         }
         match self.settings.model {
-            Model::Vca | Model::Pre6176 => {
+            Model::Vca | Model::Pre6176 | Model::Rms => {
                 audio.publish_slice(STREAM_IX.lamps, &self.lamps_frame());
                 self.lamps_zeroed = false;
             }

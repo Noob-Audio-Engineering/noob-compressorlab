@@ -69,7 +69,7 @@ let debugState = null;
  * `blurb` is the sentence that helps someone choose between them. Both are
  * declared here rather than inferred from `sub`, so a new model says what it
  * is instead of being parsed.
- * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', label: string, name: string, sub: string, family: string, blurb: string, owns: string[], meter: string | null, initPreset: string }[]}
+ * @type {{ key: 'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b' | 'bridge' | 'tg' | 'gbus', label: string, name: string, sub: string, family: string, blurb: string, owns: string[], meter: string | null, initPreset: string }[]}
  */
 export const MODELS = [
   { key: 'fet', label: '1176', name: 'NOOB 1176', sub: 'FET limiting amplifier', family: 'fet', blurb: 'Fast, forward and unmistakably aggressive. Ratio buttons, the all-buttons mode, and every revision from the blue stripe to the LN.', owns: ['fet_'], meter: 'fet_meter', initPreset: 'Default' },
@@ -78,7 +78,10 @@ export const MODELS = [
   { key: 'vca', label: 'Distressor', name: 'NOOB DISTRESSOR', sub: 'feedback VCA compressor', family: 'vca', blurb: 'Eight ratios from gentle to Nuke, two distortion modes, and a British setting that borrows the 1176 trick.', owns: ['dist_'], meter: null, initPreset: '5 5 5 5' },
   { key: 'pre6176', label: '6176', name: 'NOOB 6176', sub: 'tube preamp into the FET limiter', family: 'strip', blurb: 'A 610 tube preamp in front of the 1176, so the colour arrives before the compression does.', owns: ['pre_', 'fet_'], meter: 'pre_meter', initPreset: 'Unity' },
   { key: 'cl1b', label: 'CL-1B', name: 'NOOB CL 1B', sub: 'optical tube compressor', family: 'optical', blurb: 'The vocal one. Slow optical levelling with fixed or manual timing, and a ratio that rises as you push it.', owns: ['cl1b_'], meter: 'cl1b_meter', initPreset: 'Vocal' },
-  { key: 'bridge', label: '33609', name: 'NOOB 33609', sub: 'diode-bridge limiter/compressor', family: 'bridge', blurb: 'A limiter and a compressor in series, each with its own detector. Every control is stepped, and the printed ratios are approximations.', owns: ['neve_'], meter: 'neve_meter_select', initPreset: 'Bus' },
+  { key: 'bridge', label: '33609', name: 'NOOB 33609', sub: 'diode-bridge limiter/compressor', family: 'diode', blurb: 'A limiter and a compressor in series, each with its own detector. Every control is stepped, and the printed ratios are approximations.', owns: ['neve_'], meter: 'neve_meter_select', initPreset: 'Bus' },
+  { key: 'dbx', label: '160', name: 'NOOB 160', sub: 'true-RMS VCA compressor', family: 'vca', blurb: 'The only one here that listens to power rather than peaks, so it lets the transient through and grabs the body. No attack or release: a true-RMS detector has one time constant and they are two sides of it. Past the infinity mark the ratio goes negative.', owns: ['dbx_'], meter: 'dbx_meter', initPreset: 'Kick' },
+  { key: 'tg', label: 'TG12413', name: 'NOOB TG 12413', sub: 'zener-diode limiter module', family: 'diode', blurb: 'A console module, not a rack unit. Three switches, no threshold and no ratio: you drive it and it decides, which is how the mastering desk at Abbey Road worked.', owns: ['tg_'], meter: null, initPreset: 'Mastering' },
+  { key: 'gbus', label: '4000 G', name: 'NOOB 4000 G', sub: 'stereo bus compressor', family: 'vca', blurb: 'The glue on the mix bus. A feedback design whose ratio rises as it works, so the curve bends for its whole length and never straightens, and an automatic release built from two RC sections that share their charge unevenly.', owns: ['ssl_'], meter: null, initPreset: 'Bus' },
 ];
 
 /**
@@ -92,7 +95,7 @@ export const FAMILIES = [
   { id: 'optical', label: 'Optical', note: 'A lamp and a photocell: slow, programme-dependent, and forgiving.' },
   { id: 'vca', label: 'VCA', note: 'A voltage-controlled amplifier: whatever ratio and timing you ask for.' },
   { id: 'strip', label: 'Channel strip', note: 'A preamp and a compressor in one box, in that order.' },
-  { id: 'bridge', label: 'Diode bridge', note: 'Four diodes as the gain element: quiet about it until pushed, then unmistakable.' },
+  { id: 'diode', label: 'Diode', note: 'Diodes as the gain element, in two forms that are not the same part. Neve close four of them into a ring with two floating nodes and one junction per arm, forward-biased by an injected current; EMI hang two branches of two off the supply rail and run them in reverse breakdown. Both are quiet until pushed. They are unmistakable in different ways.' },
 ];
 
 /** Smallest window the page lays out well in, `[width, height]` CSS pixels; `src/plugin.rs` clamps to the same. */

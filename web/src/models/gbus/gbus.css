@@ -1,0 +1,446 @@
+/*
+ * The SSL 4000 G bus compressor's face.
+ *
+ * Every colour here is a median sampled from SSL's own 1618 x 2697 product
+ * render of the 500-series module, recorded in `research/SSL-Gbus.md`
+ * section 2.3. The whole design is one accent colour on a grey ground: a
+ * single blue for the six knob caps, white for everything printed, and a
+ * light grey for the one switch. That restraint is this unit's face and
+ * nothing here belongs in the framework.
+ */
+
+.facessl {
+  height: 100%;
+  --ssl-panel: #535353;
+  --ssl-edge: #000000;
+  --ssl-cap: #5884a9;
+  --ssl-skirt: #323232;
+  --ssl-glass: #010101;
+  --ssl-escutcheon: #302f2d;
+  --ssl-in: #c6c6c6;
+  --ssl-print: #ffffff;
+
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.facessl.unlit {
+  filter: brightness(0.55) saturate(0.6);
+}
+
+/*
+ * The panel keeps its measured 1 : 1.769 aspect. It is the only portrait
+ * face in the lab, so its height is what the view controls and the width
+ * follows; `aspect-ratio` does the rest.
+ */
+.facessl__panel {
+  position: relative;
+  height: 100%;
+  aspect-ratio: 1 / 1.769;
+  background: var(--ssl-panel);
+  /* the vertical brushed grain of the aluminium */
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.028) 0 1px,
+    rgba(0, 0, 0, 0.03) 1px 2px
+  );
+  border: 0.35% solid var(--ssl-edge);
+  border-radius: 0.6%;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.facessl__outline {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+.facessl__screw {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6d6d6d, #2c2c2c 70%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* the hex socket */
+.facessl__screw::after {
+  content: '';
+  position: absolute;
+  inset: 30%;
+  background: #1a1a1a;
+  clip-path: polygon(25% 6.7%, 75% 6.7%, 100% 50%, 75% 93.3%, 25% 93.3%, 0 50%);
+}
+
+.facessl__brand,
+.facessl__strap,
+.facessl__cap,
+.facessl__unit {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: var(--ssl-print);
+  white-space: nowrap;
+  pointer-events: none;
+  letter-spacing: 0.06em;
+}
+
+/*
+ * **Every legend that stays on the panel carries an 8 px floor.** The panel
+ * is portrait, so its width follows its height and a short window makes it
+ * narrow: at 900 x 520 it is about 194 px across, where 4.2cqw is 8.1 px and
+ * 3.1cqw is 6.0. Type that small is not small, it is absent, and this
+ * project has had illegible panel text reported on three models already. So
+ * the legends that remain are floored, and the ones that cannot be floored
+ * without colliding are removed instead: see the two container queries at
+ * the end of this file.
+ */
+.facessl__brand {
+  font-size: max(8px, 4.2cqw);
+  font-weight: 700;
+}
+
+/* Anchored to the screw's inner edge rather than centred on a guess. */
+.facessl__brand.left {
+  transform: translate(-100%, -50%);
+}
+
+.facessl__brand.right {
+  transform: translate(0, -50%);
+}
+
+.facessl__brand.right b {
+  font-weight: 700;
+}
+
+.facessl__brand.right span {
+  font-weight: 300;
+}
+
+/* Centred between the lower screws, and it has to fit between them. */
+.facessl__strap {
+  font-size: 2.8cqw;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.facessl__cap {
+  font-size: max(8px, 3.6cqw);
+  font-weight: 600;
+}
+
+.facessl__unit {
+  font-size: max(8px, 3.1cqw);
+  font-weight: 400;
+}
+
+.facessl__escutcheon {
+  position: absolute;
+  background: var(--ssl-escutcheon);
+  border-radius: 1%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+}
+
+.facessl__glass {
+  position: absolute;
+  background: var(--ssl-glass);
+  overflow: hidden;
+}
+
+.facessl__zero {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 3.4%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #585858, #1e1e1e 75%);
+}
+
+.facessl__zero::after {
+  content: '';
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 45%;
+  height: 10%;
+  background: #0d0d0d;
+}
+
+/* The IN switch: a light grey plastic cap, the only bright object here. */
+.facessl__in {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(#d7d7d7, #b3b3b3);
+  color: #1c1c1c;
+  border: none;
+  border-radius: 8%;
+  font-size: max(8px, 2.6cqw);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 -0.12em 0 rgba(0, 0, 0, 0.35),
+    0 0.1em 0.2em rgba(0, 0, 0, 0.5);
+}
+
+.facessl__in.on {
+  background: linear-gradient(#f0efe6, #cfcdc0);
+  box-shadow:
+    inset 0 0.12em 0.2em rgba(0, 0, 0, 0.45),
+    0 0 0.5em rgba(240, 239, 230, 0.35);
+}
+
+.facessl__in:focus-visible {
+  outline: 2px solid #7cc6ff;
+  outline-offset: 2px;
+}
+
+.facessl__knob {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+}
+
+/* --- the knobs -------------------------------------------------------- */
+
+.sslknob {
+  position: relative;
+  width: 100%;
+}
+
+/* In the extras strip the knob is sized by the caller, not by a panel. */
+.extrasssl .sslknob {
+  width: 44px;
+}
+
+.sslknob__dial {
+  display: block;
+  width: 100%;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.sslknob__dial:focus-visible .sslknob__skirt {
+  stroke: #7cc6ff;
+  stroke-width: 1.4;
+}
+
+.sslknob__marks circle {
+  fill: var(--ssl-print, #fff);
+  r: 1.4px;
+}
+
+/*
+ * The printed numbers, in the knob's 100-unit box, so their size on screen
+ * follows the panel. Ten units is 0.030 of the panel width on a switch and
+ * 0.026 on a pot, which clears 8 px once the panel is about 310 px across.
+ * Below that they are hidden rather than drawn at four pixels, and the dots
+ * carry the positions on their own.
+ */
+.sslknob__marks text {
+  fill: var(--ssl-print, #fff);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.sslknob__skirt {
+  fill: var(--ssl-skirt, #323232);
+  stroke: rgba(0, 0, 0, 0.75);
+  stroke-width: 0.8;
+}
+
+.sslknob__detent {
+  fill: #0c0c0c;
+}
+
+.sslknob__caprim {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 0.8;
+}
+
+.sslknob__index {
+  fill: var(--ssl-print, #fff);
+}
+
+.sslknob__value {
+  position: absolute;
+  left: 50%;
+  bottom: -1.1em;
+  transform: translateX(-50%);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #f2f2f2;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --- the meter -------------------------------------------------------- */
+
+.sslmeter {
+  width: 100%;
+  height: 100%;
+}
+
+.sslmeter.unlit {
+  opacity: 0.55;
+}
+
+.sslmeter__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.sslmeter__glass {
+  fill: var(--ssl-glass, #010101);
+}
+
+.sslmeter__scale line {
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 0.9;
+}
+
+.sslmeter__scale line.minor {
+  stroke-width: 0.6;
+  stroke: rgba(255, 255, 255, 0.65);
+}
+
+.sslmeter__scale text {
+  fill: rgba(255, 255, 255, 0.9);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sslmeter__unit {
+  fill: #fff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.sslmeter__caption {
+  fill: rgba(255, 255, 255, 0.85);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.sslmeter__needle {
+  stroke: #f4f2ec;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+}
+
+/* --- the extras strip ------------------------------------------------- */
+
+.extrasssl__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.extrasssl__caption {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: rgba(231, 226, 216, 0.65);
+}
+
+.extrasssl__hint {
+  font-size: 10px;
+  color: rgba(231, 226, 216, 0.4);
+}
+
+.extrasssl__value {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(231, 226, 216, 0.8);
+}
+
+/*
+ * The only portrait face in the lab, so its view puts the analysis panels
+ * beside the panel rather than under it. A 1 : 1.769 plate given the full
+ * height of a 900 x 520 window would be 240 px wide, and six knobs at that
+ * size are unreadable.
+ */
+.lab-model--gbus .gbus-stage {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  padding: 0 0.75rem 0.75rem;
+  /*
+   * **Not `min-height: 0`.** A flex item that may shrink to nothing will,
+   * and with the development panel open at the 900 x 520 minimum this
+   * stage collapsed and took the whole faceplate with it. The panel is
+   * portrait, so its width comes from this height, and the development
+   * panel below is happy to scroll where the faceplate cannot shrink. The
+   * viewport term is what matters on a large window: without it the
+   * development panel took half of a 1000 px window and left the panel
+   * 199 px wide, with its silkscreen at seven pixels.
+   */
+  min-height: max(260px, 66vh);
+}
+
+.lab-model--gbus .gbus-stage__panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.lab-model--gbus .gbus-stage__bench {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lab-model--gbus .gbus-stage__bench > * {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/*
+ * **Suppress what cannot be read rather than drawing it illegibly.**
+ *
+ * The panel is a size container, so these ask about the panel's own width
+ * rather than the window's. Two thresholds, each the width at which the
+ * type in question falls under the audit's 8 px floor:
+ *
+ * - **310 px** is where the knob-scale numerals fail, at ten units in a box
+ *   that is 0.26 to 0.30 of the panel. Below it the numbers come off and
+ *   the detent dots carry the positions, which is enough to see where a
+ *   switch is pointing. The control labels stay, floored at 8 px.
+ * - **286 px** is where `STEREO BUS COMPRESSOR` fails. This one cannot be
+ *   floored: at 8 px it is about 0.57 of the panel wide and it has to fit
+ *   the 0.434 between the two lower screws, so it would run over them.
+ *
+ * The unit legends go with the numerals rather than getting their own
+ * threshold. Floored at 8 px on a narrow panel they collide with the next
+ * row's control label, and `ATTACK` without `ms` still says what the knob
+ * is; `ms` without `ATTACK` does not.
+ */
+@container (max-width: 310px) {
+  .facessl .sslknob__marks text,
+  .facessl__unit {
+    display: none;
+  }
+}
+
+@container (max-width: 286px) {
+  .facessl__strap {
+    display: none;
+  }
+}

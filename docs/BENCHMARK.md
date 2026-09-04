@@ -31,7 +31,10 @@ Every measurement drives the real engine offline with generated signal and reads
 | 6176 | Universal Audio 6176 (610B preamp into the 1176LN) | 11 | 1 | 1 |
 | CL-1B | Tube-Tech CL 1B | 9 | 1 | 1 |
 | 33609 | Neve 2254 and 33609 | 17 | 0 | 5 |
-| **all** | | **75** | **6** | **11** |
+| 160 | dbx 160, with the 160A's OverEasy and Infinity+ | 39 | 4 | 2 |
+| 4000 G | SSL 4000 G bus compressor, the 500-series module drawn with the console's values | 33 | 2 | 3 |
+| TG12413 | EMI TG12413 | 15 | 0 | 6 |
+| **all** | | **162** | **12** | **22** |
 
 The misses are the honest part of this table, and none of them is a widened tolerance. Five of them match the README's own list of figures these models do not reach; the other three do not appear there, and the section below says which and what to do about it.
 
@@ -233,6 +236,177 @@ Notes:
 - **attack against step size**: known miss, recorded in README: the dossier derives the opposite direction from the same emitter follower, and an exponential closing a fixed 1 dB window cannot fall; the published 10 dB point is still met
 - **the 10640 amplifier in isolation**: the handbook publishes its gain, clip point and three distortion figures, and this model carries the amplifier only as the make-up gain in the chain, so there is no sub-block to assert them on
 - **noise floor**: the handbook publishes −75 dBu bypassed and −55 dBu with full make-up; this model is silent into silence, so it passes both vacuously rather than on merit
+
+## 160 — dbx 160, with the 160A's OverEasy and Infinity+
+
+Figures from [`research/dbx-160.md`](../research/dbx-160.md).
+
+| quantity | published | measured | verdict | source |
+|---|---|---|---|---|
+| unity gain at 1:1, threshold at 3 V | 0 ± 0.05 dB | -0.007 dB | meets | research/dbx-160.md §12.1 test 1, from R26 = R32 = 100 kΩ on the 160 schematic |
+| threshold dial, decibels per printed mark | 10 ± 0.5 dB | 9.908 dB | meets | research/dbx-160.md §12.1 test 4, from the factory procedure's "10 db steps" |
+| threshold at the 10 mV mark | -37.8 ± 0.5 dBu | -37.679 dBu | meets | research/dbx-160.md §7.1, dbx's "10mV(−38dB)" |
+| threshold at the 3 V mark | 11.8 ± 0.5 dBu | 11.861 dBu | meets | research/dbx-160.md §7.1, dbx's "3V(+12dB)" |
+| 1.5:1, output change for a 20 dB rise | 13.333333 ± 0.15 dB | 13.333 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 2:1, output change for a 20 dB rise | 10 ± 0.15 dB | 10.000 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 3:1, output change for a 20 dB rise | 6.6666665 ± 0.15 dB | 6.667 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 4:1, output change for a 20 dB rise | 5 ± 0.15 dB | 5.000 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 6:1, output change for a 20 dB rise | 3.3333333 ± 0.15 dB | 3.333 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 10:1, output change for a 20 dB rise | 2 ± 0.15 dB | 2.000 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| 20:1, output change for a 20 dB rise | 1 ± 0.15 dB | 1.000 dB | meets | research/dbx-160.md §12.1 test 6, from dbx's "COMPRESSION RATIO setting defines exact compression ratio" |
+| output rise over 40 dB at the ∞ mark | 0.333 ± 0.15 dB | 0.333 dB | meets | research/dbx-160.md §12.1 test 7, from dbx's "1:1 to 120:1 (infinity)" |
+| −1.0:1, output change for a 10 dB rise | -10 ± 0.3 dB | -10.000 dB | meets | research/dbx-160.md §12.1 test 8, from the 160A manual's −1:1 description |
+| −2.0:1, output change for a 10 dB rise | -5 ± 0.3 dB | -5.000 dB | meets | research/dbx-160.md §12.1 test 8, from the 160A manual's −1:1 description |
+| −5.0:1, output change for a 10 dB rise | -2 ± 0.3 dB | -2.000 dB | meets | research/dbx-160.md §12.1 test 8, from the 160A manual's −1:1 description |
+| maximum compression | 60 to 61 dB | 60.000 dB | meets | research/dbx-160.md §12.1 test 9, from dbx's "over 60dB maximum compression" |
+| output gain range | 40 ± 0.1 dB | 40.000 dB | meets | research/dbx-160.md §7.1, dbx's "±20 dB from unity gain point" and R80's track ends |
+| attack, 10 dB step | 15 ± 4.5 ms | 16.021 ms | meets | research/dbx-160.md §12.3 test 15, from dbx's 15 / 5 / 3 ms attack table |
+| attack, 20 dB step | 5 ± 1.5 ms | 6.687 ms | **misses** | research/dbx-160.md §12.3 test 15, from dbx's 15 / 5 / 3 ms attack table |
+| attack, 30 dB step | 3 ± 0.9 ms | 2.688 ms | meets | research/dbx-160.md §12.3 test 15, from dbx's 15 / 5 / 3 ms attack table |
+| release rate | 120 to 125 dB/s | 121.935 dB/s | meets | research/dbx-160.md §12.3 test 17, from dbx's 120 dB/s (160) and 125 dB/s (160A) |
+| departure from a straight line over 35 to 5 dB | 0 to 0.5 dB | 0.000 dB | meets | research/dbx-160.md §12.3 test 17, the structural half: a log-domain filter releases at a constant dB/s and an ordinary RC does not |
+| release, 1 dB | 8 ± 1.6 ms | 8.500 ms | meets | research/dbx-160.md §12.3 test 18, from the 160A's 8 / 80 / 400 ms table |
+| release, 10 dB | 80 ± 16 ms | 82.333 ms | meets | research/dbx-160.md §12.3 test 18, from the 160A's 8 / 80 / 400 ms table |
+| release, 50 dB | 400 ± 80 ms | 410.333 ms | meets | research/dbx-160.md §12.3 test 18, from the 160A's 8 / 80 / 400 ms table |
+| a sine settles below its peak | 3.01 ± 0.15 dB | 3.017 dB | meets | research/dbx-160.md §12.2 test 11, the RMS of a sine against dbx's "True rms level-detection" |
+| under-reading at crest factor 3.5 | 0.2 ± 0.3 dB | 0.058 dB | meets | research/dbx-160.md §12.2 test 12, from the THAT 2252 datasheet's crest-factor table |
+| under-reading at crest factor 5 | 0.5 ± 0.3 dB | 0.062 dB | **misses** | research/dbx-160.md §12.2 test 12, from the THAT 2252 datasheet's crest-factor table |
+| under-reading at crest factor 8 | 1 ± 0.3 dB | 0.081 dB | **misses** | research/dbx-160.md §12.2 test 12, from the THAT 2252 datasheet's crest-factor table |
+| link, two matched channels against one | 3.01 ± 0.2 dB | 3.010 dB | meets | research/dbx-160.md §12.6 test 34, from dbx's True RMS Power Summing |
+| third harmonic, 100 Hz against 50 Hz | 0.5 ± 0.05 × | 0.499 × | meets | research/dbx-160.md §12.5 test 27, from dbx's "at 100 Hz 3rd-harmonic distortion is 1/2 the value at 50 Hz" |
+| third harmonic, 200 Hz against 100 Hz | 0.5 ± 0.05 × | 0.500 × | meets | research/dbx-160.md §12.5 test 27, from dbx's "at 100 Hz 3rd-harmonic distortion is 1/2 the value at 50 Hz" |
+| third harmonic, 400 Hz against 200 Hz | 0.5 ± 0.05 × | 0.500 × | meets | research/dbx-160.md §12.5 test 27, from dbx's "at 100 Hz 3rd-harmonic distortion is 1/2 the value at 50 Hz" |
+| second harmonic at +4 dBu, ∞:1 | 0.075 ± 0.0225 % | 0.075 % | meets | research/dbx-160.md §12.5 test 30, from dbx's "0.075 % 2nd harmonic at infinite compression at +4dBm output" |
+| second-harmonic spread across ratio and frequency | 0 to 0.4 of its mean | 0.025 of its mean | meets | research/dbx-160.md §12.5 test 29, from dbx's "2nd harmonic is relatively unaffected by compression ratio, time constants and frequency" |
+| third harmonic at 100 Hz, ∞:1 | 0.3 to 1.2 % | 0.559 % | meets | research/dbx-160.md §12.5 test 33, bracketing dbx's 0.5 % and the ripple equation's 0.8 % |
+| worst THD from 0 to 40 dB of compression, 1 kHz | 0 to 0.2 % | 0.094 % | meets | research/dbx-160.md §12.5 test 31, from the 160A's "<0.2 %, typical, any amount of compression up to 40 dB @ 1 kHz" |
+| second harmonic below threshold | 0.035 to 0.105 % | 0.075 % | meets | research/dbx-160.md §12.5 test 32, from the 160X's 0.07 % below threshold |
+| third harmonic below threshold | 0.035 to 0.105 % | 0.000 % | **misses** | research/dbx-160.md §12.5 test 32, from the 160X's 0.07 % below threshold |
+| response at the input coupling corner | -3 ± 0.3 dB | -2.940 dB | meets | research/dbx-160.md §12.8 test 41, from C12 = 0.15 µF into R26 = 100 kΩ |
+| response at 20 Hz | -1.1 ± 0.2 dB | -0.954 dB | meets | research/dbx-160.md §7.5, derived from the same pair |
+| meter reading at its factory 0 VU | 0 ± 0.15 VU | -0.143 VU | meets | research/dbx-160.md §12.7 test 37, from dbx's "factory calibrated to read '0' at +4dB (1.23V)" |
+| meter reading with the trimmer at its −15 dBu end | 0 ± 0.15 VU | -0.143 VU | meets | research/dbx-160.md §12.7 test 40, from the 160A's −15 dBu to +10 dBu trimmer |
+| OverEasy knee width | *(none published)* | 6 dB (the default) | no figure | — |
+| OverEasy on a transient | *(none published)* | the body is more compressed; the slap is not louder | no figure | — |
+
+Notes:
+
+- **threshold dial, decibels per printed mark**: dbx's marks are a 1-3-10 sequence, so the steps really alternate between 9.54 and 10.46 dB and their own −38 to +12 dB span is 9.9 dB a mark
+- **4:1, output change for a 20 dB rise**: the position the factory calibrated: the schematic carries a trimmer marked "4:1 CAL", R43
+- **output rise over 40 dB at the ∞ mark**: the test that separates modelling the circuit from modelling the silkscreen: 40 dB ÷ 120 is a third of a decibel, not a brick wall
+- **maximum compression**: driven at dbx's own published maximum input level for the 160A, +24 dBu, with the              threshold at its − 40 dBu end: the claim is about what the box can do, so the              measurement belongs at the ends of its own two published ranges
+- **attack, 20 dB step**: the recorded miss. dbx's three attack figures each imply a different time constant, 33.3, 26.2 and 37.6 ms, so no single-constant detector can meet all three and the hardware is a single-constant detector. The constant here is R35 and C15 off dbx's own drawing, which puts the release rate between dbx's own two published rates; meeting this row would mean giving that up, or giving up the exact true-RMS averaging
+- **under-reading at crest factor 3.5**: the descendant part's figure, not dbx's, who publish none. The direction and the ordering are right and the magnitudes are a recorded miss: what is left in the real part is its own input bandwidth, which the datasheet gives as four corner frequencies against input current rather than as a transfer function
+- **under-reading at crest factor 5**: the descendant part's figure, not dbx's, who publish none. The direction and the ordering are right and the magnitudes are a recorded miss: what is left in the real part is its own input bandwidth, which the datasheet gives as four corner frequencies against input current rather than as a transfer function
+- **under-reading at crest factor 8**: the descendant part's figure, not dbx's, who publish none. The direction and the ordering are right and the magnitudes are a recorded miss: what is left in the real part is its own input bandwidth, which the datasheet gives as four corner frequencies against input current rather than as a transfer function
+- **second harmonic at +4 dBu, ∞:1**: a calibration rather than a test: the cell's symmetry residual is fitted to this one number. What makes it a measurement is that the same value has to hold at every other frequency and ratio, which the row below checks
+- **third harmonic at 100 Hz, ∞:1**: an order-of-magnitude check on the detector's ripple rather than a calibration: dbx did not state the frequency of their 0.5 % figure
+- **third harmonic below threshold**: a recorded miss, and the model cannot meet it honestly. With no gain reduction there is no detector ripple, and the third harmonic in the hardware at that point belongs to an output stage dbx publish no distortion figure for, so anything here would be invented
+- **response at 20 Hz**: the original had a low-frequency tilt its successor did not: the 160A publishes −3 dB at 0.5 Hz on a board with much larger coupling capacitors
+- **OverEasy knee width**: dbx never published a knee width for any model in the family, and it cannot be derived from the drawing: it is Vθ/(G·K), and the difference amplifier's gain G could not be read. The circuit bounds it to roughly 2 to 9 dB, which is why it is a parameter
+- **OverEasy on a transient**: dbx's kick-drum note says OverEasy "will therefore emphasize the slap at the beginning of the note and reduce the boominess of its body". The second clause holds. The first cannot hold for any knee centred on the threshold, which is what dbx's own definition of what THRESHOLD points at requires: such a curve lies at or below the hard-knee curve everywhere, so it can never pass more of a transient. Where a definition and a sentence of application prose disagree the model follows the definition
+
+## 4000 G — SSL 4000 G bus compressor, the 500-series module drawn with the console's values
+
+Figures from [`research/SSL-Gbus.md`](../research/SSL-Gbus.md).
+
+| quantity | published | measured | verdict | source |
+|---|---|---|---|---|
+| unity gain, sidechain out, make-up at 0 | 0 ± 0.1 dB | 0.000 dB | meets | research/SSL-Gbus.md §13.1 test 3, from THAT's "Gain at 0 V Control Voltage: 0.0 dB, ±0.1 dB" (M) |
+| the IN switch is not a bypass: make-up with the sidechain out | 10 ± 0.1 dB | 10.000 dB | meets | research/SSL-Gbus.md §13.1 test 2, from SSL's "the compressor sidechain is enabled by the IN switch" (P) and the clone builder's "the makeup gain pot is active all the time" (C) |
+| audio-path response, 20 Hz to 20 kHz | 0 ± 0.05 dB | 0.017 dB | meets | research/SSL-Gbus.md §13.1 test 6, from SSL's XLogic "20Hz to 20kHz ±0.05dB" (M). That figure describes a 2004 SuperAnalogue unit, not a 1980 console card; it is used here as the tightest published bound on a path that has no filters in it at all |
+| attack constant, .1 ms position | 0.3854 ± 0.0077079996 ms | 0.385 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| attack constant, .3 ms position | 1.269 ± 0.02538 ms | 1.271 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| attack constant, 1 ms position | 3.854 ± 0.07708 ms | 3.854 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| attack constant, 3 ms position | 12.690001 ± 0.2538 ms | 12.693 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| attack constant, 10 ms position | 38.54 ± 0.7708 ms | 38.547 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| attack constant, 30 ms position | 126.9 ± 2.5379999 ms | 126.823 ms | meets | research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S) |
+| release constant, .1 s position | 84.6 ± 1.6919999 ms | 84.589 ms | meets | research/SSL-Gbus.md §13.4 test 15, from R9–R12 across 0.47 µF on card 82E27 (S) |
+| release constant, .3 s position | 126.9 ± 2.5379999 ms | 126.823 ms | meets | research/SSL-Gbus.md §13.4 test 15, from R9–R12 across 0.47 µF on card 82E27 (S) |
+| release constant, .6 s position | 263.2 ± 5.264 ms | 263.198 ms | meets | research/SSL-Gbus.md §13.4 test 15, from R9–R12 across 0.47 µF on card 82E27 (S) |
+| release constant, 1.2 s position | 564 ± 11.28 ms | 563.734 ms | meets | research/SSL-Gbus.md §13.4 test 15, from R9–R12 across 0.47 µF on card 82E27 (S) |
+| Auto release, fast section | 42.77 ± 2.1385 ms | 42.771 ms | meets | research/SSL-Gbus.md §13.4 test 16, from R7 91 kΩ with C1 0.47 µF on card 82E27 (S) |
+| Auto release, slow section | 5.1 ± 0.255 s | 5.128 s | meets | research/SSL-Gbus.md §13.4 test 16, from R8 750 kΩ with C2 6.8 µF on card 82E27 (S) |
+| Auto release, share of the control voltage on the slow section after a sustained tone | 89.2 ± 4.46 % | 88.641 % | meets | research/SSL-Gbus.md §13.4 test 17, from R8/(R7+R8) on card 82E27 (S) |
+| Auto release, charge split after a 1 ms burst | 14.47 ± 0.7235 : 1 | 14.299 : 1 | meets | research/SSL-Gbus.md §13.4 test 17, from C2/C1 = 6.8/0.47 on card 82E27 (S) |
+| attack/release divider, .1 ms attack with the 0.1 s release | 0.9954651 ± 0.049773257  | 0.998  | meets | research/SSL-Gbus.md §13.4 test 18, from R_rel/(R_att + R_rel) on card 82E27 (S) |
+| attack/release divider, 30 ms attack with the 0.1 s release | 0.4 ± 0.020000001  | 0.400  | meets | research/SSL-Gbus.md §13.4 test 18, from R_rel/(R_att + R_rel) on card 82E27 (S) |
+| effective attack at 4:1, .1 ms panel mark | 0.099999994 ± 0.03 ms | 0.130 ms | **misses** | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| effective attack at 4:1, .3 ms panel mark | 0.3 ± 0.09 ms | 0.375 ms | meets | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| effective attack at 4:1, 1 ms panel mark | 1 ± 0.3 ms | 0.990 ms | meets | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| effective attack at 4:1, 3 ms panel mark | 3 ± 0.90000004 ms | 2.807 ms | meets | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| effective attack at 4:1, 10 ms panel mark | 10 ± 3 ms | 7.500 ms | meets | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| effective attack at 4:1, 30 ms panel mark | 30 ± 9 ms | 21.375 ms | meets | research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the dossier's and it calls it wide on purpose |
+| 10 dB off the threshold against 10 dB onto the input | 0 ± 0.5 dB | 0.000 dB | meets | research/SSL-Gbus.md §13.2 test 7, from SSL's XLogic manual: the sidechain trims "increase the side chain level by 10dB — effectively reducing the threshold on that channel by 10dB" (P) |
+| rise of the compression ratio per dB of reduction, 2:1 position | 0.11513 ± 0.023026  | 0.118  | meets | research/SSL-Gbus.md §13.3 test 10, from ratio(GR) = 1 + 0.11513·(GR + V_d/k), derived from the loop equation with ln10/20 (S, via derivation) |
+| rise of the compression ratio per dB of reduction, 4:1 position | 0.11513 ± 0.023026  | 0.130  | meets | research/SSL-Gbus.md §13.3 test 10, from ratio(GR) = 1 + 0.11513·(GR + V_d/k), derived from the loop equation with ln10/20 (S, via derivation) |
+| rise of the compression ratio per dB of reduction, 10:1 position | 0.11513 ± 0.023026  | 0.180  | **misses** | research/SSL-Gbus.md §13.3 test 10, from ratio(GR) = 1 + 0.11513·(GR + V_d/k), derived from the loop equation with ln10/20 (S, via derivation) |
+| lowering the ratio lowers the knee | yes, direction only | yes (-22.8, -14.8, -12.0 dBFS at 2:1, 4:1, 10:1) | meets | research/SSL-Gbus.md §13.3 test 11, from SSL's "Decreasing the RATIO setting lowers the effective threshold" (P) |
+| gain-cell THD, 1.0000 V RMS in at 0 dB of gain | 0.005 ± 0.0025 % | 0.005 % | meets | research/SSL-Gbus.md §13.5 test 24, from the THAT 2180A typical THD table (M). The ±50 % is the dossier's, because the datasheet gives typicals with a maximum and no distribution |
+| gain-cell THD, 3.1623 V RMS in at -15 dB of gain | 0.02 ± 0.01 % | 0.016 % | meets | research/SSL-Gbus.md §13.5 test 24, from the THAT 2180A typical THD table (M). The ±50 % is the dossier's, because the datasheet gives typicals with a maximum and no distribution |
+| sidechain high-pass slope, worst of the five corners | 6 ± 1 dB/octave | 6.178 dB/octave | meets | research/SSL-Gbus.md §13.5 test 23, from Smart Research's "150Hz −6dB/octave" (C) |
+| a channel 20 dB quieter changes the reduction | 0 ± 0.1 dB | 0.000 dB | meets | research/SSL-Gbus.md §13.5 test 20, from SSL's "the dominant, ie. louder channel, controls the gain reduction of the overall stereo level" (P) |
+| meter deflection per dB of reduction, over the scale | 5 ± 0.1 % of full scale per dB | 5.000 % of full scale per dB | meets | research/SSL-Gbus.md §13.5 test 26, from the module's printed scale 0 4 8 12 16 20 evenly spaced (P) and the clone builder's "linear scale, at about 50 µA/dB, making a 1 mA meter showing 20 dB full-scale" (C) |
+| ratio calibration | *(none published)* | 2.31:1, 3.20:1 and 4.37:1 at 5 dB of reduction | no figure | — |
+| where the knee sits in absolute terms | *(none published)* | -14.8 dBFS at 4:1 with the threshold centred | no figure | — |
+| noise floor | *(none published)* | a design choice in floating point | no figure | — |
+
+Notes:
+
+- **release constant, .1 s position**: This position looks wrong and is right. Its 84.6 ms is 1.18 times the panel's 0.1 s where the other three are 2.1 to 2.4 times theirs. The dossier reads R12 unambiguously as 180 kΩ at 16× magnification, records that 90 kΩ would fit the pattern and is not what is drawn, and refuses to adjust the value to taste
+- **Auto release, share of the control voltage on the slow section after a sustained tone**: Neither this nor the transient split below appears anywhere in the engine. They are what simulating the two sections gives, and they are why the automatic release is programme-dependent
+- **attack/release divider, .1 ms attack with the 0.1 s release**: The least supported thing in this model. No measurement of it exists anywhere; it follows from the topology, and it costs nothing because simulating three components gives it for free. At the slowest attack the network reaches only 40 % of the control voltage it otherwise would
+- **attack/release divider, 30 ms attack with the 0.1 s release**: The least supported thing in this model. No measurement of it exists anywhere; it follows from the topology, and it costs nothing because simulating three components gives it for free. At the slowest attack the network reaches only 40 % of the control voltage it otherwise would
+- **effective attack at 4:1, .1 ms panel mark**: The one recorded miss in this model, by 0.2 percentage points. γ is 0.11513·d/k and equals 3 only at the knee, so the harder the box is driven the faster it grabs, while the panel prints one number. Measured at one fixed input level giving 7 to 9.5 dB of reduction; at 12 dB the slowest position runs 41 % fast and at 5 dB the fastest runs 176 % slow. Nothing is tuned to move this
+- **10 dB off the threshold against 10 dB onto the input**: The only place SSL state the equivalence numerically, and the test that proves the model built a sidechain gain rather than a comparator. Note the direction: a threshold reading and a sidechain gain run opposite ways, which is why this model's THRESHOLD parameter is negated into the loop and the dossier's §11.4 writes +T
+- **rise of the compression ratio per dB of reduction, 2:1 position**: Measured deep in conduction, between 20 and 30 dB. The derivation treats D6 as an ideal 0.6 V drop while the same dossier insists its soft turn-on *is* the knee; both cannot hold, and a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages. k is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is 154 mV and the diode never leaves its knee. Not calibrated away, because k is an estimate
+- **rise of the compression ratio per dB of reduction, 4:1 position**: Measured deep in conduction, between 20 and 30 dB. The derivation treats D6 as an ideal 0.6 V drop while the same dossier insists its soft turn-on *is* the knee; both cannot hold, and a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages. k is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is 154 mV and the diode never leaves its knee. Not calibrated away, because k is an estimate
+- **rise of the compression ratio per dB of reduction, 10:1 position**: Measured deep in conduction, between 20 and 30 dB. The derivation treats D6 as an ideal 0.6 V drop while the same dossier insists its soft turn-on *is* the knee; both cannot hold, and a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages. k is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is 154 mV and the diode never leaves its knee. Not calibrated away, because k is an estimate
+- **lowering the ratio lowers the knee**: SSL publish no magnitude for this, only the direction, so only the direction is checked. Saying "and by about 3 dB" would be inventing a number
+- **gain-cell THD, 1.0000 V RMS in at 0 dB of gain**: These two points settle where the distortion goes. The second has a lower output than the first and four times the THD, so it cannot be a function of the output: the cell shapes its input, not its result, which is what a current-mode cell driven through a resistor does. The dossier's §11.3 writes the other form and it misses this row by a factor of seven
+- **gain-cell THD, 3.1623 V RMS in at -15 dB of gain**: These two points settle where the distortion goes. The second has a lower output than the first and four times the THD, so it cannot be a function of the output: the cell shapes its input, not its result, which is what a current-mode cell driven through a resistor does. The dossier's §11.3 writes the other form and it misses this row by a factor of seven
+- **sidechain high-pass slope, worst of the five corners**: The only slope figure published for anything in this family, and it is for a different unit's outboard cable rather than SSL's built-in filter. Measured between a quarter and an eighth of each corner, where a slope is defined; the dossier asks for −6 dB one octave down, which an exact first-order section misses on its own at −6.99 dB
+- **meter deflection per dB of reduction, over the scale**: The rare case where the naive meter and the circuit meter agree, because a Blackmer VCA's control voltage is linear in decibels. Measured at three depths, so what is checked is that one dB is worth the same deflection anywhere on the scale
+- **ratio calibration**: SSL publish no measured transfer point for any ratio position, with or without a tolerance, in any document the dossier could reach. The control-bus scaling k is an estimate, so a row reading "5 dB ±1 dB at 4:1" would be this model marking its own homework, which is the failure an audit found in five plug-ins here. The dossier refuses the test in its §13.3 and so does this table. What is checked instead is the law's shape and its direction, above
+- **where the knee sits in absolute terms**: Nothing is published. The detector's scaling is anchored so that it reaches one diode drop at −12 dBFS, which is the level the only measured recordings of this unit were made at, and that is an operating condition rather than a calibration. SSL's nominal +4 dBu was tried first and is wrong for the job: it is a VU reference and this detector is a peak rectifier
+- **noise floor**: The XLogic's "< −99 dBu" and Smart Research's "−104 dBm" describe different, later, better circuits, and the clone's "less than −80 dB" describes a homebuilt one. Asserting any of the three against a floating-point model would be theatre
+
+## TG12413 — EMI TG12413
+
+Figures from [`research/TG12413.md`](../research/TG12413.md).
+
+| quantity | published | measured | verdict | source |
+|---|---|---|---|---|
+| output switch, position 1 | -9.95 ± 0.02 dB | -9.952 dB | meets | research/TG12413.md §12 test 1, from the S3 ladder and the legend printed on the same sheet |
+| output switch, position 21 | 9.81 ± 0.02 dB | 9.810 dB | meets | research/TG12413.md §12 test 1, from the S3 ladder and the legend printed on the same sheet |
+| output switch, full span | 19.76 ± 0.05 dB | 19.763 dB | meets | research/TG12413.md §3.4; EMI printed −10 to +10 in 1 dB steps and the resistors give 19.76 |
+| output switch, worst step error | 0 ± 0.1 dB | 0.081 dB | meets | research/TG12413.md §12 test 1; the legend says 1 dB steps and the ladder delivers them to 0.09 |
+| output switch through the module, position 1 | -9.95 ± 0.1 dB | -9.952 dB | meets | research/TG12413.md §12 test 1, measured rather than tabulated |
+| recovery 2 against position 1 | 2 ± 0.04 x | 2.000 x | meets | research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A |
+| recovery 3 against position 1 | 4.77 ± 0.0954 x | 4.746 x | meets | research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A |
+| recovery 4 against position 1 | 9.45 ± 0.189 x | 9.380 x | meets | research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A |
+| recovery 5 against position 1 | 19.4 ± 0.38799998 x | 19.338 x | meets | research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A |
+| recovery 6 against position 1 | 47.1 ± 0.942 x | 46.746 x | meets | research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A |
+| HOLD at recovery 1 | 21.3 ± 1 % | 21.127 % | meets | research/TG12413.md §12 test 5, from RV1's 10 kΩ against the ladder's 47 kΩ |
+| HOLD at recovery 6 | 0.45 ± 0.6 % | 0.000 % | meets | research/TG12413.md §12 test 5, from RV1's 10 kΩ against the ladder's 2 214 kΩ |
+| (G1) reproduces the Neve's tanh law | 0 ± 0.000011950787 relative | 0.000 relative | meets | research/TG12413.md §12 test 8, against the law derived in research/Neve-33609.md |
+| input coupling corner | 4.5 ± 1 Hz | 4.516 Hz | meets | research/TG12413.md §12 test 6, from C1 4µ7 into R78 7K5 |
+| output coupling loss at 20 Hz | 0 ± 0.1 dB | 0.003 dB | meets | research/TG12413.md §12 test 6, from C23 470 µF into a 600 Ω load |
+| LIMIT, output change for a 10 dB input step | *(none published)* | 4.36 dB | no figure | — |
+| gain reduction at full scale, COMPRESS | *(none published)* | 20.02 dB | no figure | — |
+| gain reduction floor, breakdown region | *(none published)* | 52.4 dB | no figure | — |
+| attack time | *(none published)* | not tested | no figure | — |
+| threshold in dBu | *(none published)* | not tested | no figure | — |
+| distortion at any level | *(none published)* | not tested | no figure | — |
+
+Notes:
+
+- **LIMIT, output change for a 10 dB input step**: Waves say only that this is "not a brick-wall limiter: transients are expected to pass", with no figure. What anchors the row is the band it must fall outside: AMS Neve publish 0.1 ± 0.1 dB for the 33609's limiter, and this is not that
+- **gain reduction at full scale, COMPRESS**: no maximum gain reduction is published for this unit. 20 dB is the dossier's own instruction in §11.6 and the model's control-current constant is fitted to it, so this row records a calibration rather than checks one
+- **gain reduction floor, breakdown region**: the 2·r_b term of equation (G1) bounds the element's resistance below, so the divider's loss is bounded. Where the floor sits depends on r_b, which is R16's 24 Ω taken as an order of magnitude and not as a measurement; that a floor exists is the finding, not its depth
+- **attack time**: R41 plus R47 into the store gives 47 ms, which is far too slow for a limiter, so the charge path is almost certainly current-driven by VT17 and the RC figure is an upper bound. Chandler say only "Attack: Fixed". §12.6 of the dossier refuses to test it and this report does the same
+- **threshold in dBu**: there is no threshold control and the reference is three germanium diodes whose drop at their working current nobody has measured. Where the model starts working is a documented choice, not a figure
+- **distortion at any level**: no spectrum, no THD figure and no noise figure has ever been published for this unit. The element's drive is fitted to the two ends of the THD scale Chandler print on the TG1's input knob, which is a figure about a licensed recreation with its own added stages
 
 ## Where this disagreed with the README, and how it was settled
 

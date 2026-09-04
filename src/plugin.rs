@@ -27,7 +27,8 @@ use noob_vst_webgui_framework::{Assets, AudioHandle, NoobVstWebguiFramework};
 use noob_vst_webgui_framework_nih::{EditorConfig, NoobVstWebguiFrameworkEditor, StoreSlot};
 
 use crate::dsp::{
-    self, Model, Processor, Settings, Shared, bridge, fet, opto, opto1b, opto3, pre, vca,
+    self, Model, Processor, Settings, Shared, bridge, fet, gbus, opto, opto1b, opto3, pre, rms, tg,
+    vca,
 };
 
 static UI: Dir = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
@@ -53,6 +54,12 @@ pub enum ModelParam {
     Opto1b,
     #[name = "33609"]
     Bridge,
+    #[name = "160"]
+    Rms,
+    #[name = "TG12413"]
+    Tg,
+    #[name = "4000 G"]
+    Gbus,
 }
 
 /// The 1176's ratio buttons, as the host sees them.
@@ -185,6 +192,148 @@ pub enum NeveModelParam {
     U33609N,
 }
 
+/// The TG12413's mode switch, in the order EMI printed on the drawing.
+///
+/// OUT sits between the other two, so getting from compress to limit means
+/// passing through out. That is a real ergonomic fact about the hardware
+/// and it is reproduced rather than tidied. **OUT is not a bypass**: the
+/// audio still goes through the gain element and only the control is
+/// neutralised.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TgModeParam {
+    Compress,
+    Out,
+    Limit,
+}
+
+/// The TG12413's recovery switch.
+///
+/// Numerals and nothing else, because that is all the hardware is marked
+/// with. No time is printed on EMI's drawing or published anywhere, and
+/// Waves, who had the console, say the times are "very hard to put in
+/// terms of exact milliseconds". Putting milliseconds here would be
+/// inventing a figure.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TgRecoveryParam {
+    #[name = "1"]
+    R1,
+    #[name = "2"]
+    R2,
+    #[name = "3"]
+    R3,
+    #[name = "4"]
+    R4,
+    #[name = "5"]
+    R5,
+    #[name = "6"]
+    R6,
+}
+
+/// Which side of the diodes' characteristic the gain element works on.
+///
+/// Not a control on any hardware. The drawing is genuinely ambiguous about
+/// the operating region, the answer changes the sound, and it could not be
+/// settled from the documents, so the model carries the choice where it
+/// can be corrected by moving a default rather than by rewriting the
+/// element.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TgRegionParam {
+    Breakdown,
+    Forward,
+}
+
+/// The TG12413's oversampling factor.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TgOversampleParam {
+    #[name = "1x"]
+    X1,
+    #[name = "2x"]
+    X2,
+    #[name = "4x"]
+    X4,
+}
+
+/// The SSL's attack switch, printed in milliseconds on card 82E27.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslAttackParam {
+    #[name = ".1"]
+    A01,
+    #[name = ".3"]
+    A03,
+    #[name = "1"]
+    A1,
+    #[name = "3"]
+    A3,
+    #[name = "10"]
+    A10,
+    #[name = "30"]
+    A30,
+}
+
+/// The SSL's release switch. The last position is the two-section
+/// automatic network, not a time.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslReleaseParam {
+    #[name = ".1"]
+    R01,
+    #[name = ".3"]
+    R03,
+    #[name = ".6"]
+    R06,
+    #[name = "1.2"]
+    R12,
+    #[name = "Auto"]
+    Auto,
+}
+
+/// The SSL's ratio switch, the console's three positions.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslRatioParam {
+    #[name = "2:1"]
+    R2,
+    #[name = "4:1"]
+    R4,
+    #[name = "10:1"]
+    R10,
+}
+
+/// The SSL's sidechain high-pass switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslHpfParam {
+    Off,
+    #[name = "30"]
+    F30,
+    #[name = "60"]
+    F60,
+    #[name = "105"]
+    F105,
+    #[name = "125"]
+    F125,
+    #[name = "185"]
+    F185,
+}
+
+/// How the SSL's two detectors are tied together. Only the first is the
+/// hardware's; the rest are ours.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslLinkParam {
+    Dominant,
+    Sum,
+    Dual,
+    #[name = "M/S"]
+    MidSide,
+}
+
+/// The SSL's oversampling. Two positions, because both nonlinearities in
+/// its audio path are exactly second order and 2x already contains them.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SslOversampleParam {
+    #[name = "1x"]
+    X1,
+    #[name = "2x"]
+    X2,
+}
+
 /// The 33609's limiter attack lever.
 #[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum NeveLimitAttackParam {
@@ -261,6 +410,37 @@ pub enum NeveMeterParam {
     In,
     Control,
     Out,
+}
+
+/// Which dbx the face wears.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DbxModelParam {
+    #[name = "160"]
+    U160,
+    #[name = "160A"]
+    U160A,
+}
+
+/// The dbx's threshold characteristic. The original has no such
+/// switch and the engine forces it hard there; OverEasy is Leslie
+/// Tyler's 1978 invention, three years after the 160 shipped.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DbxKneeParam {
+    #[name = "Hard"]
+    Hard,
+    #[name = "OverEasy"]
+    OverEasy,
+}
+
+/// The original's three METER push buttons.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DbxMeterParam {
+    #[name = "Input"]
+    Input,
+    #[name = "Output"]
+    Output,
+    #[name = "Gain Change"]
+    GainChange,
 }
 
 /// The Distressor's ratio switch.
@@ -503,6 +683,53 @@ pub struct NoobCompressorLabParams {
     pub neve_meter_select: EnumParam<NeveMeterParam>,
     pub neve_drive: FloatParam,
     pub neve_power: BoolParam,
+    pub dbx_model: EnumParam<DbxModelParam>,
+    pub dbx_threshold: FloatParam,
+    pub dbx_ratio: FloatParam,
+    pub dbx_output: FloatParam,
+    pub dbx_knee: EnumParam<DbxKneeParam>,
+    pub dbx_meter: EnumParam<DbxMeterParam>,
+    pub dbx_meter_cal: FloatParam,
+    pub dbx_knee_width: FloatParam,
+    pub dbx_tau: FloatParam,
+    pub dbx_lookahead: FloatParam,
+    pub dbx_headroom: FloatParam,
+    /// The TG12413's three switches. Everything on this module is a
+    /// switch, so nothing here is continuous.
+    pub tg_mode: EnumParam<TgModeParam>,
+    pub tg_recovery: EnumParam<TgRecoveryParam>,
+    /// Output level as a **switch index**, 0..20, for the panel's −10 to
+    /// +10 dB. The engine works from the twenty-one resistor values behind
+    /// those markings, so the real steps are not exactly one decibel.
+    pub tg_output: IntParam,
+    /// RV1, which is a screwdriver preset inside the module rather than a
+    /// panel control.
+    pub tg_hold: FloatParam,
+    pub tg_region: EnumParam<TgRegionParam>,
+    /// How far out of balance the element's two arms are, as a fraction of
+    /// the dossier's 5 % range. Ten adjust-on-test parts say EMI aligned
+    /// each module by hand, so being slightly out is a feature.
+    pub tg_mismatch: FloatParam,
+    /// Not on EMI's module. Chandler's recreation adds a continuous input,
+    /// and since there is no threshold control, driving it is how you
+    /// choose where the unit works.
+    pub tg_input: FloatParam,
+    pub tg_drive: FloatParam,
+    pub tg_oversample: EnumParam<TgOversampleParam>,
+    /// The SSL 4000 G bus compressor. `ssl_in` is the hardware IN switch
+    /// and is **not** a bypass: it removes the sidechain and leaves the
+    /// VCA and the make-up gain in circuit.
+    pub ssl_in: BoolParam,
+    pub ssl_threshold: FloatParam,
+    pub ssl_makeup: FloatParam,
+    pub ssl_attack: EnumParam<SslAttackParam>,
+    pub ssl_release: EnumParam<SslReleaseParam>,
+    pub ssl_ratio: EnumParam<SslRatioParam>,
+    pub ssl_hpf: EnumParam<SslHpfParam>,
+    pub ssl_link: EnumParam<SslLinkParam>,
+    pub ssl_drive: FloatParam,
+    pub ssl_range: FloatParam,
+    pub ssl_oversample: EnumParam<SslOversampleParam>,
     /// Distressor knobs, 0..10.5.
     pub dist_input: FloatParam,
     pub dist_output: FloatParam,
@@ -734,6 +961,161 @@ impl Default for NoobCompressorLabParams {
             neve_meter_select: EnumParam::new("Meter", NeveMeterParam::Control).non_automatable(),
             neve_drive: percent("Drive", 0.0),
             neve_power: BoolParam::new("Power", true).non_automatable(),
+            dbx_model: EnumParam::new("Unit", DbxModelParam::U160).non_automatable(),
+            // Both dials carry the union of the two units' ranges and
+            // each face maps its own pot onto the part its hardware
+            // has, so a host sees one control with one meaning.
+            dbx_threshold: FloatParam::new(
+                "Threshold",
+                0.0,
+                FloatRange::Linear {
+                    min: rms::THRESHOLD_MIN_DBU,
+                    max: rms::THRESHOLD_MAX_DBU,
+                },
+            )
+            .with_unit(" dBu")
+            .with_step_size(0.1),
+            // The value is the coefficient the COMPRESSION pot sets,
+            // `α = 1 − 1/R`, because the ratio itself runs through
+            // infinity and comes back negative and no numeric range
+            // can say that. The taper is the original's own dial,
+            // measured off dbx's drawing, and the string the host
+            // shows is what the panel prints.
+            dbx_ratio: FloatParam::new(
+                "Compression",
+                0.75,
+                FloatRange::Skewed {
+                    min: 0.0,
+                    max: 2.0,
+                    factor: 1.0,
+                },
+            )
+            .with_step_size(0.001)
+            .with_value_to_string(Arc::new(rms::ratio_label)),
+            dbx_output: FloatParam::new(
+                "Output Gain",
+                0.0,
+                FloatRange::Linear {
+                    min: rms::OUTPUT_MIN_DB,
+                    max: rms::OUTPUT_MAX_DB,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.1),
+            dbx_knee: EnumParam::new("Threshold Characteristic", DbxKneeParam::Hard),
+            dbx_meter: EnumParam::new("Meter", DbxMeterParam::GainChange).non_automatable(),
+            dbx_meter_cal: FloatParam::new(
+                "Meter Calibration",
+                rms::METER_CAL_DEFAULT_DBU,
+                FloatRange::Linear {
+                    min: rms::METER_CAL_MIN_DBU,
+                    max: rms::METER_CAL_MAX_DBU,
+                },
+            )
+            .with_unit(" dBu")
+            .with_step_size(0.1)
+            .non_automatable(),
+            dbx_knee_width: FloatParam::new(
+                "OverEasy Width",
+                rms::engine::KNEE_WIDTH_DEFAULT_DB,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: rms::engine::KNEE_WIDTH_MAX_DB,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.1),
+            dbx_tau: FloatParam::new(
+                "Detector Time Constant",
+                rms::engine::TAU_DEFAULT_S * 1e3,
+                FloatRange::Linear {
+                    min: rms::engine::TAU_MIN_S * 1e3,
+                    max: rms::engine::TAU_MAX_S * 1e3,
+                },
+            )
+            .with_unit(" ms")
+            .with_step_size(0.01),
+            dbx_lookahead: FloatParam::new(
+                "Look-ahead",
+                0.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: rms::engine::LOOKAHEAD_MAX_MS,
+                },
+            )
+            .with_unit(" ms")
+            .with_step_size(0.05),
+            dbx_headroom: FloatParam::new(
+                "Headroom",
+                rms::HEADROOM_DEFAULT_DB,
+                FloatRange::Linear {
+                    min: rms::HEADROOM_MIN_DB,
+                    max: rms::HEADROOM_MAX_DB,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.5)
+            .non_automatable(),
+            tg_mode: EnumParam::new("Mode", TgModeParam::Compress),
+            tg_recovery: EnumParam::new("Recovery", TgRecoveryParam::R3),
+            tg_output: IntParam::new("Output Level", 10, IntRange::Linear { min: 0, max: 20 })
+                .with_value_to_string(Arc::new(|i| {
+                    format!("{:+.0} dB", tg::engine::output_marked_db(i as usize))
+                })),
+            tg_hold: percent("Hold", 0.0),
+            tg_region: EnumParam::new("Region", TgRegionParam::Breakdown).non_automatable(),
+            tg_mismatch: percent("Arm Mismatch", 0.0),
+            tg_input: FloatParam::new(
+                "Input",
+                0.0,
+                FloatRange::Linear {
+                    min: -12.0,
+                    max: 12.0,
+                },
+            )
+            .with_step_size(0.1)
+            .with_unit(" dB"),
+            tg_drive: percent("Drive", 0.0),
+            tg_oversample: EnumParam::new("Oversampling", TgOversampleParam::X2).non_automatable(),
+            ssl_in: BoolParam::new("Compressor In", true),
+            ssl_threshold: FloatParam::new(
+                "Threshold",
+                0.0,
+                FloatRange::Linear {
+                    min: -20.0,
+                    max: 20.0,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.1),
+            ssl_makeup: FloatParam::new(
+                "Make-up",
+                0.0,
+                FloatRange::Linear {
+                    min: -5.0,
+                    max: 15.0,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.1),
+            ssl_attack: EnumParam::new("Attack", SslAttackParam::A1),
+            ssl_release: EnumParam::new("Release", SslReleaseParam::Auto),
+            ssl_ratio: EnumParam::new("Ratio", SslRatioParam::R4),
+            ssl_hpf: EnumParam::new("Sidechain HPF", SslHpfParam::Off),
+            ssl_link: EnumParam::new("Detector Link", SslLinkParam::Dominant),
+            ssl_drive: percent("Drive", 0.0),
+            ssl_range: FloatParam::new(
+                "Range",
+                20.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 20.0,
+                },
+            )
+            .with_unit(" dB")
+            .with_step_size(0.1),
+            ssl_oversample: EnumParam::new("Oversampling", SslOversampleParam::X2)
+                .non_automatable(),
             dist_input: knob("Input"),
             dist_output: knob("Output"),
             dist_attack: knob("Attack"),
@@ -944,6 +1326,61 @@ unsafe impl Params for NoobCompressorLabParams {
             ),
             (g("neve_drive"), self.neve_drive.as_ptr(), g("33609")),
             (g("neve_power"), self.neve_power.as_ptr(), g("33609")),
+            (g("dbx_model"), self.dbx_model.as_ptr(), g("dbx 160")),
+            (
+                g("dbx_threshold"),
+                self.dbx_threshold.as_ptr(),
+                g("dbx 160"),
+            ),
+            (g("dbx_ratio"), self.dbx_ratio.as_ptr(), g("dbx 160")),
+            (g("dbx_output"), self.dbx_output.as_ptr(), g("dbx 160")),
+            (g("dbx_knee"), self.dbx_knee.as_ptr(), g("dbx 160")),
+            (g("dbx_meter"), self.dbx_meter.as_ptr(), g("dbx 160")),
+            (
+                g("dbx_meter_cal"),
+                self.dbx_meter_cal.as_ptr(),
+                g("dbx 160"),
+            ),
+            (
+                g("dbx_knee_width"),
+                self.dbx_knee_width.as_ptr(),
+                g("dbx 160"),
+            ),
+            (g("dbx_tau"), self.dbx_tau.as_ptr(), g("dbx 160")),
+            (
+                g("dbx_lookahead"),
+                self.dbx_lookahead.as_ptr(),
+                g("dbx 160"),
+            ),
+            (g("dbx_headroom"), self.dbx_headroom.as_ptr(), g("dbx 160")),
+            (g("tg_mode"), self.tg_mode.as_ptr(), g("TG12413")),
+            (g("tg_recovery"), self.tg_recovery.as_ptr(), g("TG12413")),
+            (g("tg_output"), self.tg_output.as_ptr(), g("TG12413")),
+            (g("tg_hold"), self.tg_hold.as_ptr(), g("TG12413")),
+            (g("tg_region"), self.tg_region.as_ptr(), g("TG12413")),
+            (g("tg_mismatch"), self.tg_mismatch.as_ptr(), g("TG12413")),
+            (g("tg_input"), self.tg_input.as_ptr(), g("TG12413")),
+            (g("tg_drive"), self.tg_drive.as_ptr(), g("TG12413")),
+            (
+                g("tg_oversample"),
+                self.tg_oversample.as_ptr(),
+                g("TG12413"),
+            ),
+            (g("ssl_in"), self.ssl_in.as_ptr(), g("4000 G")),
+            (g("ssl_threshold"), self.ssl_threshold.as_ptr(), g("4000 G")),
+            (g("ssl_makeup"), self.ssl_makeup.as_ptr(), g("4000 G")),
+            (g("ssl_attack"), self.ssl_attack.as_ptr(), g("4000 G")),
+            (g("ssl_release"), self.ssl_release.as_ptr(), g("4000 G")),
+            (g("ssl_ratio"), self.ssl_ratio.as_ptr(), g("4000 G")),
+            (g("ssl_hpf"), self.ssl_hpf.as_ptr(), g("4000 G")),
+            (g("ssl_link"), self.ssl_link.as_ptr(), g("4000 G")),
+            (g("ssl_drive"), self.ssl_drive.as_ptr(), g("4000 G")),
+            (g("ssl_range"), self.ssl_range.as_ptr(), g("4000 G")),
+            (
+                g("ssl_oversample"),
+                self.ssl_oversample.as_ptr(),
+                g("4000 G"),
+            ),
             (g("link"), self.link.as_ptr(), g("extras")),
             (g("mix"), self.mix.as_ptr(), g("extras")),
             (g("sc_hpf"), self.sc_hpf.as_ptr(), g("extras")),
@@ -1024,6 +1461,46 @@ impl NoobCompressorLabParams {
                 drive: self.neve_drive.value() / 100.0,
                 power: self.neve_power.value(),
                 ..bridge::Settings::default()
+            },
+            gbus: gbus::Settings {
+                sidechain_in: self.ssl_in.value(),
+                threshold_db: self.ssl_threshold.value(),
+                makeup_db: self.ssl_makeup.value(),
+                attack: self.ssl_attack.value() as usize,
+                release: self.ssl_release.value() as usize,
+                ratio: self.ssl_ratio.value() as usize,
+                hpf: self.ssl_hpf.value() as usize,
+                link_mode: gbus::engine::Link::from_index(self.ssl_link.value() as usize),
+                drive: self.ssl_drive.value() / 100.0,
+                range_db: self.ssl_range.value(),
+                oversample: matches!(self.ssl_oversample.value(), SslOversampleParam::X2),
+                ..gbus::Settings::default()
+            },
+            tg: tg::Settings {
+                mode: self.tg_mode.value() as usize,
+                recovery: self.tg_recovery.value() as usize,
+                output: self.tg_output.value() as usize,
+                hold: self.tg_hold.value() / 100.0,
+                region: self.tg_region.value() as usize,
+                mismatch: self.tg_mismatch.value() / 100.0,
+                input_db: self.tg_input.value(),
+                drive: self.tg_drive.value() / 100.0,
+                oversample: tg::oversample_factor(self.tg_oversample.value() as usize),
+                ..tg::Settings::default()
+            },
+            rms: rms::Settings {
+                model: self.dbx_model.value() as usize,
+                threshold_dbu: self.dbx_threshold.value(),
+                alpha: self.dbx_ratio.value(),
+                output_db: self.dbx_output.value(),
+                knee: self.dbx_knee.value() as usize,
+                knee_width_db: self.dbx_knee_width.value(),
+                tau_s: self.dbx_tau.value() * 1e-3,
+                meter: self.dbx_meter.value() as usize,
+                meter_cal_dbu: self.dbx_meter_cal.value(),
+                lookahead_ms: self.dbx_lookahead.value(),
+                headroom_db: self.dbx_headroom.value(),
+                ..rms::Settings::default()
             },
             vca: vca::Settings {
                 input: self.dist_input.value(),

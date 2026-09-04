@@ -37,7 +37,14 @@ function dropSource(list) {
 /** The VU reference: +4 dBu reads 0 VU at −18 dBFS. */
 const VU_REF_DBFS = -18;
 /** The model switch as a key, in the order of the `model` parameter's steps. */
-const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176', 'cl1b'];
+/*
+ * Positional, exactly like `MODELS` in `composables/useLab.js` and the
+ * `Model` enum in `src/dsp/mod.rs`: the `model` parameter's step is the
+ * index. A gap here silently sends a model's generated frames to the wrong
+ * page, so every step in `MODEL_NAMES` needs an entry even if its view is
+ * not built yet.
+ */
+const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176', 'cl1b', 'bridge', 'dbx', 'tg', 'gbus'];
 const modelKey = () => MODEL_KEYS[Math.round(plain('model'))] || 'fet';
 
 /**
@@ -66,6 +73,30 @@ const DIST_RATIOS = [
  */
 const stepped = (list) => list.map((p) => (p.labels && p.max == null ? { min: 0, max: p.labels.length - 1, ...p } : p));
 
+/**
+ * The dbx COMPRESSION dial's taper, sampled the way `src/dsp/rms/mod.rs`
+ * samples it so the offline page and the plug-in agree: the original's nine
+ * measured mark positions below the ∞ mark, then linear in the coefficient
+ * from 1 to 2 across the last sixth of the travel, which is where the 160A
+ * puts its four negative marks.
+ *
+ * `alpha = 1 − 1/R` is the whole ratio law, so the parameter's plain value
+ * is the coefficient and the printed ratio is what the panel says.
+ */
+const DBX_MARK_TRAVEL = [0, 0.09945, 0.1943, 0.36376, 0.50703, 0.69807, 0.8577, 0.93948, 1];
+const DBX_MARK_ALPHA = [0, 1 / 3, 0.5, 2 / 3, 0.75, 5 / 6, 0.9, 0.95, 1];
+const DBX_INFINITY_TRAVEL = 5 / 6;
+const DBX_RATIO_TABLE = Array.from({ length: 129 }, (_, i) => {
+  const t = i / 128;
+  if (t >= DBX_INFINITY_TRAVEL) return 1 + (t - DBX_INFINITY_TRAVEL) / (1 - DBX_INFINITY_TRAVEL);
+  const u = t / DBX_INFINITY_TRAVEL;
+  let k = 1;
+  while (k < DBX_MARK_TRAVEL.length - 1 && u > DBX_MARK_TRAVEL[k]) k += 1;
+  const span = DBX_MARK_TRAVEL[k] - DBX_MARK_TRAVEL[k - 1];
+  const f = span > 0 ? (u - DBX_MARK_TRAVEL[k - 1]) / span : 0;
+  return DBX_MARK_ALPHA[k - 1] + (DBX_MARK_ALPHA[k] - DBX_MARK_ALPHA[k - 1]) * f;
+});
+
 export const offline = {
   name: 'noob-compressorlab',
   meta: { vendor: 'Noob Audio Engineering', version: 'dev', sample_rate: 48000, vu_ref_dbfs: VU_REF_DBFS, transfer_points: 128, standalone: true },
@@ -74,7 +105,7 @@ export const offline = {
   // source card has to say the host is the input rather than offer controls.
   // It exists so that presentation can be checked without a host.
   params: dropSource(stepped([
-    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B', '33609'], default: 0, group: 'lab', automatable: false },
+    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B', '33609', '160', 'TG12413', '4000 G'], default: 0, group: 'lab', automatable: false },
 
     { id: 'fet_input', name: 'Input', min: 0, max: 48, default: 24, group: '1176' },
     { id: 'fet_output', name: 'Output', min: 0, max: 48, default: 24, group: '1176' },
@@ -133,6 +164,21 @@ export const offline = {
     { id: 'neve_drive', name: 'Drive', min: 0, max: 100, default: 0, unit: '%', group: '33609' },
     { id: 'neve_power', name: 'Power', toggle: true, default: 1, group: '33609', automatable: false },
 
+    // TG12413: three switches, one internal preset, and five things the
+    // hardware has no control for. `tg_output` carries the decibels EMI
+    // silkscreened; the twenty-one resistors behind them deliver 0.83 to
+    // 1.06 dB per step, which is the hardware's own error and not a rounding
+    // one (research/TG12413.md 3.4).
+    { id: 'tg_mode', name: 'Mode', labels: ['Compress', 'Out', 'Limit'], default: 0, group: 'TG12413' },
+    { id: 'tg_recovery', name: 'Recovery', labels: ['1', '2', '3', '4', '5', '6'], default: 2, group: 'TG12413' },
+    { id: 'tg_output', name: 'Output Level', min: -10, max: 10, steps: 21, default: 0, unit: 'dB', group: 'TG12413' },
+    { id: 'tg_hold', name: 'Hold', min: 0, max: 100, default: 0, unit: '%', group: 'TG12413' },
+    { id: 'tg_region', name: 'Region', labels: ['Breakdown', 'Forward'], default: 0, group: 'TG12413', automatable: false },
+    { id: 'tg_mismatch', name: 'Arm Mismatch', min: 0, max: 100, default: 0, unit: '%', group: 'TG12413' },
+    { id: 'tg_input', name: 'Input', min: -12, max: 12, default: 0, unit: 'dB', group: 'TG12413' },
+    { id: 'tg_drive', name: 'Drive', min: 0, max: 100, default: 0, unit: '%', group: 'TG12413' },
+    { id: 'tg_oversample', name: 'Oversampling', labels: ['1x', '2x', '4x'], default: 1, group: 'TG12413', automatable: false },
+
     { id: 'dist_input', name: 'Input', min: 0, max: 10.5, default: 5, group: 'Distressor' },
     { id: 'dist_output', name: 'Output', min: 0, max: 10.5, default: 5, group: 'Distressor' },
     { id: 'dist_attack', name: 'Attack', min: 0, max: 10.5, default: 5, group: 'Distressor' },
@@ -160,6 +206,44 @@ export const offline = {
     { id: 'pre_meter', name: 'Meter', labels: ['PRE', 'GR', 'COMP'], default: 1, group: '6176', automatable: false },
     { id: 'pre_phantom', name: 'Phantom Power', toggle: true, default: 0, group: '6176', automatable: false },
 
+    // The dbx's ratio publishes the coefficient the circuit sets, `alpha`,
+    // because the ratio itself runs through infinity and comes back
+    // negative and no numeric range can say that. `table` is the
+    // original's own dial taper, measured off dbx's drawing: the nine
+    // printed marks land at 0, 0.0995, 0.1943, 0.3638, 0.5070, 0.6981,
+    // 0.8577, 0.9395 and 0.8333 of the parameter's travel, the last
+    // because the ∞ mark sits five-sixths along and the 160A's negative
+    // fan takes the rest.
+    { id: 'dbx_model', name: 'Unit', labels: ['160', '160A'], default: 0, group: 'dbx 160', automatable: false },
+    { id: 'dbx_threshold', name: 'Threshold', min: -40, max: 20, default: 0, unit: 'dBu', group: 'dbx 160' },
+    { id: 'dbx_ratio', name: 'Compression', table: DBX_RATIO_TABLE, default: 0.75, group: 'dbx 160' },
+    { id: 'dbx_output', name: 'Output Gain', min: -20, max: 20, default: 0, unit: 'dB', group: 'dbx 160' },
+    { id: 'dbx_knee', name: 'Threshold Characteristic', labels: ['Hard', 'OverEasy'], default: 0, group: 'dbx 160' },
+    { id: 'dbx_meter', name: 'Meter', labels: ['Input', 'Output', 'Gain Change'], default: 2, group: 'dbx 160', automatable: false },
+    { id: 'dbx_meter_cal', name: 'Meter Calibration', min: -15, max: 10, default: 4, unit: 'dBu', group: 'dbx 160', automatable: false },
+    { id: 'dbx_knee_width', name: 'OverEasy Width', min: 0, max: 12, default: 6, unit: 'dB', group: 'dbx 160' },
+    { id: 'dbx_tau', name: 'Detector Time Constant', min: 20, max: 60, default: 35.32, unit: 'ms', group: 'dbx 160' },
+    { id: 'dbx_lookahead', name: 'Look-ahead', min: 0, max: 10, default: 0, unit: 'ms', group: 'dbx 160' },
+    { id: 'dbx_headroom', name: 'Headroom', min: 4, max: 28, default: 22, unit: 'dB', group: 'dbx 160', automatable: false },
+
+    // SSL 4000 G: two linear pots and four rotary switches, drawn on the
+    // 500-series module with the console's values on them
+    // (research/SSL-Gbus.md 2.5). `ssl_in` is the hardware IN switch and is
+    // not a bypass: it removes the sidechain and leaves the VCA and the
+    // make-up gain in circuit. The threshold is marked as the panel marks
+    // it, so more negative compresses more.
+    { id: 'ssl_in', name: 'Compressor In', toggle: true, default: 1, group: '4000 G' },
+    { id: 'ssl_threshold', name: 'Threshold', min: -20, max: 20, default: 0, unit: 'dB', group: '4000 G' },
+    { id: 'ssl_makeup', name: 'Make-up', min: -5, max: 15, default: 0, unit: 'dB', group: '4000 G' },
+    { id: 'ssl_attack', name: 'Attack', labels: ['.1', '.3', '1', '3', '10', '30'], default: 2, group: '4000 G' },
+    { id: 'ssl_release', name: 'Release', labels: ['.1', '.3', '.6', '1.2', 'Auto'], default: 4, group: '4000 G' },
+    { id: 'ssl_ratio', name: 'Ratio', labels: ['2:1', '4:1', '10:1'], default: 1, group: '4000 G' },
+    { id: 'ssl_hpf', name: 'Sidechain HPF', labels: ['Off', '30', '60', '105', '125', '185'], default: 0, group: '4000 G' },
+    { id: 'ssl_link', name: 'Detector Link', labels: ['Dominant', 'Sum', 'Dual', 'M/S'], default: 0, group: '4000 G' },
+    { id: 'ssl_drive', name: 'Drive', min: 0, max: 100, default: 0, unit: '%', group: '4000 G' },
+    { id: 'ssl_range', name: 'Range', min: 0, max: 20, default: 20, unit: 'dB', group: '4000 G' },
+    { id: 'ssl_oversample', name: 'Oversampling', labels: ['1x', '2x'], default: 1, group: '4000 G', automatable: false },
+
     { id: 'link', name: 'Stereo Link', toggle: true, default: 1, group: 'extras' },
     { id: 'mix', name: 'Mix', min: 0, max: 100, default: 100, unit: '%', group: 'extras' },
     { id: 'sc_hpf', name: 'Side-chain HPF', min: 0, max: 300, default: 0, unit: 'Hz', group: 'extras' },
@@ -175,7 +259,7 @@ export const offline = {
     // field rather than smoothing it again.
     { id: 'meter', name: 'Meter', kind: 'meter', capacity: 6, channels: 2, meta: { layout: 'in_l,in_r,out_l,out_r,gr_db,meter_vu', vu_ref_dbfs: VU_REF_DBFS, sample_rate: 48000, ballistics: 'engine' } },
     { id: 'cell', name: 'T4 cell', kind: 'raw', capacity: 3, channels: 1, meta: { layout: 'light,free_carriers,trapped_carriers' } },
-    { id: 'lamps', name: 'Lamps', kind: 'raw', capacity: 4, channels: 1, meta: { layout: 'thd_pct,redline,pre_vu_db,drive' } },
+    { id: 'lamps', name: 'Lamps', kind: 'raw', capacity: 4, channels: 1, meta: { layout: 'thd_pct,redline,pre_vu_db,drive', layout_160: 'below,above,ghost_gr_db,overeasy' } },
     { id: 'transfer', name: 'Transfer curve', kind: 'curve', capacity: 128, channels: 1, sticky: true, meta: { in_db: [-60, 0], unit: 'dBFS' } },
   ],
   frames: {
@@ -198,6 +282,19 @@ export const offline = {
         const beat = Math.max(0, Math.sin(t * 2 * Math.PI * 2.1)) ** 6;
         inl = 0.2 + 0.6 * beat;
         gr = -(14 * r.depth * beat + 2 * r.depth * Math.abs(Math.sin(t * 0.9)));
+      } else if (key === 'dbx') {
+        /*
+         * A true-RMS detector on the same drum loop, which is the whole
+         * point of the box and so is what the offline page shows: the
+         * reduction follows the *body* of each hit rather than its spike,
+         * so it lags the beat and never reaches the peak. The depth follows
+         * the ratio coefficient, which is what the pot sets.
+         */
+        const beat = Math.max(0, Math.sin(t * 2 * Math.PI * 1.9)) ** 8;
+        const body = Math.max(0, Math.sin(t * 2 * Math.PI * 1.9 - 0.5)) ** 2;
+        const alpha = Math.min(2, Math.max(0, plain('dbx_ratio', 0.75)));
+        inl = 0.18 + 0.6 * beat;
+        gr = -(alpha * (16 * body + 2 * Math.abs(Math.sin(t * 0.6))));
       } else {
         // a drum loop, fast FET grabs (the 1176 and the 6176's compressor half)
         const beat = Math.max(0, Math.sin(t * 2 * Math.PI * 1.9)) ** 8;
@@ -222,6 +319,12 @@ export const offline = {
         // the hardware's three positions: input, compression, output (0 VU is +4 dBu)
         const mode = Math.round(plain('cl1b_meter', 1));
         vu = [db(inl) - VU_REF_DBFS, gr, outDb - VU_REF_DBFS][mode];
+      } else if (key === 'dbx') {
+        // the original's three METER buttons: input level, output level,
+        // gain change, with 0 VU where the rear trimmer is set
+        const mode = Math.round(plain('dbx_meter', 2));
+        const cal = plain('dbx_meter_cal', 4) - 4;
+        vu = [db(inl) - VU_REF_DBFS - cal, outDb - VU_REF_DBFS - cal, gr][mode];
       } else if (key === 'pre6176') {
         const mode = Math.round(plain('pre_meter', 1));
         vu = [preVuDb(), gr, outDb - VU_REF_DBFS][mode];
@@ -235,12 +338,26 @@ export const offline = {
       let dark = false; // away from the optical models the cell publishes zeros once, then nothing
       return (t) => {
         const key = modelKey();
-        if (key !== 'opto' && key !== 'la3a') {
+        if (key !== 'opto' && key !== 'la3a' && key !== 'tg') {
           if (dark) return null;
           dark = true;
           return [0, 0, 0];
         }
         dark = false;
+        if (key === 'tg') {
+          // Not a cell: this machine has none. The three values are the
+          // control current in microamps, the resistance the four diodes
+          // present, and the drive fraction. The two are tied by
+          // `r = 2*r_b + 2*V_n/I` with `r_b = 24` and `V_n = 0.12`, so the
+          // generator computes one from the other rather than inventing
+          // both, and a bench reading of one against the other holds here
+          // exactly as it does in the engine.
+          const gr = 4 + 8 * (0.6 + 0.4 * Math.sin(t * 0.6));
+          const a = 10 ** (-gr / 20);
+          const r = (a * 20000) / (1 - a);
+          const i = 0.24 / Math.max(1e-6, r - 48);
+          return [i * 1e6, r, plain('tg_drive', 0) / 100];
+        }
         // the model's own units: light around 1e-5..1e-4 at working levels, carriers around 1e-3.
         // The LA-3A drives the same cell harder, so its light sits a decade up.
         const drive = key === 'la3a' ? 3 : 1;
@@ -253,12 +370,28 @@ export const offline = {
       let dark = false; // only the Distressor and the 6176 have lamps to light
       return (t) => {
         const key = modelKey();
-        if (key !== 'vca' && key !== 'pre6176') {
+        if (key !== 'vca' && key !== 'pre6176' && key !== 'dbx') {
           if (dark) return null;
           dark = true;
           return [0, 0, 0, 0];
         }
         dark = false;
+        if (key === 'dbx') {
+          /*
+           * The dbx fills the same four slots with something else:
+           * `[below, above, ghost_gr_db, overeasy]`. The two threshold
+           * indicators are one comparator's two sides, so they always sum
+           * to one and both sit half lit at the threshold, which dbx
+           * specify. The ghost is what a peak detector would have asked
+           * for, and it is always deeper than the RMS reading, which is the
+           * argument the whole model rests on.
+           */
+          const beat = Math.max(0, Math.sin(t * 2 * Math.PI * 1.9)) ** 8;
+          const alpha = Math.min(2, Math.max(0, plain('dbx_ratio', 0.75)));
+          const above = Math.min(1, Math.max(0, beat * 1.6));
+          const overeasy = Math.round(plain('dbx_knee')) === 1 ? Math.max(0, 1 - Math.abs(beat - 0.4) * 3) : 0;
+          return [1 - above, above, alpha * 24 * beat, overeasy];
+        }
         if (key === 'vca') {
           // the generator's THD: Dist 2 reaches a few per cent, Dist 3 goes to twenty
           const audio = Math.round(plain('dist_audio'));
@@ -278,7 +411,8 @@ export const offline = {
       return () => {
         const key = modelKey();
         const ratio = Math.round(plain('dist_ratio', 4));
-        const stamp = `${key}:${key === 'vca' ? ratio : ''}`;
+        const dbx = key === 'dbx' ? `${plain('dbx_ratio', 0.75).toFixed(3)}:${plain('dbx_threshold', 0).toFixed(1)}:${Math.round(plain('dbx_knee'))}:${plain('dbx_knee_width', 6).toFixed(1)}` : '';
+        const stamp = `${key}:${key === 'vca' ? ratio : ''}:${dbx}`;
         if (stamp === last) return null; // sticky: publish once per model (and per Distressor ratio)
         last = stamp;
         let knee;
@@ -291,6 +425,14 @@ export const offline = {
           [knee, slope, width] = [-30, 3, 8];
         } else if (key === 'la3a') {
           [knee, slope, width] = [-28, 4.5, 5];
+        } else if (key === 'dbx') {
+          // The one model here whose curve is exact rather than fitted:
+          // `alpha = 1 - 1/R`, so the slope is `1/(1 - alpha)`, and the
+          // knee is zero unless the OverEasy switch is in.
+          const alpha = Math.min(0.9917, Math.max(0, plain('dbx_ratio', 0.75)));
+          knee = plain('dbx_threshold', 0) - plain('dbx_headroom', 22);
+          slope = 1 / (1 - alpha);
+          width = Math.round(plain('dbx_knee')) === 1 ? plain('dbx_knee_width', 6) : 0.2;
         } else {
           [knee, slope, width] = [-26, 4, 6];
         }

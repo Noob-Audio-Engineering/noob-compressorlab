@@ -29,7 +29,7 @@
 //! misses, the miss is reported with its number; the tolerance is never
 //! widened to make a row pass, and no row is dropped for failing.
 
-use noob_compressorlab::dsp::{bridge, fet, opto, opto1b, opto3, pre, vca};
+use noob_compressorlab::dsp::{bridge, fet, gbus, opto, opto1b, opto3, pre, rms, tg, vca};
 use std::f32::consts::PI;
 use std::fmt::Write as _;
 
@@ -307,6 +307,15 @@ impl Engine for opto1b::Compressor {
     }
     fn gr_db(&self) -> f32 {
         -self.gain_reduction_db(0)
+    }
+}
+
+impl Engine for gbus::Compressor {
+    fn run(&mut self, l: &mut [f32], r: &mut [f32]) {
+        self.process_block(l, r);
+    }
+    fn gr_db(&self) -> f32 {
+        self.gr_db()
     }
 }
 
@@ -2636,6 +2645,1696 @@ fn render(sections: &[Section]) -> String {
     out
 }
 
+// ---------------------------------------------------------------------------
+// The dbx 160
+// ---------------------------------------------------------------------------
+
+impl Engine for rms::Compressor {
+    fn run(&mut self, l: &mut [f32], r: &mut [f32]) {
+        self.process_block(l, r);
+    }
+    fn gr_db(&self) -> f32 {
+        -self.gain_reduction_db(0)
+    }
+}
+
+/// Peak amplitude of a sine at `dbu`, at the dbx model's default headroom.
+/// At +4 dBu this is the lab's own 0 VU amplitude, which is the check that
+/// the two calibrations agree.
+fn dbx_amp(dbu: f32) -> f32 {
+    10f32.powf((dbu - rms::HEADROOM_DEFAULT_DB) / 20.0) * std::f32::consts::SQRT_2
+}
+
+fn dbx_unit(s: rms::Settings) -> rms::Compressor {
+    let mut c = rms::Compressor::new(SR);
+    c.configure(s);
+    c
+}
+
+/// Settled output level in dBu for a steady 1 kHz sine at `in_dbu`.
+fn dbx_out_dbu(s: rms::Settings, in_dbu: f32, seconds: f32) -> f32 {
+    let mut c = dbx_unit(s);
+    settled_out_dbfs(&mut c, 1000.0, dbx_amp(in_dbu), seconds, SR) + rms::HEADROOM_DEFAULT_DB
+        - 20.0 * std::f32::consts::SQRT_2.log10()
+}
+
+/// Steady-state harmonics of the output: `(fundamental, h2, h3)`.
+fn dbx_harmonics(s: rms::Settings, hz: f32, in_dbu: f32) -> (f32, f32, f32) {
+    let mut c = dbx_unit(s);
+    let (tail, _) = steady(&mut c, hz, dbx_amp(in_dbu), 2.5, 0.4, SR);
+    (
+        goertzel(&tail, hz, SR),
+        goertzel(&tail, hz * 2.0, SR),
+        goertzel(&tail, hz * 3.0, SR),
+    )
+}
+
+/// Time in ms to 63 % of the gain-reduction change after a step, dbx's own
+/// definition, with the resampler's reported latency taken back off.
+fn dbx_attack_ms(step_db: f32) -> f32 {
+    let s = rms::Settings {
+        threshold_dbu: -60.0,
+        alpha: 1.0,
+        ..rms::Settings::default()
+    };
+    let mut c = dbx_unit(s);
+    let lo = dbx_amp(0.0);
+    let hi = lo * 10f32.powf(step_db / 20.0);
+    let mut sine = Sine::new(1000.0, SR);
+    let mut l = vec![0.0f32; TIMING_BLOCK];
+    let mut r = vec![0.0f32; TIMING_BLOCK];
+    for _ in 0..((2.0 * SR) as usize / TIMING_BLOCK) {
+        sine.fill(&mut l, lo);
+        r.copy_from_slice(&l);
+        c.process_block(&mut l, &mut r);
+    }
+    // dbx measure the "time required to reduce signal by 63 % of level
+    // increase (above threshold)", so the reference is the settled
+    // reduction **before** the step, not the first reading after it. Taking
+    // the first reading instead loses whatever the detector did inside that
+    // block, which for a 30 dB step is most of the answer.
+    let before = c.gain_reduction_db(0);
+    let target = before + 0.63 * step_db;
+    let latency_ms = c.latency() as f32 / SR * 1e3;
+    let mut i = 0usize;
+    while (i as f32) < 0.2 * SR {
+        sine.fill(&mut l, hi);
+        r.copy_from_slice(&l);
+        c.process_block(&mut l, &mut r);
+        i += TIMING_BLOCK;
+        if c.gain_reduction_db(0) >= target {
+            return i as f32 / SR * 1e3 - latency_ms;
+        }
+    }
+    f32::NAN
+}
+
+/// The release trajectory: driven deep, then silence, sampled per timing
+/// block. Returns `(time_s, gr_db_positive)`.
+fn dbx_release_curve() -> Vec<(f32, f32)> {
+    let s = rms::Settings {
+        threshold_dbu: -60.0,
+        alpha: 1.0,
+        ..rms::Settings::default()
+    };
+    let mut c = dbx_unit(s);
+    let mut sine = Sine::new(1000.0, SR);
+    let mut l = vec![0.0f32; TIMING_BLOCK];
+    let mut r = vec![0.0f32; TIMING_BLOCK];
+    for _ in 0..((3.0 * SR) as usize / TIMING_BLOCK) {
+        sine.fill(&mut l, dbx_amp(20.0));
+        r.copy_from_slice(&l);
+        c.run(&mut l, &mut r);
+    }
+    let mut out = vec![];
+    let blocks = (1.0 * SR) as usize / TIMING_BLOCK;
+    for b in 0..blocks {
+        l.iter_mut().for_each(|v| *v = 0.0);
+        r.iter_mut().for_each(|v| *v = 0.0);
+        c.run(&mut l, &mut r);
+        out.push(((b * TIMING_BLOCK) as f32 / SR, c.gain_reduction_db(0)));
+    }
+    out
+}
+
+fn bench_rms() -> Section {
+    let mut rows = Vec::new();
+    let base = rms::Settings::default();
+
+    // The audio path at rest. R26 and R32 are both 100 kΩ, so the
+    // transimpedance stage exactly undoes the input resistor at zero
+    // control voltage, and dbx document the setting as the way to use the
+    // box as a line amplifier.
+    let unity = rms::Settings {
+        alpha: 0.0,
+        threshold_dbu: 20.0,
+        ..base
+    };
+    rows.push(Row::within(
+        "unity gain at 1:1, threshold at 3 V",
+        0.0,
+        0.05,
+        "dB",
+        dbx_out_dbu(unity, 0.0, 1.0),
+        "research/dbx-160.md §12.1 test 1, from R26 = R32 = 100 kΩ on the 160 schematic",
+    ));
+
+    // The threshold dial is dbx's own factory calibration procedure.
+    let onset = |mark_dbu: f32| {
+        let s = rms::Settings {
+            threshold_dbu: mark_dbu,
+            alpha: 1.0,
+            ..base
+        };
+        let c = dbx_unit(s);
+        let (mut lo, mut hi) = (mark_dbu - 20.0, mark_dbu + 20.0);
+        for _ in 0..60 {
+            let mid = 0.5 * (lo + hi);
+            if c.static_gr_db(dbx_amp(mid)) < 0.1 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        0.5 * (lo + hi)
+    };
+    let onsets: Vec<f32> = rms::THRESHOLD_MARK_DBU.iter().map(|m| onset(*m)).collect();
+    let steps: Vec<f32> = onsets.windows(2).map(|w| w[1] - w[0]).collect();
+    let mean_step = steps.iter().sum::<f32>() / steps.len() as f32;
+    rows.push(
+        Row::within(
+            "threshold dial, decibels per printed mark",
+            10.0,
+            0.5,
+            "dB",
+            mean_step,
+            "research/dbx-160.md §12.1 test 4, from the factory procedure's \"10 db steps\"",
+        )
+        .because(
+            "dbx's marks are a 1-3-10 sequence, so the steps really alternate between 9.54 and \
+         10.46 dB and their own \u{2212}38 to +12 dB span is 9.9 dB a mark",
+        ),
+    );
+    rows.push(Row::within(
+        "threshold at the 10 mV mark",
+        -37.8,
+        0.5,
+        "dBu",
+        onsets[0],
+        "research/dbx-160.md §7.1, dbx's \"10mV(\u{2212}38dB)\"",
+    ));
+    rows.push(Row::within(
+        "threshold at the 3 V mark",
+        11.8,
+        0.5,
+        "dBu",
+        onsets[5],
+        "research/dbx-160.md §7.1, dbx's \"3V(+12dB)\"",
+    ));
+
+    // The hard-knee ratios, which dbx call exact.
+    for (i, want) in [
+        (1usize, 20.0 / 1.5),
+        (2, 10.0),
+        (3, 20.0 / 3.0),
+        (4, 5.0),
+        (5, 20.0 / 6.0),
+        (6, 2.0),
+        (7, 1.0),
+    ] {
+        let s = rms::Settings {
+            threshold_dbu: -20.0,
+            alpha: rms::RATIO_MARK_ALPHA[i],
+            ..base
+        };
+        let c = dbx_unit(s);
+        let change = 20.0 - (c.static_gr_db(dbx_amp(20.0)) - c.static_gr_db(dbx_amp(0.0)));
+        let mut row = Row::within(
+            &format!(
+                "{}:1, output change for a 20 dB rise",
+                rms::RATIO_MARK_LABELS[i]
+            ),
+            want,
+            0.15,
+            "dB",
+            change,
+            "research/dbx-160.md §12.1 test 6, from dbx's \"COMPRESSION RATIO setting defines \
+             exact compression ratio\"",
+        );
+        if i == 4 {
+            row = row.because(
+                "the position the factory calibrated: the schematic carries a trimmer marked \
+                 \"4:1 CAL\", R43",
+            );
+        }
+        rows.push(row);
+    }
+
+    // The infinity mark, which dbx published as a number.
+    let inf = rms::Settings {
+        threshold_dbu: -40.0,
+        alpha: 1.0,
+        ..base
+    };
+    let c = dbx_unit(inf);
+    let rise = 40.0 - (c.static_gr_db(dbx_amp(20.0)) - c.static_gr_db(dbx_amp(-20.0)));
+    rows.push(
+        Row::within(
+            "output rise over 40 dB at the \u{221e} mark",
+            0.333,
+            0.15,
+            "dB",
+            rise,
+            "research/dbx-160.md §12.1 test 7, from dbx's \"1:1 to 120:1 (infinity)\"",
+        )
+        .because(
+            "the test that separates modelling the circuit from modelling the silkscreen: \
+         40 dB \u{f7} 120 is a third of a decibel, not a brick wall",
+        ),
+    );
+
+    // Infinity+, which needed no new circuit, only a longer pot.
+    for (alpha, want) in [(2.0f32, -10.0f32), (1.5, -5.0), (1.2, -2.0)] {
+        let s = rms::Settings {
+            model: rms::MODEL_160A,
+            threshold_dbu: -40.0,
+            alpha,
+            ..base
+        };
+        let c = dbx_unit(s);
+        let change = 10.0 - (c.static_gr_db(dbx_amp(-25.0)) - c.static_gr_db(dbx_amp(-35.0)));
+        rows.push(Row::within(
+            &format!(
+                "{}, output change for a 10 dB rise",
+                rms::ratio_label(alpha)
+            ),
+            want,
+            0.3,
+            "dB",
+            change,
+            "research/dbx-160.md §12.1 test 8, from the 160A manual's \u{2212}1:1 description",
+        ));
+    }
+
+    let deep = rms::Settings {
+        model: rms::MODEL_160A,
+        threshold_dbu: -40.0,
+        alpha: 1.0,
+        ..base
+    };
+    rows.push(
+        Row::ranged(
+            "maximum compression",
+            60.0,
+            61.0,
+            "dB",
+            dbx_unit(deep).static_gr_db(dbx_amp(24.0)),
+            "research/dbx-160.md §12.1 test 9, from dbx's \"over 60dB maximum compression\"",
+        )
+        .because(
+            "driven at dbx's own published maximum input level for the 160A, +24 dBu, with the              threshold at its \u{2212} 40 dBu end: the claim is about what the box can do, so the              measurement belongs at the ends of its own two published ranges",
+        ),
+    );
+
+    // Make-up gain, which dbx mark on the pot's own track.
+    let g20 = dbx_out_dbu(
+        rms::Settings {
+            output_db: 20.0,
+            ..unity
+        },
+        0.0,
+        1.0,
+    );
+    let gm20 = dbx_out_dbu(
+        rms::Settings {
+            output_db: -20.0,
+            ..unity
+        },
+        0.0,
+        1.0,
+    );
+    rows.push(Row::within(
+        "output gain range",
+        40.0,
+        0.1,
+        "dB",
+        g20 - gm20,
+        "research/dbx-160.md §7.1, dbx's \"\u{00b1}20 dB from unity gain point\" and R80's \
+         track ends",
+    ));
+
+    // The ballistics, which are one time constant seen from several sides.
+    for (step, want) in [(10.0f32, 15.0f32), (20.0, 5.0), (30.0, 3.0)] {
+        let got = dbx_attack_ms(step);
+        // \u{00b1} 30 %, which is the spread of dbx's own three figures, rounded
+        // so the table prints a number rather than a float artefact.
+        let tol = (want * 0.3 * 100.0).round() / 100.0;
+        let mut row = Row::within(
+            &format!("attack, {step:.0} dB step"),
+            want,
+            tol,
+            "ms",
+            got,
+            "research/dbx-160.md §12.3 test 15, from dbx's 15 / 5 / 3 ms attack table",
+        );
+        if step == 20.0 {
+            row = row.because(
+                "the recorded miss. dbx's three attack figures each imply a different time \
+                 constant, 33.3, 26.2 and 37.6 ms, so no single-constant detector can meet all \
+                 three and the hardware is a single-constant detector. The constant here is R35 \
+                 and C15 off dbx's own drawing, which puts the release rate between dbx's own \
+                 two published rates; meeting this row would mean giving that up, or giving up \
+                 the exact true-RMS averaging",
+            );
+        }
+        rows.push(row);
+    }
+
+    let curve = dbx_release_curve();
+    let band: Vec<(f32, f32)> = curve
+        .iter()
+        .cloned()
+        .filter(|(_, gr)| (5.0..=35.0).contains(gr))
+        .collect();
+    let n = band.len() as f32;
+    let (sx, sy): (f32, f32) = band.iter().fold((0.0, 0.0), |a, p| (a.0 + p.0, a.1 + p.1));
+    let (mx, my) = (sx / n, sy / n);
+    let (sxy, sxx): (f32, f32) = band.iter().fold((0.0, 0.0), |a, p| {
+        (a.0 + (p.0 - mx) * (p.1 - my), a.1 + (p.0 - mx) * (p.0 - mx))
+    });
+    let slope = sxy / sxx;
+    rows.push(Row::ranged(
+        "release rate",
+        120.0,
+        125.0,
+        "dB/s",
+        -slope,
+        "research/dbx-160.md §12.3 test 17, from dbx's 120 dB/s (160) and 125 dB/s (160A)",
+    ));
+    let resid = band
+        .iter()
+        .map(|(t, gr)| (gr - (my + slope * (t - mx))).abs())
+        .fold(0.0f32, f32::max);
+    rows.push(Row::ranged(
+        "departure from a straight line over 35 to 5 dB",
+        0.0,
+        0.5,
+        "dB",
+        resid,
+        "research/dbx-160.md §12.3 test 17, the structural half: a log-domain filter releases \
+         at a constant dB/s and an ordinary RC does not",
+    ));
+    let start = curve[0].1;
+    for (want_db, want_ms) in [(1.0f32, 8.0f32), (10.0, 80.0), (50.0, 400.0)] {
+        if start < want_db {
+            continue;
+        }
+        let got = curve
+            .iter()
+            .find(|(_, gr)| *gr <= start - want_db)
+            .map(|(t, _)| t * 1e3)
+            .unwrap_or(f32::NAN);
+        rows.push(Row::within(
+            &format!("release, {want_db:.0} dB"),
+            want_ms,
+            want_ms * 0.2,
+            "ms",
+            got,
+            "research/dbx-160.md §12.3 test 18, from the 160A's 8 / 80 / 400 ms table",
+        ));
+    }
+
+    // The detector really is an RMS detector.
+    let mut c = dbx_unit(unity);
+    steady(&mut c, 1000.0, 0.25, 2.0, 0.1, SR);
+    rows.push(Row::within(
+        "a sine settles below its peak",
+        3.01,
+        0.15,
+        "dB",
+        20.0 * 0.25f32.log10() - c.detector_db(0),
+        "research/dbx-160.md §12.2 test 11, the RMS of a sine against dbx's \"True rms \
+         level-detection\"",
+    ));
+
+    for (period, duty, cf, want) in [
+        (98usize, 8usize, 3.5f32, 0.2f32),
+        (100, 4, 5.0, 0.5),
+        (128, 2, 8.0, 1.0),
+    ] {
+        // At 96 kHz, where the model does not oversample: a 63-tap
+        // interpolating filter smears a two-sample pulse and would set the
+        // crest factor itself.
+        let sr = 96_000.0f32;
+        let mut c = rms::Compressor::new(sr);
+        c.configure(unity);
+        let amp = 0.1 * cf;
+        let x: Vec<f32> = (0..period * 600)
+            .map(|i| if i % period < duty { amp } else { 0.0 })
+            .collect();
+        let true_rms_db = db(rms(&x));
+        for _ in 0..2 {
+            for chunk in x.chunks(BLOCK) {
+                let mut l = chunk.to_vec();
+                let mut r = l.clone();
+                c.process_block(&mut l, &mut r);
+            }
+        }
+        rows.push(
+            Row::within(
+                &format!("under-reading at crest factor {cf}"),
+                want,
+                0.3,
+                "dB",
+                true_rms_db - c.detector_db(0),
+                "research/dbx-160.md §12.2 test 12, from the THAT 2252 datasheet's \
+                 crest-factor table",
+            )
+            .because(
+                "the descendant part's figure, not dbx's, who publish none. The direction and \
+                 the ordering are right and the magnitudes are a recorded miss: what is left in \
+                 the real part is its own input bandwidth, which the datasheet gives as four \
+                 corner frequencies against input current rather than as a transfer function",
+            ),
+        );
+    }
+
+    // The link, which sums energies rather than signals.
+    let linked = rms::Settings {
+        link: true,
+        ..unity
+    };
+    let one = {
+        let mut c = dbx_unit(linked);
+        let mut sine = Sine::new(1000.0, SR);
+        let mut l = vec![0.0f32; BLOCK];
+        let mut r = vec![0.0f32; BLOCK];
+        for _ in 0..((2.0 * SR) as usize / BLOCK) {
+            sine.fill(&mut l, 0.25);
+            r.iter_mut().for_each(|v| *v = 0.0);
+            c.process_block(&mut l, &mut r);
+        }
+        c.detector_db(0)
+    };
+    let two = {
+        let mut c = dbx_unit(linked);
+        steady(&mut c, 1000.0, 0.25, 2.0, 0.1, SR);
+        c.detector_db(0)
+    };
+    rows.push(Row::within(
+        "link, two matched channels against one",
+        3.01,
+        0.2,
+        "dB",
+        two - one,
+        "research/dbx-160.md §12.6 test 34, from dbx's True RMS Power Summing",
+    ));
+
+    // The distortion, which is the detector showing through.
+    let inf_comp = rms::Settings {
+        threshold_dbu: -10.0,
+        alpha: 1.0,
+        ..base
+    };
+    let mut h3 = vec![];
+    for hz in [50.0f32, 100.0, 200.0, 400.0] {
+        let (f, _, t) = dbx_harmonics(inf_comp, hz, 0.0);
+        h3.push(t / f);
+    }
+    for (i, w) in h3.windows(2).enumerate() {
+        rows.push(Row::within(
+            &format!(
+                "third harmonic, {} Hz against {} Hz",
+                [100, 200, 400][i],
+                [50, 100, 200][i]
+            ),
+            0.5,
+            0.05,
+            "\u{d7}",
+            w[1] / w[0],
+            "research/dbx-160.md §12.5 test 27, from dbx's \"at 100 Hz 3rd-harmonic distortion \
+             is 1/2 the value at 50 Hz\"",
+        ));
+    }
+
+    let (f, h2, _) = dbx_harmonics(
+        rms::Settings {
+            threshold_dbu: -20.0,
+            alpha: 1.0,
+            ..base
+        },
+        1000.0,
+        4.0,
+    );
+    rows.push(
+        Row::within(
+            "second harmonic at +4 dBu, \u{221e}:1",
+            0.075,
+            0.0225,
+            "%",
+            100.0 * h2 / f,
+            "research/dbx-160.md §12.5 test 30, from dbx's \"0.075 % 2nd harmonic at infinite \
+             compression at +4dBm output\"",
+        )
+        .because(
+            "a calibration rather than a test: the cell's symmetry residual is fitted to this \
+             one number. What makes it a measurement is that the same value has to hold at every \
+             other frequency and ratio, which the row below checks",
+        ),
+    );
+
+    let mut h2s = vec![];
+    for alpha in [0.5f32, 0.75, 1.0] {
+        for hz in [100.0f32, 1000.0, 10_000.0] {
+            let (f, h, _) = dbx_harmonics(
+                rms::Settings {
+                    threshold_dbu: -10.0,
+                    alpha,
+                    ..base
+                },
+                hz,
+                0.0,
+            );
+            h2s.push(100.0 * h / f);
+        }
+    }
+    let spread = (h2s.iter().cloned().fold(f32::MIN, f32::max)
+        - h2s.iter().cloned().fold(f32::MAX, f32::min))
+        / (h2s.iter().sum::<f32>() / h2s.len() as f32);
+    rows.push(Row::ranged(
+        "second-harmonic spread across ratio and frequency",
+        0.0,
+        0.40,
+        "of its mean",
+        spread,
+        "research/dbx-160.md §12.5 test 29, from dbx's \"2nd harmonic is relatively unaffected \
+         by compression ratio, time constants and frequency\"",
+    ));
+
+    let (f, _, t) = dbx_harmonics(
+        rms::Settings {
+            threshold_dbu: -20.0,
+            alpha: 1.0,
+            ..base
+        },
+        100.0,
+        0.0,
+    );
+    rows.push(
+        Row::ranged(
+            "third harmonic at 100 Hz, \u{221e}:1",
+            0.3,
+            1.2,
+            "%",
+            100.0 * t / f,
+            "research/dbx-160.md §12.5 test 33, bracketing dbx's 0.5 % and the ripple \
+             equation's 0.8 %",
+        )
+        .because(
+            "an order-of-magnitude check on the detector's ripple rather than a calibration: \
+             dbx did not state the frequency of their 0.5 % figure",
+        ),
+    );
+
+    let mut worst_thd = 0.0f32;
+    for gr in (0..=40).step_by(5) {
+        let (f, h2, h3) = dbx_harmonics(
+            rms::Settings {
+                model: rms::MODEL_160A,
+                threshold_dbu: -(gr as f32),
+                alpha: 1.0,
+                ..base
+            },
+            1000.0,
+            0.0,
+        );
+        worst_thd = worst_thd.max(100.0 * (h2 * h2 + h3 * h3).sqrt() / f);
+    }
+    rows.push(Row::ranged(
+        "worst THD from 0 to 40 dB of compression, 1 kHz",
+        0.0,
+        0.2,
+        "%",
+        worst_thd,
+        "research/dbx-160.md §12.5 test 31, from the 160A's \"<0.2 %, typical, any amount of \
+         compression up to 40 dB @ 1 kHz\"",
+    ));
+
+    let (f, h2, h3) = dbx_harmonics(
+        rms::Settings {
+            model: rms::MODEL_160A,
+            threshold_dbu: 20.0,
+            alpha: 1.0,
+            ..base
+        },
+        1000.0,
+        0.0,
+    );
+    rows.push(Row::ranged(
+        "second harmonic below threshold",
+        0.035,
+        0.105,
+        "%",
+        100.0 * h2 / f,
+        "research/dbx-160.md §12.5 test 32, from the 160X's 0.07 % below threshold",
+    ));
+    rows.push(
+        Row::ranged(
+            "third harmonic below threshold",
+            0.035,
+            0.105,
+            "%",
+            100.0 * h3 / f,
+            "research/dbx-160.md §12.5 test 32, from the 160X's 0.07 % below threshold",
+        )
+        .because(
+            "a recorded miss, and the model cannot meet it honestly. With no gain reduction \
+             there is no detector ripple, and the third harmonic in the hardware at that point \
+             belongs to an output stage dbx publish no distortion figure for, so anything here \
+             would be invented",
+        ),
+    );
+
+    // The audio path's own corners, which are components rather than a
+    // specification: dbx publish no frequency response for the original.
+    let hp_level = |hz: f32| response_db(|| Box::new(dbx_unit(unity)), hz, 0.25, SR);
+    let reference = hp_level(1000.0);
+    rows.push(Row::within(
+        "response at the input coupling corner",
+        -3.0,
+        0.3,
+        "dB",
+        hp_level(rms::engine::INPUT_HP_HZ) - reference,
+        "research/dbx-160.md §12.8 test 41, from C12 = 0.15 \u{b5}F into R26 = 100 k\u{3a9}",
+    ));
+    rows.push(
+        Row::within(
+            "response at 20 Hz",
+            -1.1,
+            0.2,
+            "dB",
+            hp_level(20.0) - reference,
+            "research/dbx-160.md §7.5, derived from the same pair",
+        )
+        .because(
+            "the original had a low-frequency tilt its successor did not: the 160A publishes \
+             \u{2212}3 dB at 0.5 Hz on a board with much larger coupling capacitors",
+        ),
+    );
+
+    // The metering.
+    let meter_vu = |cal: f32, meter: usize, in_dbu: f32| {
+        let s = rms::Settings {
+            meter,
+            meter_cal_dbu: cal,
+            ..unity
+        };
+        let mut c = dbx_unit(s);
+        steady(&mut c, 1000.0, dbx_amp(in_dbu), 1.0, 0.1, SR);
+        c.meter_frame()[5]
+    };
+    rows.push(Row::within(
+        "meter reading at its factory 0 VU",
+        0.0,
+        0.15,
+        "VU",
+        meter_vu(4.0, rms::METER_OUTPUT, 4.0),
+        "research/dbx-160.md §12.7 test 37, from dbx's \"factory calibrated to read '0' at \
+         +4dB (1.23V)\"",
+    ));
+    rows.push(Row::within(
+        "meter reading with the trimmer at its \u{2212}15 dBu end",
+        0.0,
+        0.15,
+        "VU",
+        meter_vu(-15.0, rms::METER_OUTPUT, -15.0),
+        "research/dbx-160.md §12.7 test 40, from the 160A's \u{2212}15 dBu to +10 dBu trimmer",
+    ));
+
+    // What nobody ever published.
+    rows.push(Row::unanchored(
+        "OverEasy knee width",
+        format!("{} dB (the default)", rms::engine::KNEE_WIDTH_DEFAULT_DB),
+        "dbx never published a knee width for any model in the family, and it cannot be derived \
+         from the drawing: it is V\u{3b8}/(G\u{b7}K), and the difference amplifier's gain G could \
+         not be read. The circuit bounds it to roughly 2 to 9 dB, which is why it is a parameter",
+    ));
+    rows.push(Row::unanchored(
+        "OverEasy on a transient",
+        "the body is more compressed; the slap is not louder".into(),
+        "dbx's kick-drum note says OverEasy \"will therefore emphasize the slap at the beginning \
+         of the note and reduce the boominess of its body\". The second clause holds. The first \
+         cannot hold for any knee centred on the threshold, which is what dbx's own definition \
+         of what THRESHOLD points at requires: such a curve lies at or below the hard-knee curve \
+         everywhere, so it can never pass more of a transient. Where a definition and a sentence \
+         of application prose disagree the model follows the definition",
+    ));
+
+    Section {
+        model: "160",
+        unit: "dbx 160, with the 160A's OverEasy and Infinity+",
+        dossier: "research/dbx-160.md",
+        rows,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The SSL 4000 G bus compressor
+// ---------------------------------------------------------------------------
+
+/// Timing measurements run here rather than at [`SR`]: the fastest attack
+/// constant is 385 µs, seventeen samples at 44.1 kHz, and one sample of
+/// quantisation is 6 % of it.
+const GBUS_TIMING_SR: f32 = 192_000.0;
+
+fn gbus_unit(s: gbus::Settings) -> gbus::Compressor {
+    let mut c = gbus::Compressor::new(SR);
+    c.configure(s);
+    c
+}
+
+fn gbus_amp(dbfs: f32) -> f32 {
+    10f32.powf(dbfs / 20.0)
+}
+
+/// The bare attack constant, with the release path opened, against the
+/// resistor and capacitor on card 82E27.
+fn gbus_open_loop_tau(attack: usize) -> f32 {
+    let mut t = gbus::Timing::open_loop(GBUS_TIMING_SR, attack);
+    // Well past the diode drop, so the diode conducts and the network is
+    // the bare R and C.
+    let d = 20.0f32;
+    let target = 0.632_120_6 * (d - gbus::V_DIODE);
+    let mut n = 0usize;
+    while n < (GBUS_TIMING_SR * 2.0) as usize {
+        let v = t.step(d);
+        n += 1;
+        if v >= target {
+            break;
+        }
+    }
+    n as f32 / GBUS_TIMING_SR
+}
+
+/// The bare release constant: charge, disconnect the detector, time the
+/// decay to 1/e.
+fn gbus_release_tau(release: usize) -> f32 {
+    let mut t = gbus::Timing::new(GBUS_TIMING_SR);
+    t.configure(0, release);
+    for _ in 0..(GBUS_TIMING_SR as usize / 10) {
+        t.step(10.0);
+    }
+    let start = t.voltage();
+    let mut n = 0usize;
+    while n < (GBUS_TIMING_SR * 6.0) as usize {
+        let v = t.release_only();
+        n += 1;
+        if v <= start / std::f32::consts::E {
+            break;
+        }
+    }
+    n as f32 / GBUS_TIMING_SR
+}
+
+/// The input level at which gain reduction first reaches `gr`, dBFS.
+fn gbus_level_for(s: gbus::Settings, gr: f32) -> f32 {
+    let c = gbus_unit(s);
+    let (mut lo, mut hi) = (-80.0f32, 60.0f32);
+    for _ in 0..60 {
+        let mid = 0.5 * (lo + hi);
+        if c.static_gr_db(gbus_amp(mid)) < gr {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    0.5 * (lo + hi)
+}
+
+/// The local compression ratio at `gr` decibels of reduction.
+fn gbus_ratio_at(s: gbus::Settings, gr: f32) -> f32 {
+    let c = gbus_unit(s);
+    let l = gbus_level_for(s, gr);
+    let h = 0.25f32;
+    let hi = (l + h) - c.static_gr_db(gbus_amp(l + h));
+    let lo = (l - h) - c.static_gr_db(gbus_amp(l - h));
+    1.0 / ((hi - lo) / (2.0 * h))
+}
+
+/// The settled output level of a sine, dBFS.
+fn gbus_out_dbfs(s: gbus::Settings, level_dbfs: f32) -> f32 {
+    let mut c = gbus_unit(s);
+    let (tail, _) = steady(&mut c, 1000.0, gbus_amp(level_dbfs), 3.0, 0.5, SR);
+    db(rms(&tail) * std::f32::consts::SQRT_2)
+}
+
+fn bench_gbus() -> Section {
+    let mut rows = Vec::new();
+    let base = gbus::Settings::default();
+
+    // -- the audio path, which is one multiply ---------------------------
+    let straight = gbus::Settings {
+        sidechain_in: false,
+        oversample: false,
+        ..base
+    };
+    rows.push(Row::within(
+        "unity gain, sidechain out, make-up at 0",
+        0.0,
+        0.1,
+        "dB",
+        gbus_out_dbfs(straight, -20.0) + 20.0,
+        "research/SSL-Gbus.md §13.1 test 3, from THAT's \"Gain at 0 V Control Voltage: 0.0 dB, \
+         ±0.1 dB\" (M)",
+    ));
+    rows.push(Row::within(
+        "the IN switch is not a bypass: make-up with the sidechain out",
+        10.0,
+        0.1,
+        "dB",
+        gbus_out_dbfs(
+            gbus::Settings {
+                makeup_db: 10.0,
+                ..straight
+            },
+            -20.0,
+        ) + 20.0,
+        "research/SSL-Gbus.md §13.1 test 2, from SSL's \"the compressor sidechain is enabled by \
+         the IN switch\" (P) and the clone builder's \"the makeup gain pot is active all the \
+         time\" (C)",
+    ));
+    let mut worst_flat = 0.0f32;
+    for hz in [20.0f32, 100.0, 1000.0, 10_000.0, 20_000.0] {
+        let mut c = gbus_unit(straight);
+        let (tail, _) = steady(&mut c, hz, 0.1, 1.0, 0.3, SR);
+        let g = db(rms(&tail) * std::f32::consts::SQRT_2) - db(0.1);
+        worst_flat = worst_flat.max(g.abs());
+    }
+    rows.push(Row::within(
+        "audio-path response, 20 Hz to 20 kHz",
+        0.0,
+        0.05,
+        "dB",
+        worst_flat,
+        "research/SSL-Gbus.md §13.1 test 6, from SSL's XLogic \"20Hz to 20kHz ±0.05dB\" (M). \
+         That figure describes a 2004 SuperAnalogue unit, not a 1980 console card; it is used \
+         here as the tightest published bound on a path that has no filters in it at all",
+    ));
+
+    // -- the ballistics, which are four component values each ------------
+    for i in 0..6 {
+        let want = gbus::attack_tau(i);
+        rows.push(Row::within(
+            &format!("attack constant, {} ms position", gbus::ATTACK_NAMES[i]),
+            want * 1e3,
+            want * 1e3 * 0.02,
+            "ms",
+            gbus_open_loop_tau(i) * 1e3,
+            "research/SSL-Gbus.md §13.4 test 13, from R1–R6 across C = 0.47 µF on card 82E27 (S)",
+        ));
+    }
+    for i in 0..4 {
+        let want = gbus::release_tau(i);
+        let mut r = Row::within(
+            &format!("release constant, {} s position", gbus::RELEASE_NAMES[i]),
+            want * 1e3,
+            want * 1e3 * 0.02,
+            "ms",
+            gbus_release_tau(i) * 1e3,
+            "research/SSL-Gbus.md §13.4 test 15, from R9–R12 across 0.47 µF on card 82E27 (S)",
+        );
+        if i == 0 {
+            r = r.because(
+                "This position looks wrong and is right. Its 84.6 ms is 1.18 times the panel's \
+                 0.1 s where the other three are 2.1 to 2.4 times theirs. The dossier reads R12 \
+                 unambiguously as 180 kΩ at 16× magnification, records that 90 kΩ would fit the \
+                 pattern and is not what is drawn, and refuses to adjust the value to taste",
+            );
+        }
+        rows.push(r);
+    }
+
+    // The automatic release, measured section by section.
+    let mut t = gbus::Timing::new(GBUS_TIMING_SR);
+    t.configure(0, gbus::RELEASE_AUTO);
+    for _ in 0..(GBUS_TIMING_SR as usize * 12) {
+        t.step(10.0);
+    }
+    let (v1_0, v2_0) = t.sections();
+    let equilibrium_share = v2_0 / (v1_0 + v2_0);
+    let (mut tau1, mut tau2) = (None, None);
+    for i in 1..=(GBUS_TIMING_SR as usize * 20) {
+        t.release_only();
+        let (v1, v2) = t.sections();
+        if tau1.is_none() && v1 <= v1_0 / std::f32::consts::E {
+            tau1 = Some(i as f32 / GBUS_TIMING_SR);
+        }
+        if tau2.is_none() && v2 <= v2_0 / std::f32::consts::E {
+            tau2 = Some(i as f32 / GBUS_TIMING_SR);
+        }
+        if tau1.is_some() && tau2.is_some() {
+            break;
+        }
+    }
+    rows.push(Row::within(
+        "Auto release, fast section",
+        42.77,
+        42.77 * 0.05,
+        "ms",
+        tau1.unwrap_or(0.0) * 1e3,
+        "research/SSL-Gbus.md §13.4 test 16, from R7 91 kΩ with C1 0.47 µF on card 82E27 (S)",
+    ));
+    rows.push(Row::within(
+        "Auto release, slow section",
+        5.10,
+        5.10 * 0.05,
+        "s",
+        tau2.unwrap_or(0.0),
+        "research/SSL-Gbus.md §13.4 test 16, from R8 750 kΩ with C2 6.8 µF on card 82E27 (S)",
+    ));
+    rows.push(
+        Row::within(
+            "Auto release, share of the control voltage on the slow section after a sustained tone",
+            89.2,
+            89.2 * 0.05,
+            "%",
+            equilibrium_share * 100.0,
+            "research/SSL-Gbus.md §13.4 test 17, from R8/(R7+R8) on card 82E27 (S)",
+        )
+        .because(
+            "Neither this nor the transient split below appears anywhere in the engine. They are \
+             what simulating the two sections gives, and they are why the automatic release is \
+             programme-dependent",
+        ),
+    );
+    let mut t = gbus::Timing::new(GBUS_TIMING_SR);
+    t.configure(3, gbus::RELEASE_AUTO);
+    for _ in 0..(GBUS_TIMING_SR as usize / 1000) {
+        t.step(5.0);
+    }
+    let (v1, v2) = t.sections();
+    rows.push(Row::within(
+        "Auto release, charge split after a 1 ms burst",
+        14.47,
+        14.47 * 0.05,
+        ": 1",
+        v1 / v2,
+        "research/SSL-Gbus.md §13.4 test 17, from C2/C1 = 6.8/0.47 on card 82E27 (S)",
+    ));
+
+    // The divider between the attack and release resistors.
+    for attack in [0usize, 5] {
+        let mut t = gbus::Timing::new(GBUS_TIMING_SR);
+        t.configure(attack, 0);
+        for _ in 0..(GBUS_TIMING_SR as usize * 3) {
+            t.step(10.0);
+        }
+        let got = t.voltage() / (10.0 - gbus::V_DIODE);
+        let want = gbus::RELEASE_R[0] / (gbus::RELEASE_R[0] + gbus::ATTACK_R[attack]);
+        rows.push(
+            Row::within(
+                &format!(
+                    "attack/release divider, {} ms attack with the 0.1 s release",
+                    gbus::ATTACK_NAMES[attack]
+                ),
+                want,
+                want * 0.05,
+                "",
+                got,
+                "research/SSL-Gbus.md §13.4 test 18, from R_rel/(R_att + R_rel) on card 82E27 (S)",
+            )
+            .because(
+                "The least supported thing in this model. No measurement of it exists anywhere; \
+                 it follows from the topology, and it costs nothing because simulating three \
+                 components gives it for free. At the slowest attack the network reaches only \
+                 40 % of the control voltage it otherwise would",
+            ),
+        );
+    }
+
+    // The panel's attack legend, which is a different claim from the
+    // resistors above.
+    let panel = [0.1e-3f32, 0.3e-3, 1e-3, 3e-3, 10e-3, 30e-3];
+    for (i, want) in panel.iter().enumerate() {
+        let s = gbus::Settings {
+            attack: i,
+            release: 3,
+            ratio: 1,
+            ..base
+        };
+        let mut c = gbus::Compressor::new(GBUS_TIMING_SR);
+        c.configure(s);
+        c.reset();
+        let amp = gbus_amp(-3.0);
+        let block = ((want * GBUS_TIMING_SR / 80.0) as usize).max(1);
+        let n = ((GBUS_TIMING_SR * want * 600.0) as usize).max((GBUS_TIMING_SR * 0.05) as usize);
+        let mut trace = Vec::with_capacity(n / block + 1);
+        let mut l = vec![amp; block];
+        let mut r = vec![amp; block];
+        for _ in 0..(n / block) {
+            for j in 0..block {
+                l[j] = amp;
+                r[j] = amp;
+            }
+            c.process_block(&mut l, &mut r);
+            trace.push(c.gr_db());
+        }
+        let final_gr = trace[trace.len() - 1];
+        let target = 0.632_120_6 * final_gr;
+        let idx = trace.iter().position(|g| *g >= target).unwrap_or(0);
+        let got = (idx * block) as f32 / GBUS_TIMING_SR;
+        let mut row = Row::within(
+            &format!(
+                "effective attack at 4:1, {} ms panel mark",
+                gbus::ATTACK_NAMES[i]
+            ),
+            want * 1e3,
+            want * 1e3 * 0.30,
+            "ms",
+            got * 1e3,
+            "research/SSL-Gbus.md §13.4 test 14, from the panel legend ATTACK mS (P) with \
+             τ_closed = τ_open/(1+γ) and γ = 3 at 4:1 (S, via derivation). The ±30 % is the \
+             dossier's and it calls it wide on purpose",
+        );
+        if i == 0 {
+            row = row.because(
+                "The one recorded miss in this model, by 0.2 percentage points. γ is 0.11513·d/k \
+                 and equals 3 only at the knee, so the harder the box is driven the faster it \
+                 grabs, while the panel prints one number. Measured at one fixed input level \
+                 giving 7 to 9.5 dB of reduction; at 12 dB the slowest position runs 41 % fast \
+                 and at 5 dB the fastest runs 176 % slow. Nothing is tuned to move this",
+            );
+        }
+        rows.push(row);
+    }
+
+    // -- the loop, and the shape it produces -----------------------------
+    let mut worst_threshold = 0.0f32;
+    for ratio in 0..3 {
+        let a = gbus_unit(gbus::Settings {
+            ratio,
+            threshold_db: -10.0,
+            release: 0,
+            ..base
+        })
+        .static_gr_db(gbus_amp(-24.0));
+        let b = gbus_unit(gbus::Settings {
+            ratio,
+            threshold_db: 0.0,
+            release: 0,
+            ..base
+        })
+        .static_gr_db(gbus_amp(-14.0));
+        worst_threshold = worst_threshold.max((a - b).abs());
+    }
+    rows.push(
+        Row::within(
+            "10 dB off the threshold against 10 dB onto the input",
+            0.0,
+            0.5,
+            "dB",
+            worst_threshold,
+            "research/SSL-Gbus.md §13.2 test 7, from SSL's XLogic manual: the sidechain trims \
+             \"increase the side chain level by 10dB — effectively reducing the threshold on that \
+             channel by 10dB\" (P)",
+        )
+        .because(
+            "The only place SSL state the equivalence numerically, and the test that proves the \
+             model built a sidechain gain rather than a comparator. Note the direction: a \
+             threshold reading and a sidechain gain run opposite ways, which is why this model's \
+             THRESHOLD parameter is negated into the loop and the dossier's §11.4 writes +T",
+        ),
+    );
+
+    let deep_rise = |ratio: usize| {
+        let s = gbus::Settings {
+            ratio,
+            range_db: 60.0,
+            release: 0,
+            ..base
+        };
+        (gbus_ratio_at(s, 30.0) - gbus_ratio_at(s, 20.0)) / 10.0
+    };
+    for ratio in 0..3 {
+        let got = deep_rise(ratio);
+        rows.push(
+            Row::within(
+                &format!(
+                    "rise of the compression ratio per dB of reduction, {} position",
+                    gbus::RATIO_NAMES[ratio]
+                ),
+                0.11513,
+                0.11513 * 0.20,
+                "",
+                got,
+                "research/SSL-Gbus.md §13.3 test 10, from ratio(GR) = 1 + 0.11513·(GR + V_d/k), \
+                 derived from the loop equation with ln10/20 (S, via derivation)",
+            )
+            .because(
+                "Measured deep in conduction, between 20 and 30 dB. The derivation treats D6 as \
+                 an ideal 0.6 V drop while the same dossier insists its soft turn-on *is* the \
+                 knee; both cannot hold, and a real diode's incremental conductance stays below \
+                 its asymptote until the control voltage is several thermal voltages. k is 69, 23 \
+                 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is 154 mV and the diode \
+                 never leaves its knee. Not calibrated away, because k is an estimate",
+            ),
+        );
+    }
+
+    let knees: Vec<f32> = (0..3)
+        .map(|ratio| {
+            gbus_level_for(
+                gbus::Settings {
+                    ratio,
+                    release: 0,
+                    ..base
+                },
+                0.5,
+            )
+        })
+        .collect();
+    let monotone = knees.windows(2).all(|w| w[1] > w[0]);
+    rows.push(Row::new(
+        "lowering the ratio lowers the knee",
+        "yes, direction only",
+        format!(
+            "{} ({:.1}, {:.1}, {:.1} dBFS at 2:1, 4:1, 10:1)",
+            if monotone { "yes" } else { "**no**" },
+            knees[0],
+            knees[1],
+            knees[2]
+        ),
+        "research/SSL-Gbus.md §13.3 test 11, from SSL's \"Decreasing the RATIO setting lowers the \
+         effective threshold\" (P)",
+        if monotone {
+            Verdict::Meets
+        } else {
+            Verdict::Misses
+        },
+    ).because(
+        "SSL publish no magnitude for this, only the direction, so only the direction is checked. \
+         Saying \"and by about 3 dB\" would be inventing a number",
+    ));
+
+    // -- the gain cell, on its own, as its datasheet measures it ---------
+    for (v_rms, gain_db, want_pct) in [(1.0f32, 0.0f32, 0.005f32), (3.1623, -15.0, 0.020)] {
+        let mut cell = gbus::BlackmerCell::new(SR);
+        let amp = v_rms * std::f32::consts::SQRT_2 / gbus::engine::VOLTS_PER_SAMPLE;
+        let g = cell.gain(gain_db);
+        let n = 8192usize;
+        let hz = SR * 171.0 / n as f32;
+        let step = 2.0 * PI * hz / SR;
+        for i in 0..(SR as usize / 2) {
+            cell.shape(amp * (i as f32 * step).sin());
+        }
+        let y: Vec<f32> = (0..n)
+            .map(|i| cell.shape(amp * (i as f32 * step).sin()) * g)
+            .collect();
+        let got = 100.0 * goertzel(&y, 2.0 * hz, SR) / goertzel(&y, hz, SR);
+        rows.push(
+            Row::within(
+                &format!("gain-cell THD, {v_rms:.4} V RMS in at {gain_db} dB of gain"),
+                want_pct,
+                want_pct * 0.5,
+                "%",
+                got,
+                "research/SSL-Gbus.md §13.5 test 24, from the THAT 2180A typical THD table (M). \
+                 The ±50 % is the dossier's, because the datasheet gives typicals with a maximum \
+                 and no distribution",
+            )
+            .because(
+                "These two points settle where the distortion goes. The second has a lower output \
+                 than the first and four times the THD, so it cannot be a function of the output: \
+                 the cell shapes its input, not its result, which is what a current-mode cell \
+                 driven through a resistor does. The dossier's §11.3 writes the other form and it \
+                 misses this row by a factor of seven",
+            ),
+        );
+    }
+
+    // -- the sidechain -------------------------------------------------
+    let mut worst_slope = 0.0f32;
+    for i in 1..6 {
+        let fc = gbus::HPF_HZ[i];
+        let c = gbus_unit(gbus::Settings { hpf: i, ..base });
+        let per_octave = c.sidechain_response_db(fc / 4.0) - c.sidechain_response_db(fc / 8.0);
+        worst_slope = worst_slope.max((per_octave - 6.0).abs());
+    }
+    rows.push(
+        Row::within(
+            "sidechain high-pass slope, worst of the five corners",
+            6.0,
+            1.0,
+            "dB/octave",
+            6.0 + worst_slope,
+            "research/SSL-Gbus.md §13.5 test 23, from Smart Research's \"150Hz −6dB/octave\" (C)",
+        )
+        .because(
+            "The only slope figure published for anything in this family, and it is for a \
+             different unit's outboard cable rather than SSL's built-in filter. Measured between \
+             a quarter and an eighth of each corner, where a slope is defined; the dossier asks \
+             for −6 dB one octave down, which an exact first-order section misses on its own at \
+             −6.99 dB",
+        ),
+    );
+
+    let dominant = {
+        let s = gbus::Settings { release: 0, ..base };
+        let both = {
+            let mut c = gbus_unit(s);
+            let mut sine = Sine::new(1000.0, SR);
+            let (mut l, mut r) = (vec![0.0f32; BLOCK], vec![0.0f32; BLOCK]);
+            for _ in 0..((SR as usize) / BLOCK) {
+                sine.fill(&mut l, gbus_amp(-6.0));
+                r.copy_from_slice(&l);
+                c.process_block(&mut l, &mut r);
+            }
+            c.gr_db()
+        };
+        let uneven = {
+            let mut c = gbus_unit(s);
+            let mut sine = Sine::new(1000.0, SR);
+            let (mut l, mut r) = (vec![0.0f32; BLOCK], vec![0.0f32; BLOCK]);
+            for _ in 0..((SR as usize) / BLOCK) {
+                sine.fill(&mut l, gbus_amp(-6.0));
+                for (i, v) in r.iter_mut().enumerate() {
+                    *v = l[i] * gbus_amp(-20.0);
+                }
+                c.process_block(&mut l, &mut r);
+            }
+            c.gr_db()
+        };
+        (uneven - both).abs()
+    };
+    rows.push(Row::within(
+        "a channel 20 dB quieter changes the reduction",
+        0.0,
+        0.1,
+        "dB",
+        dominant,
+        "research/SSL-Gbus.md §13.5 test 20, from SSL's \"the dominant, ie. louder channel, \
+         controls the gain reduction of the overall stereo level\" (P)",
+    ));
+
+    // The published claim is that the scale is *linear*, so the thing to
+    // measure is proportionality across the scale rather than one point.
+    // Asking for exactly 50 % at exactly 10 dB measures how close the
+    // chosen input level landed to 10 dB, which is the instrument and not
+    // the meter: it read 46.4 % because the tone settled at 9.28 dB.
+    let deflection_per_db = {
+        let s = gbus::Settings { release: 0, ..base };
+        let mut worst = 0.0f32;
+        for target in [5.0f32, 10.0, 15.0] {
+            let mut c = gbus::Compressor::new(SR);
+            c.configure(s);
+            let level = gbus_level_for(s, target);
+            let mut sine = Sine::new(1000.0, SR);
+            let (mut l, mut r) = (vec![0.0f32; BLOCK], vec![0.0f32; BLOCK]);
+            for _ in 0..((SR as usize * 3) / BLOCK) {
+                sine.fill(&mut l, gbus_amp(level));
+                r.copy_from_slice(&l);
+                c.process_block(&mut l, &mut r);
+            }
+            let frame = c.meter_frame();
+            let gr = frame[4];
+            if gr > 0.5 {
+                worst = worst.max((frame[5] / 20.0) / gr * 100.0);
+            }
+        }
+        worst
+    };
+    rows.push(
+        Row::within(
+            "meter deflection per dB of reduction, over the scale",
+            5.0,
+            0.1,
+            "% of full scale per dB",
+            deflection_per_db,
+            "research/SSL-Gbus.md §13.5 test 26, from the module's printed scale 0 4 8 12 16 20 \
+             evenly spaced (P) and the clone builder's \"linear scale, at about 50 µA/dB, making \
+             a 1 mA meter showing 20 dB full-scale\" (C)",
+        )
+        .because(
+            "The rare case where the naive meter and the circuit meter agree, because a Blackmer \
+             VCA's control voltage is linear in decibels. Measured at three depths, so what is \
+             checked is that one dB is worth the same deflection anywhere on the scale",
+        ),
+    );
+
+    // -- what cannot be anchored ----------------------------------------
+    rows.push(Row::unanchored(
+        "ratio calibration",
+        format!(
+            "{:.2}:1, {:.2}:1 and {:.2}:1 at 5 dB of reduction",
+            gbus_ratio_at(
+                gbus::Settings {
+                    ratio: 0,
+                    release: 0,
+                    ..base
+                },
+                5.0
+            ),
+            gbus_ratio_at(
+                gbus::Settings {
+                    ratio: 1,
+                    release: 0,
+                    ..base
+                },
+                5.0
+            ),
+            gbus_ratio_at(
+                gbus::Settings {
+                    ratio: 2,
+                    release: 0,
+                    ..base
+                },
+                5.0
+            ),
+        ),
+        "SSL publish no measured transfer point for any ratio position, with or without a \
+         tolerance, in any document the dossier could reach. The control-bus scaling k is an \
+         estimate, so a row reading \"5 dB ±1 dB at 4:1\" would be this model marking its own \
+         homework, which is the failure an audit found in five plug-ins here. The dossier refuses \
+         the test in its §13.3 and so does this table. What is checked instead is the law's shape \
+         and its direction, above",
+    ));
+    rows.push(Row::unanchored(
+        "where the knee sits in absolute terms",
+        format!("{:.1} dBFS at 4:1 with the threshold centred", knees[1]),
+        "Nothing is published. The detector's scaling is anchored so that it reaches one diode \
+         drop at −12 dBFS, which is the level the only measured recordings of this unit were made \
+         at, and that is an operating condition rather than a calibration. SSL's nominal +4 dBu \
+         was tried first and is wrong for the job: it is a VU reference and this detector is a \
+         peak rectifier",
+    ));
+    rows.push(Row::unanchored(
+        "noise floor",
+        "a design choice in floating point".into(),
+        "The XLogic's \"< −99 dBu\" and Smart Research's \"−104 dBm\" describe different, later, \
+         better circuits, and the clone's \"less than −80 dB\" describes a homebuilt one. \
+         Asserting any of the three against a floating-point model would be theatre",
+    ));
+
+    Section {
+        model: "4000 G",
+        unit: "SSL 4000 G bus compressor, the 500-series module drawn with the console's values",
+        dossier: "research/SSL-Gbus.md",
+        rows,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The EMI TG12413
+// ---------------------------------------------------------------------------
+
+/// A 1 kHz sine at `amp` peak for `secs`, returning the peak of the last
+/// 20 ms.
+fn tg_settle(c: &mut tg::Compressor, amp: f32, secs: f32) -> f32 {
+    const N: usize = 256;
+    let blocks = (secs * SR / N as f32).ceil() as usize;
+    let tail = ((0.020 * SR) as usize / N).max(1);
+    let mut ph = 0.0f32;
+    let step = 2.0 * PI * 1000.0 / SR;
+    let mut peak = 0.0f32;
+    for b in 0..blocks {
+        let mut l = [0.0f32; N];
+        let mut r = [0.0f32; N];
+        for i in 0..N {
+            l[i] = amp * ph.sin();
+            r[i] = l[i];
+            ph += step;
+            if ph > 2.0 * PI {
+                ph -= 2.0 * PI;
+            }
+        }
+        c.process_block(&mut l, &mut r);
+        if b + tail >= blocks {
+            for v in l {
+                peak = peak.max(v.abs());
+            }
+        }
+    }
+    peak
+}
+
+fn tg_out_dbu(s: tg::Settings, in_dbu: f32, secs: f32) -> f32 {
+    let mut c = tg::Compressor::new(SR);
+    c.configure(s);
+    tg::engine::amp_dbu(tg_settle(&mut c, tg::engine::dbu_amp(in_dbu), secs))
+}
+
+/// Release time constant, in seconds, from the store's own discharge.
+fn tg_release_s(recovery: usize, hold: f32) -> f32 {
+    const N: usize = 32;
+    let mut c = tg::Compressor::new(SR);
+    c.configure(tg::Settings {
+        recovery,
+        hold,
+        ..tg::Settings::default()
+    });
+    tg_settle(&mut c, 0.9, 1.0);
+    let mut l = [0.0f32; N];
+    let mut r = [0.0f32; N];
+    c.process_block(&mut l, &mut r);
+    let target = c.control_a(0) / std::f32::consts::E;
+    for b in 1..(20.0 * SR / N as f32) as usize {
+        let mut l = [0.0f32; N];
+        let mut r = [0.0f32; N];
+        c.process_block(&mut l, &mut r);
+        if c.control_a(0) <= target {
+            return b as f32 * N as f32 / SR;
+        }
+    }
+    f32::INFINITY
+}
+
+/// The TG12413's rows.
+///
+/// **This is the only section in the report with no manufacturer's figures
+/// in it at all.** There is no factory handbook, no specification and no
+/// measurement of any kind published for this unit. What EMI printed is a
+/// circuit diagram, and every anchored row below is an arithmetic
+/// consequence of component values read off it. The unanchored rows say
+/// what they measured and why nothing pins it.
+fn bench_tg() -> Section {
+    let mut rows = Vec::new();
+    let base = tg::Settings::default();
+
+    // The two figures EMI printed, and the twenty-one resistors behind them.
+    rows.push(Row::within(
+        "output switch, position 1",
+        -9.95,
+        0.02,
+        "dB",
+        tg::engine::output_db(0),
+        "research/TG12413.md §12 test 1, from the S3 ladder and the legend printed on the same sheet",
+    ));
+    rows.push(Row::within(
+        "output switch, position 21",
+        9.81,
+        0.02,
+        "dB",
+        tg::engine::output_db(20),
+        "research/TG12413.md §12 test 1, from the S3 ladder and the legend printed on the same sheet",
+    ));
+    rows.push(Row::within(
+        "output switch, full span",
+        19.76,
+        0.05,
+        "dB",
+        tg::engine::output_db(20) - tg::engine::output_db(0),
+        "research/TG12413.md §3.4; EMI printed −10 to +10 in 1 dB steps and the resistors give 19.76",
+    ));
+    {
+        let mut worst = 0.0f32;
+        for i in 1..20 {
+            worst =
+                worst.max((tg::engine::output_db(i) - tg::engine::output_db(i - 1) - 1.0).abs());
+        }
+        rows.push(Row::within(
+            "output switch, worst step error",
+            0.0,
+            0.10,
+            "dB",
+            worst,
+            "research/TG12413.md §12 test 1; the legend says 1 dB steps and the ladder delivers them to 0.09",
+        ));
+    }
+    // Measured through the module, not just through the table.
+    {
+        let quiet = tg_out_dbu(
+            tg::Settings {
+                mode: tg::MODE_OUT,
+                output: 0,
+                ..base
+            },
+            0.0,
+            0.3,
+        );
+        let unity = tg_out_dbu(
+            tg::Settings {
+                mode: tg::MODE_OUT,
+                ..base
+            },
+            0.0,
+            0.3,
+        );
+        rows.push(Row::within(
+            "output switch through the module, position 1",
+            -9.95,
+            0.10,
+            "dB",
+            quiet - unity,
+            "research/TG12413.md §12 test 1, measured rather than tabulated",
+        ));
+    }
+
+    // The recovery ladder's ratios, which are the only hard timing figure.
+    {
+        let fast = tg_release_s(0, 0.0);
+        for (pos, want) in [
+            (1usize, 2.00f32),
+            (2, 4.77),
+            (3, 9.45),
+            (4, 19.4),
+            (5, 47.1),
+        ] {
+            rows.push(Row::within(
+                &format!("recovery {} against position 1", pos + 1),
+                want,
+                0.02 * want,
+                "x",
+                tg_release_s(pos, 0.0) / fast,
+                "research/TG12413.md §12 test 3, from the six resistors on switch assembly B204A",
+            ));
+        }
+        rows.push(Row::within(
+            "HOLD at recovery 1",
+            21.3,
+            1.0,
+            "%",
+            100.0 * (tg_release_s(0, 1.0) / fast - 1.0),
+            "research/TG12413.md §12 test 5, from RV1's 10 kΩ against the ladder's 47 kΩ",
+        ));
+        rows.push(Row::within(
+            "HOLD at recovery 6",
+            0.45,
+            0.6,
+            "%",
+            100.0 * (tg_release_s(5, 1.0) / tg_release_s(5, 0.0) - 1.0),
+            "research/TG12413.md §12 test 5, from RV1's 10 kΩ against the ladder's 2 214 kΩ",
+        ));
+    }
+
+    // The gain element, against the law it generalises.
+    {
+        let ring = tg::element::Element::ring();
+        let k = 2.0 * tg::element::JUNCTION_SCALE;
+        let mut worst = 0.0f32;
+        for decade in 0..4 {
+            let i_bias = 1e-6 * 10f32.powi(decade);
+            for step in 1..=60 {
+                let a = 0.995 * step as f32 / 60.0;
+                let i0 = a * i_bias;
+                let u = ring.voltage(i0, i_bias);
+                let i1 = noob_electrical_components::diode_bridge::current(u, i_bias, k);
+                worst = worst.max(((i1 - i0) / i0).abs());
+            }
+        }
+        rows.push(Row::within(
+            "(G1) reproduces the Neve's tanh law",
+            0.0,
+            f32::EPSILON / (1.0 - 0.995 * 0.995),
+            "relative",
+            worst,
+            "research/TG12413.md §12 test 8, against the law derived in research/Neve-33609.md",
+        ));
+    }
+
+    // The coupling capacitors.
+    {
+        let f = 20.0f32;
+        rows.push(Row::within(
+            "input coupling corner",
+            4.5,
+            1.0,
+            "Hz",
+            tg::engine::F_IN_COUPLING,
+            "research/TG12413.md §12 test 6, from C1 4µ7 into R78 7K5",
+        ));
+        let out_loss = -20.0 * (f / (f * f + tg::engine::F_OUT_COUPLING.powi(2)).sqrt()).log10();
+        rows.push(Row::within(
+            "output coupling loss at 20 Hz",
+            0.0,
+            0.1,
+            "dB",
+            out_loss,
+            "research/TG12413.md §12 test 6, from C23 470 µF into a 600 Ω load",
+        ));
+    }
+
+    // What the unit does, with nothing to check it against.
+    {
+        let lo = tg_out_dbu(
+            tg::Settings {
+                mode: tg::MODE_LIMIT,
+                ..base
+            },
+            10.0,
+            1.5,
+        );
+        let hi = tg_out_dbu(
+            tg::Settings {
+                mode: tg::MODE_LIMIT,
+                ..base
+            },
+            20.0,
+            1.5,
+        );
+        rows.push(
+            Row::unanchored(
+                "LIMIT, output change for a 10 dB input step",
+                format!("{:.2} dB", hi - lo),
+                "Waves say only that this is \"not a brick-wall limiter: transients are expected to \
+                 pass\", with no figure. What anchors the row is the band it must fall outside: AMS \
+                 Neve publish 0.1 ± 0.1 dB for the 33609's limiter, and this is not that",
+            ),
+        );
+    }
+    {
+        let mut c = tg::Compressor::new(SR);
+        c.configure(base);
+        tg_settle(&mut c, 1.0, 2.0);
+        rows.push(Row::unanchored(
+            "gain reduction at full scale, COMPRESS",
+            format!("{:.2} dB", c.gain_reduction_db(0)),
+            "no maximum gain reduction is published for this unit. 20 dB is the dossier's own \
+             instruction in §11.6 and the model's control-current constant is fitted to it, so this \
+             row records a calibration rather than checks one",
+        ));
+    }
+    {
+        let e = tg::element::Element::breakdown();
+        rows.push(Row::unanchored(
+            "gain reduction floor, breakdown region",
+            format!("{:.1} dB", e.gr_db(1.0)),
+            "the 2·r_b term of equation (G1) bounds the element's resistance below, so the divider's \
+             loss is bounded. Where the floor sits depends on r_b, which is R16's 24 Ω taken as an \
+             order of magnitude and not as a measurement; that a floor exists is the finding, not \
+             its depth",
+        ));
+    }
+    rows.push(Row::unanchored(
+        "attack time",
+        "not tested".into(),
+        "R41 plus R47 into the store gives 47 ms, which is far too slow for a limiter, so the charge \
+         path is almost certainly current-driven by VT17 and the RC figure is an upper bound. \
+         Chandler say only \"Attack: Fixed\". §12.6 of the dossier refuses to test it and this \
+         report does the same",
+    ));
+    rows.push(Row::unanchored(
+        "threshold in dBu",
+        "not tested".into(),
+        "there is no threshold control and the reference is three germanium diodes whose drop at \
+         their working current nobody has measured. Where the model starts working is a documented \
+         choice, not a figure",
+    ));
+    rows.push(Row::unanchored(
+        "distortion at any level",
+        "not tested".into(),
+        "no spectrum, no THD figure and no noise figure has ever been published for this unit. The \
+         element's drive is fitted to the two ends of the THD scale Chandler print on the TG1's \
+         input knob, which is a figure about a licensed recreation with its own added stages",
+    ));
+
+    Section {
+        model: "TG12413",
+        unit: "EMI TG12413",
+        dossier: "research/TG12413.md",
+        rows,
+    }
+}
+
 fn main() {
     eprintln!(
         "driving the engines; this takes a few minutes at {} kHz",
@@ -2649,6 +4348,9 @@ fn main() {
         bench_pre(),
         bench_opto1b(),
         bench_bridge(),
+        bench_rms(),
+        bench_gbus(),
+        bench_tg(),
     ];
 
     for s in &sections {

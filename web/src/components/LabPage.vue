@@ -27,8 +27,11 @@ import VcaView from '../models/vca/VcaView.vue';
 import Pre6176View from '../models/pre6176/Pre6176View.vue';
 import Cl1bView from '../models/cl1b/Cl1bView.vue';
 import BridgeView from '../models/bridge/BridgeView.vue';
+import DbxView from '../models/dbx/DbxView.vue';
+import TgView from '../models/tg/TgView.vue';
+import GbusView from '../models/gbus/GbusView.vue';
 
-const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View, cl1b: Cl1bView, bridge: BridgeView };
+const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View, cl1b: Cl1bView, bridge: BridgeView, dbx: DbxView, tg: TgView, gbus: GbusView };
 const lab = useLab();
 useWindow();
 const key = lab.key;

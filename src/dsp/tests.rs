@@ -110,6 +110,37 @@ fn the_parameter_contract_holds() {
             "neve_meter_select",
             "neve_drive",
             "neve_power",
+            "dbx_model",
+            "dbx_threshold",
+            "dbx_ratio",
+            "dbx_output",
+            "dbx_knee",
+            "dbx_meter",
+            "dbx_meter_cal",
+            "dbx_knee_width",
+            "dbx_tau",
+            "dbx_lookahead",
+            "dbx_headroom",
+            "tg_mode",
+            "tg_recovery",
+            "tg_output",
+            "tg_hold",
+            "tg_region",
+            "tg_mismatch",
+            "tg_input",
+            "tg_drive",
+            "tg_oversample",
+            "ssl_in",
+            "ssl_threshold",
+            "ssl_makeup",
+            "ssl_attack",
+            "ssl_release",
+            "ssl_ratio",
+            "ssl_hpf",
+            "ssl_link",
+            "ssl_drive",
+            "ssl_range",
+            "ssl_oversample",
             "link",
             "mix",
             "sc_hpf",
@@ -131,11 +162,11 @@ fn the_parameter_contract_holds() {
     assert_eq!(by_id("opto_cell").default, 1.0);
     assert_eq!(by_id("src_kind").labels.len(), 7);
     assert_eq!(by_id("src_level").default, 0.4);
-    assert_eq!(param_specs(false).len(), 73);
+    assert_eq!(param_specs(false).len(), 104);
 
     let (bridge, ix) = build_bridge("test", SR);
     assert_eq!(ix.model, 0);
-    assert_eq!(ix.src_freq, Some(75));
+    assert_eq!(ix.src_freq, Some(106));
     let streams = streams(SR);
     assert_eq!(streams[STREAM_IX.meter].id, "meter");
     assert_eq!(streams[STREAM_IX.cell].id, "cell");
@@ -382,6 +413,18 @@ fn the_lamps_stream_only_speaks_for_the_models_that_have_lamps() {
         match m {
             Model::Vca => assert!(f[0] > 0.0, "the Distressor should report distortion"),
             Model::Pre6176 => assert!(f[2] > -80.0, "the 6176 should report its PRE meter"),
+            // The dbx fills the same four slots with a different meaning:
+            // `[below, above, ghost_gr_db, overeasy]`. One of its two
+            // threshold indicators is always lit, because they are a
+            // comparator pair rather than two independent lamps, and the
+            // OverEasy one is dark unless that switch is in.
+            Model::Rms => {
+                assert!(
+                    (f[0] + f[1] - 1.0).abs() < 1e-3,
+                    "the dbx's threshold indicators should share one lamp's worth of light"
+                );
+                assert_eq!(f[3], 0.0, "OverEasy is out, so its indicator is dark");
+            }
             _ => assert_eq!(f, [0.0; LAMPS_LEN], "{} has no lamps", m.label()),
         }
     }

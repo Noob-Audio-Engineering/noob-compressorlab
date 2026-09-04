@@ -118,7 +118,7 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 
 ## The model switch
 
-`model` is a non-automatable parameter of the instance, and it has six positions:
+`model` is a non-automatable parameter of the instance, and it has seven positions:
 
 | position | what it is | engine |
 |---|---|---|
@@ -128,6 +128,7 @@ nih-plug this repository's `[patch]` section points at; keep that line.
 | `Distressor` | the feedback VCA compressor with eight curves and two distortion modes | `dsp::vca` |
 | `6176` | the 610 tube preamp in front of the 1176 | `dsp::pre` and `dsp::fet` |
 | `CL-1B` | the tube optical one whose timing is on the panel, not in the cell | `dsp::opto1b` |
+| `33609` | the diode-bridge limiter and compressor, with two detectors and one gain element | `dsp::bridge` |
 
 The first two keep the positions they had, so a project saved before the lab grew still loads.
 
@@ -135,7 +136,7 @@ The `Processor` owns every engine; only the active one runs. When the switch fli
 that becomes active starts from rest and takes over through a 20 ms crossfade while the outgoing
 engine keeps running, so the change does not click. The active model's latency is reported to the
 host and updated on a switch: 15 samples for the 1176 and for the 6176 (the 1176's 2x
-oversampler), none for the others. The 6176's latency does not change with its routing switch,
+oversampler), 31 for the 33609 below 88.2 kHz and none above it, none for the others. The 6176's latency does not change with its routing switch,
 because the 1176 engine runs in all three positions. The transfer curve is republished for the new
 model, and the `cell` and `lamps` streams are zeroed once when a model that does not use them
 takes over.
@@ -143,14 +144,14 @@ takes over.
 Every knob of every model is a parameter, so a project saves the whole lab. The prefixes are
 `fet_` for the 1176, `opto_` for the LA-2A, `la3a_` for the LA-3A, `dist_` for the Distressor and
 `pre_` for the 610 section of the 6176, whose compressor half reuses the 1176's `fet_` parameters,
-and `cl1b_` for the CL 1B.
+`cl1b_` for the CL 1B and `neve_` for the 33609.
 The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever engine is active.
 
 ## Parameters
 
 | id | range / labels | default | group | automatable |
 |---|---|---|---|---|
-| `model` | 1176, LA-2A, LA-3A, Distressor, 6176 | 1176 | lab | no |
+| `model` | 1176, LA-2A, LA-3A, Distressor, 6176, CL-1B, 33609 | 1176 | lab | no |
 | `fet_input` | 0..48 mark (= −48..0 dB) | 24 | 1176 | yes |
 | `fet_output` | 0..48 mark | 24 | 1176 | yes |
 | `fet_attack` | 0 (OFF)..7 | 4 | 1176 | yes |
@@ -204,6 +205,20 @@ The four they all share (`link`, `mix`, `sc_hpf`, `bypass`) apply to whichever e
 | `pre_load` | 15k, 600 | 15k | 6176 | no |
 | `pre_meter` | PRE, GR, COMP | GR | 6176 | no |
 | `pre_phantom` | toggle (+48 V) | off | 6176 | no |
+| `neve_model` | 2254E, 33609J, 33609N | 33609J | 33609 | no |
+| `neve_limit_in` | toggle | off | 33609 | yes |
+| `neve_limit_threshold` | +4.0..+15.0 dBu in 0.5 dB steps | +8.0 | 33609 | yes |
+| `neve_limit_attack` | Slow, Fast | Slow | 33609 | yes |
+| `neve_limit_recovery` | 50 ms, 100 ms, 200 ms, 800 ms, A1, A2 | 100 ms | 33609 | yes |
+| `neve_compress_in` | toggle | on | 33609 | yes |
+| `neve_compress_threshold` | −20..+10 dBu in 2 dB steps | −10 | 33609 | yes |
+| `neve_compress_ratio` | 1.5:1, 2:1, 3:1, 4:1, 6:1 | 2:1 | 33609 | yes |
+| `neve_compress_attack` | Fast, Slow (the /N only) | Fast | 33609 | yes |
+| `neve_compress_recovery` | 100 ms, 400 ms, 800 ms, 1500 ms, A1, A2 | 400 ms | 33609 | yes |
+| `neve_gain` | 0..20 dB in 2 dB steps | 0 | 33609 | yes |
+| `neve_meter_select` | In, Control, Out (the 2254/E only) | Control | 33609 | no |
+| `neve_drive` | 0..100 % (not on the hardware) | 0 | 33609 | yes |
+| `neve_power` | toggle | on | 33609 | no |
 | `link` | toggle | on | extras | yes |
 | `mix` | 0..100 % | 100 | extras | yes |
 | `sc_hpf` | 0 (off)..300 Hz | 0 | extras | yes |
@@ -495,13 +510,80 @@ The research also proposed clamping the drive ratio to one. That would have capp
 10 dB calibration point, while its own minimum-resistance constant exists precisely to set the
 maximum reduction, so the clamp belongs on the resistance instead.
 
+## The Neve 33609
+
+A limiter and a compressor in series, sharing one gain element, each with its own detector listening
+at a different point. Three findings out of `research/Neve-33609.md` shape the whole engine, and each
+is the difference between this model and a generic compressor wearing a faceplate.
+
+**The gain element's law is a hyperbolic tangent.** Four diodes with two floating common nodes make a
+differential pair, so the bridge current is `I·tanh(u/2ηV_T)` with no implicit resistive term to
+solve. That is not the Wright omega function the survey recommending this unit expected, and it is
+not an approximation of one: the omega form belongs to a *single* diode shunting a resistor, where
+the resistance sits inside the loop. The derivation validates itself. Three resistor values off the
+parts list give 25.01 dB of open-bridge loss where Neve annotated 25 dB on the same drawing, and
+that is the first row of the benchmark table. The law lives in
+the `diode-bridge` crate of `noob-electrical-components`, because
+it is a part rather than a circuit; the divider around it is here.
+
+**The two sidechains listen at different points.** The compressor taps the RV1 wiper, before the
+make-up amplifier; the limiter taps the 10640 output, after it. So raising the make-up drives the
+limiter harder while leaving the compressor's threshold exactly where it was, and AMS Neve sell that
+as a feature. Twenty decibels of make-up moves the limiter's own reduction by 31.4 dB and the
+compressor's by 0.00 dB, and both figures are asserted. They combine as a **maximum**, because TR9
+and TR13 are emitter followers into a shared load: whichever base is higher holds the node and the
+other turns off.
+
+**Distortion is set by the voltage across the bridge, not by the amount of gain reduction.** More
+control current means less resistance, less voltage across the bridge and a smaller `tanh` argument,
+so the bridge itself distorts *less* as it works harder. The published figures do rise with gain
+reduction, but that is sidechain ripple modulating the gain, not the bridge waveshaping, which is why
+the only published pair that varies one thing at a time varies *level* at a fixed recovery. The
+detector is deliberately a peak rectifier with a short reservoir rather than a clean envelope, because
+a perfectly smoothed one would pass the distortion figures by cheating.
+
+### The ratios are not what the panel says
+
+The handbook publishes a calibration table with its own per-position tolerances, and it is the best
+ground truth any model in the lab has. Two of the five printed ratios are wrong: the 3:1 position is
+really 2.86:1 and the 6:1 position is 6.67:1. `RATIO_TRUE` carries the measured figures and
+`RATIO_NAMES` the printed ones, and the model uses the former while the panel and the host both show
+the latter. All five positions meet the handbook's table.
+
+### One bridge, and what follows from it
+
+The handbook's signal path is "T2, D14 to D17, TR16 and TR17, TR3 and TR4, T1, T3 and the bypass
+switch". One bridge, so both sidechains drive it through the shared load and the limiter's reduction
+lowers what the compressor's detector reads. That is the hardware and not a shortcut, but it means
+the two halves of the tap-point claim cannot be read off a single make-up sweep: once the limiter
+wins, the compressor backs off because its own tap really has gone quiet. The test measures the
+compressor's half with the limiter out and says so at the test.
+
+The detectors read the input with the *other* sidechain's contribution subtracted, rather than
+reading the bridge output directly. That is not a departure from the feedback topology; it is the
+same equilibrium with the loop delay taken out. The audio path carries a 2x oversampler whose 31
+samples of group delay are a modelling artefact rather than a component, and a brickwall detector
+reading through them diverges: the output collapsed to −161 dBu the first time the make-up drove the
+limiter. A losing detector still reads a genuinely reduced signal, which is what keeps the maximum
+and the handover honest.
+
+### What is fitted rather than derived
+
+Three constants, each named at its definition. The bridge's drive level is calibrated against the
+published distortion rather than against the block diagram's level annotation, because the two
+disagree by about 20 dB and the dossier flags that as unresolved. The control law's two slopes are
+fitted to the 2254 level diagram's two published control voltages, because the divider contains a
+factory preset whose position no drawing states. And the auto-release platform's charge constant is
+fitted to the published behaviour, "rapid for transient peaks but slower for persistent high levels",
+because no resistor list fixes its charge path.
+
 ## Where the models miss their published figures
 
 Three audits went through these engines against their research documents and found tests that had
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Seven remain.
+Eleven remain, four of them the 33609's.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -512,6 +594,10 @@ Seven remain.
 | 610 | +0 / −1 dB from 20 Hz to 20 kHz | met at 48, 96 and 192 kHz; −2.2 dB at 20 kHz at 44.1 kHz and −1.1 dB at 88.2 kHz | **this used to miss at every rate and now misses only on the 44.1 kHz family.** Two faults were behind it. The two modelled transformer roll-offs spent 1.61 dB of the 1 dB budget between them, and the research says in as many words that their corners were "chosen to keep the B response within +0 / −1 dB", which that arithmetic never reached; they now sit where that stated purpose puts them. And the stage stopped oversampling at and above 88.2 kHz, which dropped the shaper's own rate and made the response *worse* at high rates than at low ones, so the factor now follows the host. What is left is the resampler's own passband droop: 20 kHz sits at 91 % of Nyquist at 44.1 kHz and at 45 % of the half-band's cutoff at 88.2 kHz, against 42 % at 96 kHz. Buying it back means a longer half-band and more latency, in code the 1176 engine shares, which is a trade rather than a fix |
 | LA-3A | 40 dB of gain reduction at Peak Reduction 10 | about 34 dB at the published drive, reaching 40 dB only with 12 dB more | in Compress every decibel of reduction takes a decibel off the side-chain, so the loop starves itself: measured, depth rises about 4.3 dB for every 6 dB of extra drive. Limit reaches 40 dB at the published level, and both figures are asserted |
 | CL 1B | at the 2:1 stop, ten decibels in gives five out at every depth from 3 dB | 5.2, 4.8 and 4.8 dB from 8 dB of reduction and deeper; 6.4 dB from 3 dB | a feedback optical compressor has a soft knee near its threshold, which is what the reviews describe; the manual's sentence is a description of what the Ratio control selects rather than a knee specification |
+| 33609 | limit recovery A1 settling 1500 ms ±50 %, so 750 to 2250 ms | 2324 ms | two Neve documents disagree and no single pair of constants meets both. The switch drawings PL20235 and PL20237 label the automatic positions "A1 100mS/2S" and "A2 50mS/5S", and a 2 s capacitor cannot settle in 1.5 s. The model keeps the drawings' constants, because they are a statement about the circuit rather than about a measurement, and because the two-constant behaviour they describe is asserted directly: after a sustained tone the release constant measures 1997 ms against a published 2000. A2 lands inside its own ±50 % window. What the test asserts instead is the ordering both documents agree on |
+| 33609 | compress recovery A1 800 ms, no tolerance published | 1488 ms under the limit recovery's borrowed ±50 % | the same disagreement on the compressor's switch: the /N manual gives the constants as "a1 (auto): 100ms/2000ms" and the handbook lists 800 ms for the position. The constants are kept and the settling figure is the miss. The four fixed positions all meet their published times |
+| 33609 | attack settling time falls as the step size rises, and a 20 dB step settles in under half a 3 dB step's time | it rises: 2.50 ms at 3 dB against 3.83 ms at 10 dB | the direction is the dossier's own derivation rather than a published figure, and it does not follow from the circuit it cites. A follower whose charging rate is proportional to the difference is an exponential, and the time for an exponential to close a **fixed** 1 dB window grows like the logarithm of the step. The published 10 dB point is met in both attack positions, and the measured direction is asserted so a future change to the envelope cannot pass unnoticed |
+| 33609 | distortion 0.03 % at 0 dBu and 0.2 % at +15 dBu on the 2254 | 0.000 % and 0.004 % | these are published **maxima**, so passing them is legitimate, but the model is far cleaner than the hardware rather than merely inside the limit. Two things are missing: the four transformers are not modelled at all, and the bridge's drive level is the one constant that could not be derived. The block diagram's annotation puts about 30 mV across the bridge and a `tanh` argument near 0.34, where the bridge's own third harmonic is about 0.96 % — more than ten times the 0.075 % the handbook publishes for the through path — so the drive is calibrated against the distortion instead and the ~20 dB gap between the two readings is recorded at `BRIDGE_DRIVE_V` rather than split |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes
 for this symptom in preference to a bigger oversampling factor. It was right about the mechanism: the
@@ -532,7 +618,7 @@ ratio is what is asserted, and the note is at the test.
 
 ## Tests
 
-`cargo test` runs 152 tests (one more is `#[ignore]`d and prints curves):
+`cargo test` runs 184 tests (one more is `#[ignore]`d and prints curves):
 
 - **the lab** (`src/dsp/tests.rs`): the parameter contract (ids, labels, defaults, stream layout);
   shared values reach every engine; every model compresses and reports `gr_db` ≤ 0 with the GR meter
@@ -595,6 +681,24 @@ ratio is what is asserted, and the note is at the test.
   the fixed one and that it gives up on long peaks; the meter's calibration; that the bus takes the
   larger reduction rather than the average; and the structural test whose only job is to prove the T4
   cell was not imported, which is the one that stops this becoming a third LA-2A.
+- **the Neve 33609** (`src/dsp/bridge/tests.rs`): 30 tests numbered as its research's own test plan
+  numbers them, so a failure names the test in the document it came from, and each one says whether
+  the figure it asserts is published and by whom or derived and by whom. The 25 dB open bridge, which
+  three resistor values and a level annotation on the same Neve drawing agree on to within
+  0.01 dB. The compress ratio table at all five positions, with the manufacturer's own per-position
+  tolerances, and the implied ratios asserted as ratios so an implementation that believed the
+  silkscreen fails at the 3:1 and 6:1 positions. The brickwall's 0.1 dB output change for a 10 dB
+  input step. The handbook's own limiter calibration procedure at three points of the switch. The
+  make-up that moves the limiter by 31 dB and the compressor by nothing, the maximum that is not a
+  sum, and the losing sidechain that keeps its charge and releases on its own constant. The two
+  published control voltages off the 2254/E level diagram, which are the only statement anywhere of
+  what this family's sidechains produce. Both published distortion pairs, the attack times under the
+  handbook's own settling-time definition, the four fixed recovery positions on each switch, the
+  automatic positions as two time constants, and the /N's compressor attack with its 100 Hz
+  sidechain filter. Plus the hygiene the lab asks of every model: bypass exact to 1e-6, flat within
+  each model's *own* published tolerance, the same static answer at 44.1, 48, 96 and 192 kHz, ten
+  seconds of silence that stays silent and sixty seconds of full-scale square wave with every
+  control at its extreme that stays bounded.
 
 ### The cell switches, and what is actually known about the three eras
 

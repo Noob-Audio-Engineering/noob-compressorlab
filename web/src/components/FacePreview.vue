@@ -31,6 +31,7 @@ import La3aFace from '../models/la3a/Faceplate.vue';
 import VcaFace from '../models/vca/Faceplate.vue';
 import Pre6176Face from '../models/pre6176/Faceplate.vue';
 import Cl1bFace from '../models/cl1b/Faceplate.vue';
+import BridgeFace from '../models/bridge/Faceplate.vue';
 
 const props = defineProps({
   modelKey: { type: String, required: true },
@@ -39,7 +40,20 @@ const props = defineProps({
 /** The width the faces are laid out at before scaling: a comfortable full-size panel. */
 const RENDER_W = 1100;
 
-const FACES = { fet: FetFace, opto: OptoFace, la3a: La3aFace, vca: VcaFace, pre6176: Pre6176Face, cl1b: Cl1bFace };
+/*
+ * One entry per model in `MODELS`. A key missing here draws an empty card
+ * rather than failing, so a new model has to be added in both this map and
+ * `LabPage.vue`'s.
+ */
+const FACES = {
+  fet: FetFace,
+  opto: OptoFace,
+  la3a: La3aFace,
+  vca: VcaFace,
+  pre6176: Pre6176Face,
+  cl1b: Cl1bFace,
+  bridge: BridgeFace,
+};
 const face = computed(() => FACES[props.modelKey] || null);
 
 const host = ref(null);

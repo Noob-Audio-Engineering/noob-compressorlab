@@ -30,7 +30,8 @@ Every measurement drives the real engine offline with generated signal and reads
 | Distressor | Empirical Labs EL8 Distressor | 12 | 0 | 1 |
 | 6176 | Universal Audio 6176 (610B preamp into the 1176LN) | 11 | 1 | 1 |
 | CL-1B | Tube-Tech CL 1B | 9 | 1 | 1 |
-| **all** | | **58** | **6** | **6** |
+| 33609 | Neve 2254 and 33609 | 17 | 0 | 5 |
+| **all** | | **75** | **6** | **11** |
 
 The misses are the honest part of this table, and none of them is a widened tolerance. Five of them match the README's own list of figures these models do not reach; the other three do not appear there, and the section below says which and what to do about it.
 
@@ -193,6 +194,45 @@ Notes:
 - **slowest release, full recovery to 0 dB**: the service manual measures this by switching the tone off and watching the needle reach 0 VU, so this is a full recovery rather than a 63 % time
 - **release at quarter travel, full recovery**: a logarithmic taper would put this at about 0.35 s; the pot is linear, which is why the manufacturer's own recommended vocal setting sits where it does
 - **the optical element's internals**: the manufacturer has never published what is inside the gain-reduction element, and a twenty-year forum thread asking directly never gets an answer
+
+## 33609 — Neve 2254 and 33609
+
+Figures from [`research/Neve-33609.md`](research/Neve-33609.md).
+
+| quantity | published | measured | verdict | source |
+|---|---|---|---|---|
+| open-bridge attenuation | 25 ± 0.2 dB | 25.001 dB | meets | research/Neve-33609.md §12 test 3, from EX11475's −6 and −31 dBu rail marks |
+| unity gain, both sections out | 0 ± 0.5 dBu | -0.002 dBu | meets | research/Neve-33609.md §12 test 2, from the block diagram's annotated chain |
+| 1.5:1 position, output change for a 10 dB step | 6.5 ± 1 dB | 6.494 dB | meets | research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table |
+| 2:1 position, output change for a 10 dB step | 5 ± 1 dB | 4.981 dB | meets | research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table |
+| 3:1 position, output change for a 10 dB step | 3.5 ± 1 dB | 3.497 dB | meets | research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table |
+| 4:1 position, output change for a 10 dB step | 2.5 ± 0.5 dB | 2.522 dB | meets | research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table |
+| 6:1 position, output change for a 10 dB step | 1.5 ± 0.5 dB | 1.499 dB | meets | research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table |
+| limit ratio, +10 to +20 dBu | 0.1 ± 0.1 dB out | 0.130 dB out | meets | research/Neve-33609.md §12 test 7, from the handbook's Limit Ratio entry |
+| limit threshold +8 dBu holding a +20 dBu tone | 8 ± 0.5 dBu | 8.362 dBu | meets | research/Neve-33609.md §12 test 8, from the handbook's calibration procedure |
+| 2254/E control voltage, +20 dBm limited to +8 dBm | 3.5 ± 0.3 V | 3.465 V | meets | research/Neve-33609.md §12 test 11, from level diagram EB/20134 |
+| limiter reduction added by 20 dB of make-up | 15 to 60 dB | 31.429 dB | meets | research/Neve-33609.md §12 test 12, from AMS Neve's tap-point description |
+| compressor reduction moved by 20 dB of make-up | 0 ± 0.5 dB | 0.000 dB | meets | research/Neve-33609.md §12 test 12, from the handbook's tap-point description |
+| 2254 distortion at 0 dBu, 800 ms recovery | 0 to 0.03 % | 0.000 % | meets | research/Neve-33609.md §12 test 17, from the AMS Neve 2254/R specification |
+| 2254 distortion at +15 dBu, 800 ms recovery | 0 to 0.2 % | 0.004 % | meets | research/Neve-33609.md §12 test 17, from the AMS Neve 2254/R specification |
+| 33609 distortion through the unit at +9 dBu | 0 to 0.075 % | 0.000 % | meets | research/Neve-33609.md §12 test 18a, from the handbook's Distortion entry |
+| Slow limit attack, settling | 4 ± 1 ms | 3.833 ms | meets | research/Neve-33609.md §12 test 20, from the handbook's Attack Time entry |
+| Fast limit attack, settling | 2 ± 1 ms | 2.167 ms | meets | research/Neve-33609.md §12 test 20, from the handbook's Attack Time entry |
+| the bridge's own distortion against gain reduction | *(none published)* | falls monotonically as the control current rises | no figure | — |
+| the automatic recovery positions | *(none published)* | kept at the switch drawings' 100 ms/2 s and 50 ms/5 s | no figure | — |
+| attack against step size | *(none published)* | settling time rises with the step, not falls | no figure | — |
+| the 10640 amplifier in isolation | *(none published)* | not modelled as a separate block | no figure | — |
+| noise floor | *(none published)* | no noise source is modelled | no figure | — |
+
+Notes:
+
+- **3:1 position, output change for a 10 dB step**: the panel prints 3:1; the handbook's own table implies 2.86:1, and the model follows the table
+- **6:1 position, output change for a 10 dB step**: the panel prints 6:1; the table implies 6.67:1
+- **the bridge's own distortion against gain reduction**: no manufacturer publishes a spectrum for these units, so this is the tanh law's own derived behaviour rather than a measurement; what rises with depth in the whole unit is sidechain ripple, which is why test 17 varies level instead
+- **the automatic recovery positions**: known miss, recorded in README: the handbook's Limit Recovery entry lists 1500 ms and 3000 ms for the same two positions, and a 2 s capacitor cannot settle in 1.5 s, so A1 measures 2324 ms against a 750-to-2250 ms window
+- **attack against step size**: known miss, recorded in README: the dossier derives the opposite direction from the same emitter follower, and an exponential closing a fixed 1 dB window cannot fall; the published 10 dB point is still met
+- **the 10640 amplifier in isolation**: the handbook publishes its gain, clip point and three distortion figures, and this model carries the amplifier only as the make-up gain in the chain, so there is no sub-block to assert them on
+- **noise floor**: the handbook publishes −75 dBu bypassed and −55 dBu with full make-up; this model is silent into silence, so it passes both vacuously rather than on merit
 
 ## Where this disagreed with the README, and how it was settled
 

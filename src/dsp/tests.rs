@@ -96,6 +96,20 @@ fn the_parameter_contract_holds() {
             "pre_load",
             "pre_meter",
             "pre_phantom",
+            "neve_model",
+            "neve_limit_in",
+            "neve_limit_threshold",
+            "neve_limit_attack",
+            "neve_limit_recovery",
+            "neve_compress_in",
+            "neve_compress_threshold",
+            "neve_compress_ratio",
+            "neve_compress_attack",
+            "neve_compress_recovery",
+            "neve_gain",
+            "neve_meter_select",
+            "neve_drive",
+            "neve_power",
             "link",
             "mix",
             "sc_hpf",
@@ -117,11 +131,11 @@ fn the_parameter_contract_holds() {
     assert_eq!(by_id("opto_cell").default, 1.0);
     assert_eq!(by_id("src_kind").labels.len(), 7);
     assert_eq!(by_id("src_level").default, 0.4);
-    assert_eq!(param_specs(false).len(), 59);
+    assert_eq!(param_specs(false).len(), 73);
 
     let (bridge, ix) = build_bridge("test", SR);
     assert_eq!(ix.model, 0);
-    assert_eq!(ix.src_freq, Some(61));
+    assert_eq!(ix.src_freq, Some(75));
     let streams = streams(SR);
     assert_eq!(streams[STREAM_IX.meter].id, "meter");
     assert_eq!(streams[STREAM_IX.cell].id, "cell");

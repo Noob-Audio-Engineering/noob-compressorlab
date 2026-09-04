@@ -26,7 +26,9 @@ use nih_plug::prelude::*;
 use noob_vst_webgui_framework::{Assets, AudioHandle, NoobVstWebguiFramework};
 use noob_vst_webgui_framework_nih::{EditorConfig, NoobVstWebguiFrameworkEditor, StoreSlot};
 
-use crate::dsp::{self, Model, Processor, Settings, Shared, fet, opto, opto1b, opto3, pre, vca};
+use crate::dsp::{
+    self, Model, Processor, Settings, Shared, bridge, fet, opto, opto1b, opto3, pre, vca,
+};
 
 static UI: Dir = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
 
@@ -49,6 +51,8 @@ pub enum ModelParam {
     Pre6176,
     #[name = "CL-1B"]
     Opto1b,
+    #[name = "33609"]
+    Bridge,
 }
 
 /// The 1176's ratio buttons, as the host sees them.
@@ -168,6 +172,95 @@ pub enum Cl1bBusParam {
     One,
     #[name = "2"]
     Two,
+}
+
+/// Which unit of the diode-bridge family the 33609 model wears.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveModelParam {
+    #[name = "2254E"]
+    U2254E,
+    #[name = "33609J"]
+    U33609J,
+    #[name = "33609N"]
+    U33609N,
+}
+
+/// The 33609's limiter attack lever.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveLimitAttackParam {
+    Slow,
+    Fast,
+}
+
+/// The 33609's limiter recovery switch. The last two positions are the
+/// automatic ones, a fast stage over a slow platform.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveLimitRecoveryParam {
+    #[name = "50 ms"]
+    R50,
+    #[name = "100 ms"]
+    R100,
+    #[name = "200 ms"]
+    R200,
+    #[name = "800 ms"]
+    R800,
+    #[name = "A1"]
+    Auto1,
+    #[name = "A2"]
+    Auto2,
+}
+
+/// The 33609's ratio switch, **as the panel prints it**.
+///
+/// Two of the five are not what they say. The manufacturer's own
+/// calibration table puts the 3:1 position at 2.86:1 and the 6:1 position
+/// at 6.67:1, and the engine works in those; this is the silkscreen, which
+/// is what an engineer reading the host's parameter list expects to see.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveRatioParam {
+    #[name = "1.5:1"]
+    R15,
+    #[name = "2:1"]
+    R2,
+    #[name = "3:1"]
+    R3,
+    #[name = "4:1"]
+    R4,
+    #[name = "6:1"]
+    R6,
+}
+
+/// The 33609/N's compressor attack lever, which the /J and the 2254 do not
+/// have. The engine ignores it unless the unit is the /N.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveCompressAttackParam {
+    Fast,
+    Slow,
+}
+
+/// The 33609's compressor recovery switch.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveCompressRecoveryParam {
+    #[name = "100 ms"]
+    R100,
+    #[name = "400 ms"]
+    R400,
+    #[name = "800 ms"]
+    R800,
+    #[name = "1500 ms"]
+    R1500,
+    #[name = "A1"]
+    Auto1,
+    #[name = "A2"]
+    Auto2,
+}
+
+/// The 2254/E's meter switch. The 33609 has two meters and no room for it.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum NeveMeterParam {
+    In,
+    Control,
+    Out,
 }
 
 /// The Distressor's ratio switch.
@@ -393,6 +486,23 @@ pub struct NoobCompressorLabParams {
     /// The panel's OFF/ON mains knob. Parks the machine rather than
     /// silencing it, as the 1176's METER OFF does in this same plug-in.
     pub cl1b_power: BoolParam,
+    pub neve_model: EnumParam<NeveModelParam>,
+    pub neve_limit_in: BoolParam,
+    /// Limit threshold as a **switch index**, 0..22, +4.0 to +15.0 dBu.
+    pub neve_limit_threshold: IntParam,
+    pub neve_limit_attack: EnumParam<NeveLimitAttackParam>,
+    pub neve_limit_recovery: EnumParam<NeveLimitRecoveryParam>,
+    pub neve_compress_in: BoolParam,
+    /// Compress threshold as a switch index, 0..15, −20 to +10 dBu.
+    pub neve_compress_threshold: IntParam,
+    pub neve_compress_ratio: EnumParam<NeveRatioParam>,
+    pub neve_compress_attack: EnumParam<NeveCompressAttackParam>,
+    pub neve_compress_recovery: EnumParam<NeveCompressRecoveryParam>,
+    /// Make-up as a switch index, 0..10, 0 to 20 dB.
+    pub neve_gain: IntParam,
+    pub neve_meter_select: EnumParam<NeveMeterParam>,
+    pub neve_drive: FloatParam,
+    pub neve_power: BoolParam,
     /// Distressor knobs, 0..10.5.
     pub dist_input: FloatParam,
     pub dist_output: FloatParam,
@@ -581,6 +691,49 @@ impl Default for NoobCompressorLabParams {
             cl1b_meter: EnumParam::new("Meter", Cl1bMeterParam::Compression).non_automatable(),
             cl1b_bus: EnumParam::new("Sidechain Bus", Cl1bBusParam::Off),
             cl1b_power: BoolParam::new("Power", true).non_automatable(),
+            // Every control on this unit is a switch, so each of these is
+            // discrete rather than a knob with a step size. The three with
+            // real units carry the **switch index** as their value and let
+            // the engine's own law turn it into decibels for display, so
+            // the law exists once and the host can never land between two
+            // positions.
+            neve_model: EnumParam::new("Unit", NeveModelParam::U33609J).non_automatable(),
+            neve_limit_in: BoolParam::new("Limit In", false),
+            neve_limit_threshold: IntParam::new(
+                "Limit Threshold",
+                8,
+                IntRange::Linear { min: 0, max: 22 },
+            )
+            .with_value_to_string(Arc::new(|i| {
+                format!("{:.1} dBu", bridge::engine::limit_threshold_dbu(i as usize))
+            })),
+            neve_limit_attack: EnumParam::new("Limit Attack", NeveLimitAttackParam::Slow),
+            neve_limit_recovery: EnumParam::new("Limit Recovery", NeveLimitRecoveryParam::R100),
+            neve_compress_in: BoolParam::new("Compress In", true),
+            neve_compress_threshold: IntParam::new(
+                "Compress Threshold",
+                5,
+                IntRange::Linear { min: 0, max: 15 },
+            )
+            .with_value_to_string(Arc::new(|i| {
+                format!(
+                    "{:.0} dBu",
+                    bridge::engine::compress_threshold_dbu(i as usize)
+                )
+            })),
+            neve_compress_ratio: EnumParam::new("Ratio", NeveRatioParam::R2),
+            neve_compress_attack: EnumParam::new("Compress Attack", NeveCompressAttackParam::Fast),
+            neve_compress_recovery: EnumParam::new(
+                "Compress Recovery",
+                NeveCompressRecoveryParam::R400,
+            ),
+            neve_gain: IntParam::new("Make-up Gain", 0, IntRange::Linear { min: 0, max: 10 })
+                .with_value_to_string(Arc::new(|i| {
+                    format!("{:.0} dB", bridge::engine::gain_db(i as usize))
+                })),
+            neve_meter_select: EnumParam::new("Meter", NeveMeterParam::Control).non_automatable(),
+            neve_drive: percent("Drive", 0.0),
+            neve_power: BoolParam::new("Power", true).non_automatable(),
             dist_input: knob("Input"),
             dist_output: knob("Output"),
             dist_attack: knob("Attack"),
@@ -741,6 +894,56 @@ unsafe impl Params for NoobCompressorLabParams {
             (g("cl1b_meter"), self.cl1b_meter.as_ptr(), g("CL-1B")),
             (g("cl1b_bus"), self.cl1b_bus.as_ptr(), g("CL-1B")),
             (g("cl1b_power"), self.cl1b_power.as_ptr(), g("CL-1B")),
+            (g("neve_model"), self.neve_model.as_ptr(), g("33609")),
+            (g("neve_limit_in"), self.neve_limit_in.as_ptr(), g("33609")),
+            (
+                g("neve_limit_threshold"),
+                self.neve_limit_threshold.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_limit_attack"),
+                self.neve_limit_attack.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_limit_recovery"),
+                self.neve_limit_recovery.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_compress_in"),
+                self.neve_compress_in.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_compress_threshold"),
+                self.neve_compress_threshold.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_compress_ratio"),
+                self.neve_compress_ratio.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_compress_attack"),
+                self.neve_compress_attack.as_ptr(),
+                g("33609"),
+            ),
+            (
+                g("neve_compress_recovery"),
+                self.neve_compress_recovery.as_ptr(),
+                g("33609"),
+            ),
+            (g("neve_gain"), self.neve_gain.as_ptr(), g("33609")),
+            (
+                g("neve_meter_select"),
+                self.neve_meter_select.as_ptr(),
+                g("33609"),
+            ),
+            (g("neve_drive"), self.neve_drive.as_ptr(), g("33609")),
+            (g("neve_power"), self.neve_power.as_ptr(), g("33609")),
             (g("link"), self.link.as_ptr(), g("extras")),
             (g("mix"), self.mix.as_ptr(), g("extras")),
             (g("sc_hpf"), self.sc_hpf.as_ptr(), g("extras")),
@@ -804,6 +1007,23 @@ impl NoobCompressorLabParams {
                 bus: self.cl1b_bus.value() as usize,
                 power: self.cl1b_power.value(),
                 ..opto1b::Settings::default()
+            },
+            bridge: bridge::Settings {
+                model: self.neve_model.value() as usize,
+                limit_in: self.neve_limit_in.value(),
+                limit_threshold: self.neve_limit_threshold.value() as usize,
+                limit_attack: self.neve_limit_attack.value() as usize,
+                limit_recovery: self.neve_limit_recovery.value() as usize,
+                compress_in: self.neve_compress_in.value(),
+                compress_threshold: self.neve_compress_threshold.value() as usize,
+                compress_ratio: self.neve_compress_ratio.value() as usize,
+                compress_attack: self.neve_compress_attack.value() as usize,
+                compress_recovery: self.neve_compress_recovery.value() as usize,
+                gain: self.neve_gain.value() as usize,
+                meter_select: self.neve_meter_select.value() as usize,
+                drive: self.neve_drive.value() / 100.0,
+                power: self.neve_power.value(),
+                ..bridge::Settings::default()
             },
             vca: vca::Settings {
                 input: self.dist_input.value(),

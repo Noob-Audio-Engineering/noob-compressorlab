@@ -4,11 +4,11 @@ The front panels of [Noob CompressorLab](../README.md), a Vue 3 + Tailwind
 single-page app rendered inside the plug-in's native web view (or a browser
 tab), talking to the Rust DSP over
 [noob-vst-webgui-framework](https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework). One instance is one compressor at a
-time: the `model` parameter picks one of six, the page shows that model's
+time: the `model` parameter picks one of seven, the page shows that model's
 face, extras and workbench, and because the choice is a parameter it is
 saved with the host's project and can differ per instance.
 
-Everything you see is this plug-in's own look, six times over: the 1176's
+Everything you see is this plug-in's own look, seven times over: the 1176's
 black (or silver, or blue-striped) panel with its machined knobs, push
 buttons and cream VU face; the LA-2A's brushed plate with its bakelite
 knobs, bat-handle levers, rotary selector and bevelled meter; the LA-3A's
@@ -17,7 +17,9 @@ Distressor's charcoal single unit with its ivory knobs and rows of coloured
 lamps; and the 6176's brushed aluminium carrying two black inset panels,
 the tube preamp on the left and the limiter on the right; and the CL-1B's
 blue three-unit panel with its faceted black knobs, three-position levers
-and a ruby pilot jewel. The framework
+and a ruby pilot jewel; and the 33609's slate blue-grey two-unit panel with
+its twelve switch knobs on bright knurled skirts, eight bat toggles and two
+staggered gain-reduction movements. The framework
 supplies behaviour only: parameter handles, knob gestures in rotation space
 (`useKnobGesture` with the `rotation` option, so a printed taper stays under
 the pointer), the needle's ballistics and scale maths, the history and
@@ -100,7 +102,7 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
     │   ├── PreKnob.vue               the glossy black knobs, continuous and stepped alike
     │   ├── RatioKnob.vue             the RATIO rotary, the one control that drives two parameters
     │   └── PreToggle.vue             the small bat toggles, two or three positions
-    └── models/cl1b/Cl1bView.vue      the CL-1B: the three-unit faceplate, the lab strip, the drawer
+    ├── models/cl1b/Cl1bView.vue      the CL-1B: the three-unit faceplate, the lab strip, the drawer
         ├── Faceplate.vue             the blue 483 x 131 mm panel, laid out from the dossier's measured fractions
         ├── Cl1bKnob.vue              the five faceted black knobs, scale printed on the panel, 239 degrees
         ├── Cl1bLever.vue             the three-position levers: meter, attack/release select, sidechain bus
@@ -108,6 +110,13 @@ App.vue                         root: the wait screen, then LabPage; Ctrl+Z / Ct
         ├── Cl1bPower.vue             the mains switch
         ├── VuFaceCl1b.vue            its own VU: two arcs, dB over percentage, maker's script, VU lower right
         └── ExtrasStrip.vue           the shared globals group
+    └── models/bridge/BridgeView.vue  the 33609: the two-unit faceplate, the extras bar, the drawer
+        ├── Faceplate.vue             the 19 : 3.5 panel, every fraction measured off the front photograph; both channel rows drive one set of handles
+        ├── NeveKnob.vue              the twelve switch knobs: flat blue cap, knurled grey skirt, one tick per detent on the panel around it
+        ├── NeveLever.vue             the bat toggles, legend above and below, two indicator lamps where the centre block has them
+        ├── NeveMeter.vue             a gain-reduction movement: glass, bezel lip and can, reading 0 at the left and 20 dB at the right
+        ├── NevePower.vue             the round red mains button
+        └── ExtrasBar.vue             UNIT, DRIVE and METER, then the shared globals group
 ```
 
 Composables and data:
@@ -121,6 +130,7 @@ Composables and data:
 | `models/vca/useVca.js` | the Distressor's handles (ids `dist_*`), the ratio / detector / audio tables, the bargraph steps, the knob taper |
 | `models/cl1b/useCl1b.js` | the CL-1B's handles (`useControls()`, ids `cl1b_*`), the measured scale marks, the mains handle |
 | `models/pre6176/usePre.js` | the 6176's handles (`pre_*` plus the `fet_*` half it drives) and the mappings between the 6176's printed numbers and the 1176's |
+| `models/bridge/useBridge.js` | the 33609's handles (`useControls()`, ids `neve_*`), the printed scales and their detent counts, the measured knob sweeps, the meter's measured mark angles, the mains handle |
 | `presets.js` | factory presets per model and the `presets.user.<model>` store helpers |
 | `dev/manifest.js` | the design-mode manifest |
 
@@ -155,11 +165,49 @@ positions a standalone 1176 has not got, BP and 1, which write the routing
 parameter `pre_join` instead of `fet_ratio`; from 4 on it is the ratio
 switch again.
 
+### The 33609's two rows on one set of handles
+
+The 33609 is a stereo unit with two complete channels: LIMIT 1 and
+COMPRESS 1 above, LIMIT 2 and COMPRESS 2 below, each with its own switches.
+The model has one set of parameters, so the face draws both rows the way the
+panel does and both rows drive the same handles. Turning a knob in row one
+turns its twin in row two because here they really are one control. That is
+a 33609 with its MONO / STEREO lever in the ganged position, and it is what
+one parameter set can honestly show; the alternative would have been to draw
+one row and leave half the panel bare, which is not what the hardware looks
+like. The centre block's two bypass levers work the same way, both writing
+the shared `bypass`.
+
+The panel is not symmetric top to bottom, which is worth knowing before
+anyone tries to tidy the layout constants. Both blocks are the same height,
+0.4455 and 0.4442 of the panel, but the lower block's contents sit higher
+inside it: its captions are 0.029 below its top rule where the upper
+block's are 0.085, though both titles sit 0.033 above their bottom rule. The
+knob rows are 0.4217 apart while the block rules are 0.4756 apart. So
+`CHANNELS` in `Faceplate.vue` carries a measured caption, knob, title and
+lever position for each row rather than one offset applied twice.
+
+### The 33609's meter scale is not linear
+
+The gain-reduction faces read 0 at the left and 20 dB at the right, and the
+six printed marks are not evenly spaced. Fitting a circle to the ticks in
+`ref/neve-33609n-front.jpg` puts the pivot 2.16 glass-heights below the top
+of the glass and 0.496 of the way across it, ticks on a radius of 0.767
+glass widths, residuals under a third of a pixel; against that centre the
+marks fall at −30.8°, −17.2°, −2.3°, +8.3°, +19.5° and +30.4° from vertical.
+The first 8 dB take 28.5 of the 61.2 degrees of travel and the remaining
+12 dB share the other 32.7. Both movements measure the same to within a
+pixel although they sit at different places in the frame, which is what
+rules out the lens. `METER_ANGLES` in `useBridge.js` holds those figures,
+the ticks are drawn where they were measured, and the needle is interpolated
+through the same table, so a reading taken off this face is the reading the
+metal gives.
+
 ## What binds to what
 
 | control | parameter | notes |
 |---|---|---|
-| the five model keys | `model` | framework `Segmented`, styled as `.labbar__model` |
+| the model button | `model` | opens the browse view, which writes the parameter; styled as `.labbar__model` |
 | BYPASS (top bar), POWER (both faces) | `bypass` | the levers are inverted |
 | INPUT, OUTPUT | `fet_input`, `fet_output` | marks 0..48 on the original's taper |
 | ATTACK, RELEASE | `fet_attack`, `fet_release` | ATTACK has the OFF detent before 1 |
@@ -192,9 +240,17 @@ switch again.
 | RATIO rotary (6176) | `pre_join` + `fet_ratio` | a knob marked BP, 1, 4, 8, 12, 20, ALL, as the hardware has it; BP and 1 write the routing, 4 to ALL the ratio (`RatioKnob.vue`) |
 | METER (6176) | `pre_meter` | PRE / GR / COMP |
 | LO CUT, voicing, input loading | `pre_hpf`, `pre_voice`, `pre_load` | the centre strip and the extras bar |
-| STEREO / LINK, MIX, SC HPF | `link`, `mix`, `sc_hpf` | shared by both models |
+| threshold dBu, recovery ms (33609) | `neve_limit_threshold`, `neve_limit_recovery`, `neve_compress_threshold`, `neve_compress_recovery` | every control on this unit is a rotary switch, so all four are stepped; the detent counts come from the switch drawings in the dossier and are larger than the printed numbers suggest, 23 and 16 against 12 and 9 |
+| gain, ratio (33609) | `neve_gain`, `neve_compress_ratio` | eleven stops and five; the printed ratios are the metal's approximations and the engine models the handbook's real slopes |
+| limit in, compress in, attack fast / slow (33609) | `neve_limit_in`, `neve_compress_in`, `neve_limit_attack`, `neve_compress_attack` | the four block levers |
+| bypass, mono / stereo (33609) | `bypass`, `link` | the centre block's own levers, so they drive the shared parameters rather than having a path of their own; the panel has two bypass levers, one per channel, and both write the one handle |
+| external / internal control (33609) | page state | the hardware's side-chain link to a second unit, which this model has nothing to connect to. It latches and is saved with the page, and it is the one lever on this face that does not reach the engine |
+| the 33609's mains button | `neve_power` if the engine has it, else page state | as the CL-1B's: when the parameter exists the unit powers down, and powering down passes audio through rather than silencing it |
+| UNIT, DRIVE, METER (33609) | `neve_model`, `neve_drive`, `neve_meter_select` | the extras bar, because the 33609's panel has none of them |
+| STEREO / LINK, MIX, SC HPF | `link`, `mix`, `sc_hpf` | shared by every model |
 | DEMO SOURCE | `src_kind`, `src_level`, `src_freq` | not in the bench bar: it lives in the development panel, and it exists only in the standalone (`hasParam`) |
-| every needle | stream `meter[5]` | **where the needle already is**, in dB against the meter's zero. The VU movement runs in the audio thread for all five models (13 rad/s, damping 0.80: 99 % in 300 ms, about 1.5 % overshoot), so a face draws this field rather than smoothing it again; the framework needle is asked for nothing but a short critically-damped follow to bridge the gap between frames |
+| the 33609's two movements | stream `meter[5]` | both read the one field, because the two channels are ganged. Unlike the six VU faces this is a gain-reduction scale: it rests at 0 on the **left** and swings right, and its printed marks are not evenly spaced, so `METER_ANGLES` in `useBridge.js` carries the angle measured for each one and the needle is interpolated through the same table |
+| every needle | stream `meter[5]` | **where the needle already is**, in dB against the meter's zero. The VU movement runs in the audio thread for every model (13 rad/s, damping 0.80: 99 % in 300 ms, about 1.5 % overshoot), so a face draws this field rather than smoothing it again; the framework needle is asked for nothing but a short critically-damped follow to bridge the gap between frames |
 | LAST 8 SECONDS | stream `meter[0, 2, 4]` | in and out peaks (dBFS), gain reduction (dB, at most 0) |
 | TRANSFER | stream `transfer`, marker from `meter[0, 2]` | sticky curve, republished on change |
 | INSIDE THE T4 | stream `cell` | light, free and trapped carriers (the two optical models) |
@@ -314,6 +370,7 @@ height is left and the charts grow with it.
 | Distressor | one unit, full rack | 19 : 1.75 |
 | 6176 | two units, full rack | 19 : 3.5 |
 | CL-1B | three units, full rack | 483 : 131 |
+| 33609 | two units, full rack | 19 : 3.5 |
 
 The LA-3A is the odd one: the unit itself is only half a rack wide, so its
 face draws the SR-3A mounting kit the hardware is sold with — a full

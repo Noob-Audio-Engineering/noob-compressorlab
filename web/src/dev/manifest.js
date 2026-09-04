@@ -74,7 +74,7 @@ export const offline = {
   // source card has to say the host is the input rather than offer controls.
   // It exists so that presentation can be checked without a host.
   params: dropSource(stepped([
-    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B'], default: 0, group: 'lab', automatable: false },
+    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B', '33609'], default: 0, group: 'lab', automatable: false },
 
     { id: 'fet_input', name: 'Input', min: 0, max: 48, default: 24, group: '1176' },
     { id: 'fet_output', name: 'Output', min: 0, max: 48, default: 24, group: '1176' },
@@ -110,6 +110,28 @@ export const offline = {
     { id: 'cl1b_meter', name: 'Meter', labels: ['Input', 'Compression', 'Output'], default: 1, group: 'CL-1B', automatable: false },
     { id: 'cl1b_bus', name: 'Sidechain Bus', labels: ['Off', '1', '2'], default: 0, group: 'CL-1B' },
     { id: 'cl1b_power', name: 'Power', toggle: true, default: 1, group: 'CL-1B', automatable: false },
+
+    // 33609: every control is a rotary switch, so every one of these is
+    // stepped, and the detent counts are the switch drawings' rather than the
+    // printed scales' (research/Neve-33609.md 2.3). The three that carry a
+    // scale publish the real unit over the real range rather than a step
+    // index, so a host's generic view reads +8.0 dBu and not "8"; all three
+    // laws are exactly linear, so the framework's snapping lands on each
+    // switch position without a table. Ranges and defaults are section 11.3.
+    { id: 'neve_model', name: 'Unit', labels: ['2254E', '33609J', '33609N'], default: 1, group: '33609', automatable: false },
+    { id: 'neve_limit_in', name: 'Limit In', toggle: true, default: 0, group: '33609' },
+    { id: 'neve_limit_threshold', name: 'Limit Threshold', min: 4, max: 15, steps: 23, default: 8, unit: 'dBu', group: '33609' },
+    { id: 'neve_limit_attack', name: 'Limit Attack', labels: ['Slow', 'Fast'], default: 0, group: '33609' },
+    { id: 'neve_limit_recovery', name: 'Limit Recovery', labels: ['50 ms', '100 ms', '200 ms', '800 ms', 'A1', 'A2'], default: 1, group: '33609' },
+    { id: 'neve_compress_in', name: 'Compress In', toggle: true, default: 1, group: '33609' },
+    { id: 'neve_compress_threshold', name: 'Compress Threshold', min: -20, max: 10, steps: 16, default: -10, unit: 'dBu', group: '33609' },
+    { id: 'neve_compress_ratio', name: 'Ratio', labels: ['1.5:1', '2:1', '3:1', '4:1', '6:1'], default: 1, group: '33609' },
+    { id: 'neve_compress_attack', name: 'Compress Attack', labels: ['Fast', 'Slow'], default: 0, group: '33609' },
+    { id: 'neve_compress_recovery', name: 'Compress Recovery', labels: ['100 ms', '400 ms', '800 ms', '1500 ms', 'A1', 'A2'], default: 1, group: '33609' },
+    { id: 'neve_gain', name: 'Make-up Gain', min: 0, max: 20, steps: 11, default: 0, unit: 'dB', group: '33609' },
+    { id: 'neve_meter_select', name: 'Meter', labels: ['In', 'Control', 'Out'], default: 1, group: '33609', automatable: false },
+    { id: 'neve_drive', name: 'Drive', min: 0, max: 100, default: 0, unit: '%', group: '33609' },
+    { id: 'neve_power', name: 'Power', toggle: true, default: 1, group: '33609', automatable: false },
 
     { id: 'dist_input', name: 'Input', min: 0, max: 10.5, default: 5, group: 'Distressor' },
     { id: 'dist_output', name: 'Output', min: 0, max: 10.5, default: 5, group: 'Distressor' },

@@ -853,7 +853,7 @@ fn the_la2_cell_has_a_dual_time_constant() {
 #[test]
 fn only_the_la2_cell_gained_the_third_photocell() {
     for cell in 0..3 {
-        let p = cell_params_for(cell);
+        let p = cell_params_for(T4Variant::from_index(cell));
         if cell == 2 {
             assert!(p.fast_share > 0.0, "the LA-2 cell lost its third photocell");
             assert!(p.fast_speed > 1.0, "the third photocell is not faster");
@@ -866,7 +866,7 @@ fn only_the_la2_cell_gained_the_third_photocell() {
     }
     // Silver and Gray report their free carriers untouched.
     for cell in [0usize, 1] {
-        let mut c = Cell::new(cell_params_for(cell), SR);
+        let mut c = Cell::new(cell_params_for(T4Variant::from_index(cell)), SR);
         for _ in 0..2000 {
             c.step(0.4);
         }

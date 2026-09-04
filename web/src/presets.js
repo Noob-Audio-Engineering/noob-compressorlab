@@ -15,7 +15,7 @@
  */
 import { getClient } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
 
-/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b', Preset[]>} */
+/** @type {Record<'fet' | 'opto' | 'la3a' | 'vca' | 'pre6176' | 'cl1b' | 'bridge', Preset[]>} */
 export const FACTORY_PRESETS = {
   // fet_ratio: 0 4:1, 1 8:1, 2 12:1, 3 20:1, 4 All. fet_revision: 0 A .. 7 H, 8 LN (see REVISIONS in models/fet/useFet.js).
   fet: [
@@ -174,6 +174,32 @@ export const FACTORY_PRESETS = {
       name: 'Fixed times',
       description: "Mine: the same idea with the attack and release knobs out of circuit, so the unit picks its own times from the programme. Ratio up for a firmer hand.",
       values: { cl1b_gain: 0.32, cl1b_ratio: 0.6, cl1b_threshold: 0.58, cl1b_mode: 0 },
+    },
+  ],
+  // 33609: every value is a switch position, not a level. Thresholds count
+  // detents, so limit index 8 is +8 dBu (23 stops from +4 in half decibels)
+  // and compress index 5 is -10 dBu (16 stops from -20 in twos); gain index 2
+  // is 4 dB (11 stops from 0 in twos); ratio 0..4 is 1.5:1 to 6:1.
+  bridge: [
+    {
+      name: 'Bus',
+      description: 'Where the unit is happiest: the compressor alone at 2:1, a gentle threshold and the 400 ms recovery, with the limiter out of circuit.',
+      values: {},
+    },
+    {
+      name: 'Bus, both in',
+      description: 'The compressor doing the work with the limiter above it catching peaks. The two detectors listen at different points, so the make-up drives the limiter and leaves the compressor where it was.',
+      values: { neve_limit_in: 1, neve_limit_threshold: 12, neve_limit_recovery: 4, neve_compress_threshold: -12, neve_compress_ratio: 1, neve_compress_recovery: 4, neve_gain: 4 },
+    },
+    {
+      name: 'Firm',
+      description: 'Mine: a lower threshold and 4:1 for a hand that stays on the material, with the automatic recovery so it lets go by programme rather than by clock.',
+      values: { neve_compress_threshold: -16, neve_compress_ratio: 3, neve_compress_recovery: 5, neve_gain: 8 },
+    },
+    {
+      name: 'Limiter only',
+      description: 'The compressor out and the limiter in on its fast attack, which is the way the 2254 was used in front of a tape machine.',
+      values: { neve_compress_in: 0, neve_limit_in: 1, neve_limit_attack: 1, neve_limit_threshold: 10, neve_limit_recovery: 1 },
     },
   ],
 };

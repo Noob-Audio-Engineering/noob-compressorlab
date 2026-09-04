@@ -90,6 +90,7 @@
 //! [`Settings`] snapshot once per block; the engines smooth the continuous
 //! ones themselves.
 
+pub mod bridge;
 pub mod fet;
 pub mod opto;
 pub mod opto1b;
@@ -140,7 +141,15 @@ pub use source::{SOURCE_NAMES, Source};
 
 /// Labels of `model`, in parameter order. The first two keep their places
 /// so that a project saved before the lab grew still loads.
-pub const MODEL_NAMES: [&str; 6] = ["1176", "LA-2A", "LA-3A", "Distressor", "6176", "CL-1B"];
+pub const MODEL_NAMES: [&str; 7] = [
+    "1176",
+    "LA-2A",
+    "LA-3A",
+    "Distressor",
+    "6176",
+    "CL-1B",
+    "33609",
+];
 /// Points in the `transfer` stream (both engines draw the same grid).
 pub const TRANSFER_POINTS: usize = fet::TRANSFER_POINTS;
 /// Input range of the transfer curve, dBFS.
@@ -174,17 +183,20 @@ pub enum Model {
     Pre6176,
     /// The CL 1B ([`opto1b`]).
     Opto1b,
+    /// The Neve 33609 ([`bridge`]).
+    Bridge,
 }
 
 impl Model {
     /// Every model in parameter order.
-    pub const ALL: [Model; 6] = [
+    pub const ALL: [Model; 7] = [
         Model::Fet,
         Model::Opto,
         Model::Opto3,
         Model::Vca,
         Model::Pre6176,
         Model::Opto1b,
+        Model::Bridge,
     ];
 
     /// From the parameter value / label index (clamped).
@@ -240,6 +252,7 @@ pub struct Settings {
     /// The 610 section, which only the 6176 model uses.
     pub pre: pre::Settings,
     pub opto1b: opto1b::Settings,
+    pub bridge: bridge::Settings,
 }
 
 impl Default for Settings {
@@ -252,6 +265,7 @@ impl Default for Settings {
             vca: vca::Settings::default(),
             pre: pre::Settings::default(),
             opto1b: opto1b::Settings::default(),
+            bridge: bridge::Settings::default(),
         }
         .with_shared(Shared::default())
     }
@@ -285,6 +299,10 @@ impl Settings {
         self.opto1b.mix = s.mix;
         self.opto1b.sc_hpf = s.sc_hpf_hz;
         self.opto1b.bypass = s.bypass;
+        self.bridge.link = s.link;
+        self.bridge.mix = s.mix;
+        self.bridge.sc_hpf = s.sc_hpf_hz;
+        self.bridge.bypass = s.bypass;
         self
     }
 
@@ -333,6 +351,20 @@ pub struct ParamIx {
     pub cl1b_meter: usize,
     pub cl1b_bus: usize,
     pub cl1b_power: usize,
+    pub neve_model: usize,
+    pub neve_limit_in: usize,
+    pub neve_limit_threshold: usize,
+    pub neve_limit_attack: usize,
+    pub neve_limit_recovery: usize,
+    pub neve_compress_in: usize,
+    pub neve_compress_threshold: usize,
+    pub neve_compress_ratio: usize,
+    pub neve_compress_attack: usize,
+    pub neve_compress_recovery: usize,
+    pub neve_gain: usize,
+    pub neve_meter_select: usize,
+    pub neve_drive: usize,
+    pub neve_power: usize,
     pub dist_input: usize,
     pub dist_output: usize,
     pub dist_attack: usize,
@@ -685,6 +717,97 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
             .toggle()
             .not_automatable()
             .group("6176"),
+        // The 33609's controls are **all switches**, and AMS Neve make a
+        // feature of that: two units set to the same positions match. So
+        // every one of these is stepped, and the three with real units
+        // publish decibels straight from the engine's own law rather than
+        // a 0-to-1 travel. Those three laws are exactly linear, so a range
+        // and a step count reproduce the switch without the sampled table
+        // the CL-1B's tapered pots need.
+        ParamSpec::new("neve_model", "Unit")
+            .labels(bridge::MODEL_NAMES)
+            .default(bridge::MODEL_33609J as f32)
+            .not_automatable()
+            .group("33609"),
+        ParamSpec::new("neve_limit_in", "Limit In")
+            .toggle()
+            .default(0.0)
+            .group("33609"),
+        ParamSpec::new("neve_limit_threshold", "Limit Threshold")
+            .range(
+                bridge::engine::limit_threshold_dbu(0),
+                bridge::engine::limit_threshold_dbu(22),
+            )
+            .steps(23)
+            .default(bridge::engine::limit_threshold_dbu(8))
+            .unit("dBu")
+            .group("33609"),
+        ParamSpec::new("neve_limit_attack", "Limit Attack")
+            .labels(bridge::LIMIT_ATTACK_NAMES)
+            .default(0.0)
+            .group("33609"),
+        ParamSpec::new("neve_limit_recovery", "Limit Recovery")
+            .labels(bridge::LIMIT_RECOVERY_NAMES)
+            .default(1.0)
+            .group("33609"),
+        ParamSpec::new("neve_compress_in", "Compress In")
+            .toggle()
+            .default(1.0)
+            .group("33609"),
+        ParamSpec::new("neve_compress_threshold", "Compress Threshold")
+            .range(
+                bridge::engine::compress_threshold_dbu(0),
+                bridge::engine::compress_threshold_dbu(15),
+            )
+            .steps(16)
+            .default(bridge::engine::compress_threshold_dbu(5))
+            .unit("dBu")
+            .group("33609"),
+        // The printed labels, two of which the manufacturer's own
+        // calibration table contradicts. The engine works in
+        // `bridge::RATIO_TRUE` and the panel prints these, which is what
+        // the hardware does.
+        ParamSpec::new("neve_compress_ratio", "Ratio")
+            .labels(bridge::RATIO_NAMES)
+            .default(1.0)
+            .group("33609"),
+        // The /N's addition. The /J and the 2254 have a fixed compressor
+        // attack and no control for it, so the engine ignores this unless
+        // the unit is the /N.
+        ParamSpec::new("neve_compress_attack", "Compress Attack")
+            .labels(bridge::COMPRESS_ATTACK_NAMES)
+            .default(0.0)
+            .group("33609"),
+        ParamSpec::new("neve_compress_recovery", "Compress Recovery")
+            .labels(bridge::COMPRESS_RECOVERY_NAMES)
+            .default(1.0)
+            .group("33609"),
+        ParamSpec::new("neve_gain", "Make-up Gain")
+            .range(bridge::engine::gain_db(0), bridge::engine::gain_db(10))
+            .steps(11)
+            .default(bridge::engine::gain_db(0))
+            .unit("dB")
+            .group("33609"),
+        // The 2254/E's meter switch. The 33609 has two meters and no room
+        // for it, so the engine reads it only for the 2254.
+        ParamSpec::new("neve_meter_select", "Meter")
+            .labels(bridge::METER_NAMES)
+            .default(1.0)
+            .not_automatable()
+            .group("33609"),
+        // Not on any of the three. The bridge's distortion is set by the
+        // voltage across it, and the hardware never lets the user raise
+        // that, so this is the one way to hear the gain element itself.
+        ParamSpec::new("neve_drive", "Drive")
+            .range(0.0, 100.0)
+            .default(0.0)
+            .unit("%")
+            .group("33609"),
+        ParamSpec::new("neve_power", "Power")
+            .toggle()
+            .default(1.0)
+            .not_automatable()
+            .group("33609"),
         ParamSpec::new("link", "Stereo Link")
             .toggle()
             .default(1.0)
@@ -785,6 +908,20 @@ pub fn param_index(s: &NoobVstWebguiFramework) -> ParamIx {
         cl1b_meter: ix("cl1b_meter"),
         cl1b_bus: ix("cl1b_bus"),
         cl1b_power: ix("cl1b_power"),
+        neve_model: ix("neve_model"),
+        neve_limit_in: ix("neve_limit_in"),
+        neve_limit_threshold: ix("neve_limit_threshold"),
+        neve_limit_attack: ix("neve_limit_attack"),
+        neve_limit_recovery: ix("neve_limit_recovery"),
+        neve_compress_in: ix("neve_compress_in"),
+        neve_compress_threshold: ix("neve_compress_threshold"),
+        neve_compress_ratio: ix("neve_compress_ratio"),
+        neve_compress_attack: ix("neve_compress_attack"),
+        neve_compress_recovery: ix("neve_compress_recovery"),
+        neve_gain: ix("neve_gain"),
+        neve_meter_select: ix("neve_meter_select"),
+        neve_drive: ix("neve_drive"),
+        neve_power: ix("neve_power"),
         dist_input: ix("dist_input"),
         dist_output: ix("dist_output"),
         dist_attack: ix("dist_attack"),
@@ -875,6 +1012,33 @@ pub fn read_settings(audio: &AudioHandle, ix: &ParamIx) -> Settings {
             power: audio.param(ix.cl1b_power) >= 0.5,
             ..opto1b::Settings::default()
         },
+        // Every switch here is read as an **index**, from the normalised
+        // value rather than the plain one. The three with real units are
+        // stepped linearly, so `norm * (steps - 1)` is the switch position
+        // exactly, and the engine's own laws turn it back into decibels.
+        // Going the other way, through the plain value, would mean the
+        // decibel law existed twice.
+        bridge: bridge::Settings {
+            model: audio.param(ix.neve_model).round().clamp(0.0, 2.0) as usize,
+            limit_in: audio.param(ix.neve_limit_in) >= 0.5,
+            limit_threshold: (audio.param_norm(ix.neve_limit_threshold) * 22.0).round() as usize,
+            limit_attack: audio.param(ix.neve_limit_attack).round().clamp(0.0, 1.0) as usize,
+            limit_recovery: audio.param(ix.neve_limit_recovery).round().clamp(0.0, 5.0) as usize,
+            compress_in: audio.param(ix.neve_compress_in) >= 0.5,
+            compress_threshold: (audio.param_norm(ix.neve_compress_threshold) * 15.0).round()
+                as usize,
+            compress_ratio: audio.param(ix.neve_compress_ratio).round().clamp(0.0, 4.0) as usize,
+            compress_attack: audio.param(ix.neve_compress_attack).round().clamp(0.0, 1.0) as usize,
+            compress_recovery: audio
+                .param(ix.neve_compress_recovery)
+                .round()
+                .clamp(0.0, 5.0) as usize,
+            gain: (audio.param_norm(ix.neve_gain) * 10.0).round() as usize,
+            meter_select: audio.param(ix.neve_meter_select).round().clamp(0.0, 2.0) as usize,
+            drive: (audio.param(ix.neve_drive) / 100.0).clamp(0.0, 1.0),
+            power: audio.param(ix.neve_power) >= 0.5,
+            ..bridge::Settings::default()
+        },
         vca: vca::Settings {
             input: audio.param(ix.dist_input),
             output: audio.param(ix.dist_output),
@@ -926,6 +1090,7 @@ pub struct Processor {
     vca: vca::Compressor,
     pre: pre::Stage,
     opto1b: opto1b::Compressor,
+    bridge: bridge::Compressor,
     /// The engine fading out (only meaningful while `xfade > 0`).
     outgoing: Model,
     /// Samples of crossfade left.
@@ -959,6 +1124,7 @@ impl Processor {
             vca: vca::Compressor::new(sr),
             pre: pre::Stage::new(sr),
             opto1b: opto1b::Compressor::new(sr),
+            bridge: bridge::Compressor::new(sr),
             outgoing: Model::Fet,
             xfade: 0,
             xfade_len: (XFADE_SECONDS * sr).round() as usize,
@@ -988,6 +1154,7 @@ impl Processor {
         self.vca.set_sample_rate(sr);
         self.pre.set_sample_rate(sr);
         self.opto1b.set_sample_rate(sr);
+        self.bridge.set_sample_rate(sr);
         self.first = true;
         self.reset();
     }
@@ -1030,6 +1197,7 @@ impl Processor {
             Model::Vca => self.vca.latency(),
             Model::Opto3 => self.opto3.latency(),
             Model::Opto1b => self.opto1b.latency(),
+            Model::Bridge => self.bridge.latency(),
             Model::Opto => 0,
         }
     }
@@ -1075,6 +1243,7 @@ impl Processor {
                     self.fet.reset();
                 }
                 Model::Opto1b => self.opto1b.reset(),
+                Model::Bridge => self.bridge.reset(),
             }
             changed = true;
         }
@@ -1084,6 +1253,7 @@ impl Processor {
         changed |= self.vca.configure(&s.vca);
         changed |= self.pre.configure(&s.pre);
         changed |= self.opto1b.configure(s.opto1b);
+        changed |= self.bridge.configure(s.bridge);
         self.settings = *s;
         self.first = false;
         if changed {
@@ -1106,6 +1276,7 @@ impl Processor {
                 self.fet.process(l, r);
             }
             Model::Opto1b => self.opto1b.process_block(l, r),
+            Model::Bridge => self.bridge.process_block(l, r),
         }
     }
 
@@ -1172,6 +1343,11 @@ impl Processor {
             }
             Model::Opto1b => {
                 let f = self.opto1b.meter_frame();
+                self.gr_db = -f[4];
+                f[5]
+            }
+            Model::Bridge => {
+                let f = self.bridge.meter_frame();
                 self.gr_db = -f[4];
                 f[5]
             }
@@ -1272,6 +1448,9 @@ impl Processor {
             Model::Pre6176 => self.transfer_6176(out),
             Model::Opto1b => self
                 .opto1b
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
+            Model::Bridge => self
+                .bridge
                 .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
         }
     }

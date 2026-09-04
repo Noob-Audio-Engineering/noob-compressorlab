@@ -78,6 +78,7 @@ export const MODELS = [
   { key: 'vca', label: 'Distressor', name: 'NOOB DISTRESSOR', sub: 'feedback VCA compressor', family: 'vca', blurb: 'Eight ratios from gentle to Nuke, two distortion modes, and a British setting that borrows the 1176 trick.', owns: ['dist_'], meter: null, initPreset: '5 5 5 5' },
   { key: 'pre6176', label: '6176', name: 'NOOB 6176', sub: 'tube preamp into the FET limiter', family: 'strip', blurb: 'A 610 tube preamp in front of the 1176, so the colour arrives before the compression does.', owns: ['pre_', 'fet_'], meter: 'pre_meter', initPreset: 'Unity' },
   { key: 'cl1b', label: 'CL-1B', name: 'NOOB CL 1B', sub: 'optical tube compressor', family: 'optical', blurb: 'The vocal one. Slow optical levelling with fixed or manual timing, and a ratio that rises as you push it.', owns: ['cl1b_'], meter: 'cl1b_meter', initPreset: 'Vocal' },
+  { key: 'bridge', label: '33609', name: 'NOOB 33609', sub: 'diode-bridge limiter/compressor', family: 'bridge', blurb: 'A limiter and a compressor in series, each with its own detector. Every control is stepped, and the printed ratios are approximations.', owns: ['neve_'], meter: 'neve_meter_select', initPreset: 'Bus' },
 ];
 
 /**
@@ -91,6 +92,7 @@ export const FAMILIES = [
   { id: 'optical', label: 'Optical', note: 'A lamp and a photocell: slow, programme-dependent, and forgiving.' },
   { id: 'vca', label: 'VCA', note: 'A voltage-controlled amplifier: whatever ratio and timing you ask for.' },
   { id: 'strip', label: 'Channel strip', note: 'A preamp and a compressor in one box, in that order.' },
+  { id: 'bridge', label: 'Diode bridge', note: 'Four diodes as the gain element: quiet about it until pushed, then unmistakable.' },
 ];
 
 /** Smallest window the page lays out well in, `[width, height]` CSS pixels; `src/plugin.rs` clamps to the same. */

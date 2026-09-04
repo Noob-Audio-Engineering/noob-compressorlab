@@ -29,7 +29,7 @@
 //! misses, the miss is reported with its number; the tolerance is never
 //! widened to make a row pass, and no row is dropped for failing.
 
-use noob_compressorlab::dsp::{fet, opto, opto1b, opto3, pre, vca};
+use noob_compressorlab::dsp::{bridge, fet, opto, opto1b, opto3, pre, vca};
 use std::f32::consts::PI;
 use std::fmt::Write as _;
 
@@ -2026,6 +2026,355 @@ fn bench_opto1b() -> Section {
     }
 }
 
+// ---------------------------------------------------------------------------
+// The Neve 33609
+// ---------------------------------------------------------------------------
+
+/// A sine amplitude at `x` dBu, on this family's calibration.
+fn neve_dbu(x: f32) -> f32 {
+    bridge::engine::dbu_amp(x)
+}
+
+/// Settle a 1 kHz sine at `amp` for `secs` and return the output peak.
+fn neve_settle(c: &mut bridge::Compressor, amp: f32, secs: f32) -> f32 {
+    let mut sine = Sine::new(1000.0, SR);
+    let mut l = vec![0.0f32; BLOCK];
+    let mut r = vec![0.0f32; BLOCK];
+    let blocks = (secs * SR / BLOCK as f32) as usize;
+    let mut peak = 0.0f32;
+    for b in 0..blocks {
+        sine.fill(&mut l, amp);
+        r.copy_from_slice(&l);
+        c.process_block(&mut l, &mut r);
+        if b + 4 >= blocks {
+            for v in l.iter() {
+                peak = peak.max(v.abs());
+            }
+        }
+    }
+    peak
+}
+
+/// Output level in dBu for a 1 kHz sine at `in_dbu`.
+fn neve_out_dbu(s: bridge::Settings, in_dbu: f32, secs: f32) -> f32 {
+    let mut c = bridge::Compressor::new(SR);
+    c.configure(s);
+    bridge::engine::amp_dbu(neve_settle(&mut c, neve_dbu(in_dbu), secs))
+}
+
+fn bench_bridge() -> Section {
+    let mut rows = Vec::new();
+    let base = bridge::Settings {
+        compress_in: false,
+        limit_in: false,
+        ..bridge::Settings::default()
+    };
+
+    // The open bridge's own attenuation, which three resistor values and a
+    // level annotation on the same drawing agree on.
+    let net = bridge::Network::default();
+    rows.push(Row::within(
+        "open-bridge attenuation",
+        25.0,
+        0.2,
+        "dB",
+        -20.0 * net.open_gain().log10(),
+        "research/Neve-33609.md §12 test 3, from EX11475's −6 and −31 dBu rail marks",
+    ));
+
+    rows.push(Row::within(
+        "unity gain, both sections out",
+        0.0,
+        0.5,
+        "dBu",
+        neve_out_dbu(base, 0.0, 0.3),
+        "research/Neve-33609.md §12 test 2, from the block diagram's annotated chain",
+    ));
+
+    // The calibration table, with the manufacturer's own per-position
+    // tolerances. This is the best anchor any model in the lab has.
+    const RATIO_TABLE: [(usize, f32, f32); 5] = [
+        (0, 6.5, 1.0),
+        (1, 5.0, 1.0),
+        (2, 3.5, 1.0),
+        (3, 2.5, 0.5),
+        (4, 1.5, 0.5),
+    ];
+    for (pos, want, tol) in RATIO_TABLE {
+        let s = bridge::Settings {
+            compress_in: true,
+            compress_ratio: pos,
+            compress_threshold: 0,
+            compress_recovery: 0,
+            ..base
+        };
+        let change = neve_out_dbu(s, 10.0, 1.0) - neve_out_dbu(s, 0.0, 1.0);
+        rows.push(
+            Row::within(
+                &format!(
+                    "{} position, output change for a 10 dB step",
+                    bridge::RATIO_NAMES[pos]
+                ),
+                want,
+                tol,
+                "dB",
+                change,
+                "research/Neve-33609.md §12 test 4, from the 33609/J handbook's compress ratio table",
+            )
+            .because(match pos {
+                2 => "the panel prints 3:1; the handbook's own table implies 2.86:1, and the model \
+                      follows the table",
+                4 => "the panel prints 6:1; the table implies 6.67:1",
+                _ => "",
+            }),
+        );
+    }
+
+    let lim = bridge::Settings {
+        limit_in: true,
+        limit_threshold: 8,
+        limit_recovery: 0,
+        ..base
+    };
+    rows.push(Row::within(
+        "limit ratio, +10 to +20 dBu",
+        0.1,
+        0.1,
+        "dB out",
+        neve_out_dbu(lim, 20.0, 1.0) - neve_out_dbu(lim, 10.0, 1.0),
+        "research/Neve-33609.md §12 test 7, from the handbook's Limit Ratio entry",
+    ));
+    rows.push(Row::within(
+        "limit threshold +8 dBu holding a +20 dBu tone",
+        8.0,
+        0.5,
+        "dBu",
+        neve_out_dbu(lim, 20.0, 1.0),
+        "research/Neve-33609.md §12 test 8, from the handbook's calibration procedure",
+    ));
+
+    // The two published control voltages, the only statement anywhere of
+    // what this family's sidechains produce.
+    let mut c = bridge::Compressor::new(SR);
+    c.configure(bridge::Settings {
+        model: bridge::MODEL_2254E,
+        ..lim
+    });
+    neve_settle(&mut c, neve_dbu(20.0), 1.0);
+    rows.push(Row::within(
+        "2254/E control voltage, +20 dBm limited to +8 dBm",
+        3.5,
+        0.3,
+        "V",
+        c.control_v(0),
+        "research/Neve-33609.md §12 test 11, from level diagram EB/20134",
+    ));
+
+    // The behaviour the whole model exists for.
+    let two = |gain: usize| bridge::Settings {
+        compress_in: true,
+        limit_in: true,
+        compress_ratio: 4,
+        compress_threshold: 12,
+        compress_recovery: 0,
+        limit_threshold: 8,
+        limit_recovery: 0,
+        gain,
+        ..base
+    };
+    let mut lo = bridge::Compressor::new(SR);
+    lo.configure(two(0));
+    neve_settle(&mut lo, neve_dbu(20.0), 1.5);
+    let mut hi = bridge::Compressor::new(SR);
+    hi.configure(two(10));
+    neve_settle(&mut hi, neve_dbu(20.0), 1.5);
+    rows.push(Row::ranged(
+        "limiter reduction added by 20 dB of make-up",
+        15.0,
+        60.0,
+        "dB",
+        hi.limit_gr_db(0) - lo.limit_gr_db(0),
+        "research/Neve-33609.md §12 test 12, from AMS Neve's tap-point description",
+    ));
+
+    let comp_only = |gain: usize| bridge::Settings {
+        compress_in: true,
+        compress_ratio: 4,
+        compress_threshold: 0,
+        compress_recovery: 0,
+        gain,
+        ..base
+    };
+    let mut a = bridge::Compressor::new(SR);
+    a.configure(comp_only(0));
+    neve_settle(&mut a, neve_dbu(0.0), 1.0);
+    let mut b = bridge::Compressor::new(SR);
+    b.configure(comp_only(10));
+    neve_settle(&mut b, neve_dbu(0.0), 1.0);
+    rows.push(Row::within(
+        "compressor reduction moved by 20 dB of make-up",
+        0.0,
+        0.5,
+        "dB",
+        b.compress_gr_db(0) - a.compress_gr_db(0),
+        "research/Neve-33609.md §12 test 12, from the handbook's tap-point description",
+    ));
+
+    // Distortion: two published pairs, both maxima.
+    let dist = |s: bridge::Settings, level: f32, warm: f32| {
+        let mut c = bridge::Compressor::new(SR);
+        c.configure(s);
+        let mut sine = Sine::new(1000.0, SR);
+        let mut l = vec![0.0f32; BLOCK];
+        let mut r = vec![0.0f32; BLOCK];
+        let blocks = ((warm + 0.2) * SR / BLOCK as f32) as usize;
+        let mut tail = Vec::new();
+        for bl in 0..blocks {
+            sine.fill(&mut l, neve_dbu(level));
+            r.copy_from_slice(&l);
+            c.process_block(&mut l, &mut r);
+            if bl + (0.2 * SR) as usize / BLOCK >= blocks {
+                tail.extend_from_slice(&l);
+            }
+        }
+        // A whole number of 1 kHz cycles, or the fundamental leaks into
+        // the harmonic bins and the reading becomes a measurement of the
+        // window rather than of the unit.
+        let cycle = (SR / 1000.0) as usize;
+        tail.truncate(tail.len() / cycle * cycle);
+        thd_pct(&tail, 1000.0, SR)
+    };
+    let e2254 = bridge::Settings {
+        model: bridge::MODEL_2254E,
+        compress_in: true,
+        compress_ratio: 1,
+        compress_threshold: 14,
+        compress_recovery: 2,
+        ..base
+    };
+    rows.push(Row::ranged(
+        "2254 distortion at 0 dBu, 800 ms recovery",
+        0.0,
+        0.03,
+        "%",
+        dist(e2254, 0.0, 1.0),
+        "research/Neve-33609.md §12 test 17, from the AMS Neve 2254/R specification",
+    ));
+    rows.push(Row::ranged(
+        "2254 distortion at +15 dBu, 800 ms recovery",
+        0.0,
+        0.2,
+        "%",
+        dist(e2254, 15.0, 1.0),
+        "research/Neve-33609.md §12 test 17, from the AMS Neve 2254/R specification",
+    ));
+    rows.push(Row::ranged(
+        "33609 distortion through the unit at +9 dBu",
+        0.0,
+        0.075,
+        "%",
+        dist(base, 9.0, 0.5),
+        "research/Neve-33609.md §12 test 18a, from the handbook's Distortion entry",
+    ));
+
+    // Timings, under the handbook's own definitions.
+    for (pos, want) in [
+        (bridge::LIMIT_ATTACK_SLOW, 4.0f32),
+        (bridge::LIMIT_ATTACK_FAST, 2.0),
+    ] {
+        rows.push(Row::within(
+            &format!("{} limit attack, settling", bridge::LIMIT_ATTACK_NAMES[pos]),
+            want,
+            1.0,
+            "ms",
+            neve_attack_ms(pos),
+            "research/Neve-33609.md §12 test 20, from the handbook's Attack Time entry",
+        ));
+    }
+
+    rows.push(Row::unanchored(
+        "the bridge's own distortion against gain reduction",
+        "falls monotonically as the control current rises".into(),
+        "no manufacturer publishes a spectrum for these units, so this is the tanh law's own \
+         derived behaviour rather than a measurement; what rises with depth in the whole unit is \
+         sidechain ripple, which is why test 17 varies level instead",
+    ));
+    rows.push(Row::unanchored(
+        "the automatic recovery positions",
+        "kept at the switch drawings' 100 ms/2 s and 50 ms/5 s".into(),
+        "known miss, recorded in README: the handbook's Limit Recovery entry lists 1500 ms and \
+         3000 ms for the same two positions, and a 2 s capacitor cannot settle in 1.5 s, so A1 \
+         measures 2324 ms against a 750-to-2250 ms window",
+    ));
+    rows.push(Row::unanchored(
+        "attack against step size",
+        "settling time rises with the step, not falls".into(),
+        "known miss, recorded in README: the dossier derives the opposite direction from the same \
+         emitter follower, and an exponential closing a fixed 1 dB window cannot fall; the \
+         published 10 dB point is still met",
+    ));
+    rows.push(Row::unanchored(
+        "the 10640 amplifier in isolation",
+        "not modelled as a separate block".into(),
+        "the handbook publishes its gain, clip point and three distortion figures, and this model \
+         carries the amplifier only as the make-up gain in the chain, so there is no sub-block to \
+         assert them on",
+    ));
+    rows.push(Row::unanchored(
+        "noise floor",
+        "no noise source is modelled".into(),
+        "the handbook publishes −75 dBu bypassed and −55 dBu with full make-up; this model is \
+         silent into silence, so it passes both vacuously rather than on merit",
+    ));
+
+    Section {
+        model: "33609",
+        unit: "Neve 2254 and 33609",
+        dossier: "research/Neve-33609.md",
+        rows,
+    }
+}
+
+/// Limit attack settling time in ms, by the handbook's definition: a
+/// +10 dBu tone stepped up 10 dB, timed until the output is back within
+/// 1 dB of where it started.
+fn neve_attack_ms(attack: usize) -> f32 {
+    const N: usize = 8;
+    let mut c = bridge::Compressor::new(SR);
+    c.configure(bridge::Settings {
+        limit_in: true,
+        limit_attack: attack,
+        limit_threshold: 8,
+        limit_recovery: 0,
+        compress_in: false,
+        ..bridge::Settings::default()
+    });
+    let mut sine = Sine::new(1000.0, SR);
+    let mut l = vec![0.0f32; N];
+    let mut r = vec![0.0f32; N];
+    let warm = (0.8 * SR / N as f32) as usize;
+    let watch = (0.4 * SR / N as f32) as usize;
+    let mut want = 0.0f32;
+    for b in 0..(warm + watch) {
+        let amp = if b < warm {
+            neve_dbu(10.0)
+        } else {
+            neve_dbu(20.0)
+        };
+        sine.fill(&mut l, amp);
+        r.copy_from_slice(&l);
+        c.process_block(&mut l, &mut r);
+        let gr = c.gain_reduction_db(0);
+        if b + 1 == warm {
+            want = gr + 9.0;
+        }
+        if b >= warm && gr >= want {
+            return (b - warm + 1) as f32 * N as f32 / SR * 1e3;
+        }
+    }
+    f32::INFINITY
+}
+
 /// A sine amplitude at `x` dBu, on the CL 1B's own calibration where 0 VU
 /// is +4 dBu.
 fn opto1b_dbu(x: f32) -> f32 {
@@ -2297,6 +2646,7 @@ fn main() {
         bench_vca(),
         bench_pre(),
         bench_opto1b(),
+        bench_bridge(),
     ];
 
     for s in &sections {

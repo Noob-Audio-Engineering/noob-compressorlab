@@ -1429,7 +1429,7 @@ columns are there so a reviewer can see at a glance what is shared and what is n
 | `R_RATIO_MAX` | — | — | **10 kΩ** | P2, the Ratio pot [9] — **new** |
 | `R_DARK` | 2 MΩ | 2 MΩ | 2 MΩ | shared |
 | `R_GRE_MIN` | 500 Ω | 400 Ω | **200 Ω** | **estimate**: no maximum reduction is published (6.3), so this is tuned against test 6's shape, not against a figure |
-| `CELL_GAMMA` | 0.8 | 0.8 | 0.8 | **shared**; CdS gamma 0.6-0.9 [59] [60] [62] |
+| `CELL_GAMMA` | 0.7 | 0.7 | 0.7 | CdS gamma 0.6-0.9 [59] [60] [62], and 0.7 is the LA-2A design table's pick inside that range. This row read 0.8 and **shared** until 2026-09-03: the implementation held 0.8 with nothing written behind it, and "shared" cited the code rather than a source. No T4 measurement exists either way |
 | `EL_B` | 5.0 | 5.0 | **not used** | the GRE's emitter is undocumented (4.2) |
 | `tau_f0`, `tau_r1`, `tau_t0`, `k_m`, `capture`, `k_gen` | the T4's | the T4's | **not used** | the timing is electronic (4.3) |
 | `TAU_CELL` | — | — | **0.2 ms** | **estimate**, chosen well under the 0.5 ms fastest published attack — **new** |

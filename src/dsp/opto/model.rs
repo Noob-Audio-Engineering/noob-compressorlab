@@ -43,7 +43,7 @@ use super::filters::{Biquad, OnePole, Shelf};
 /// it, which are this machine's and not the part's.
 pub use noob_electrical_components::photocell::{
     CELL_GAMMA, CELL_SPEEDS, Cell, CellParams, EL_B, K_G, LA2_FAST_SHARE, LA2_FAST_SPEED, R_DARK,
-    R_MIN, cell_params_for, distortion, resistance_for,
+    R_MIN, T4Variant, cell_params_for, distortion, resistance_for,
 };
 
 /// The divider's series resistance, `R6 + R7` of the schematic (ohms).
@@ -393,7 +393,7 @@ impl Compressor {
                 sr,
             );
         }
-        let params = cell_params_for(s.cell);
+        let params = cell_params_for(T4Variant::from_index(s.cell));
         for cell in &mut self.cells {
             cell.set_params(params);
         }
@@ -568,7 +568,7 @@ impl Compressor {
     /// steady-state loop (used for the transfer curve and by the tests).
     pub fn static_gr_db(&self, amp: f32) -> f32 {
         let shaping = self.ch[0].sidechain_gain_1k(self.sr);
-        let params = cell_params_for(self.settings.cell);
+        let params = cell_params_for(T4Variant::from_index(self.settings.cell));
         let mut n = 0.0f32;
         for _ in 0..80 {
             let a = attenuation_for(resistance_for(n));

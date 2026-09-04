@@ -1196,7 +1196,7 @@ values are given alongside so a reviewer can see at a glance what actually chang
 | `R_DARK` | 2 MΩ | 2 MΩ | same cell |
 | `R_MIN` | 500 Ω | **400 Ω** | gives the specified 40 dB max GR (derived, 3.3) |
 | `EL_B` | 5.0 | 5.0 | same panel; Alfrey-Taylor [40] |
-| `CELL_GAMMA` | 0.8 | 0.8 | same cell; CdS gamma 0.6-0.9 [38] [39] |
+| `CELL_GAMMA` | 0.7 | 0.7 | CdS gamma 0.6-0.9 [38] [39], and 0.7 is the LA-2A design table's pick inside that range. This row read 0.8 and "same cell" until 2026-09-03, which cited the implementation rather than a source; the implementation had no justification recorded for 0.8. No T4 measurement exists either way |
 | `tau_u` (panel smoothing) | 1.0 ms | **0.25 ms** | low-impedance driver behind a transformer (3.5) — estimate |
 | `tau_f0` (cell attack, dim light) | 40 ms | 40 ms | same cell; the speed comes from the drive |
 | `l_a` (light at which attack halves) | 0.05 | 0.05 | same cell |

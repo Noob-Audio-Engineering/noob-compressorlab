@@ -1,0 +1,576 @@
+/*
+ * The Neve 33609/N's look. Every colour here was sampled from
+ * `ref/neve-33609n-front.jpg`, and every position from the same file; see
+ * the header of `Faceplate.vue` for what was measured and for the one place
+ * my measurement disagrees with the research's colour table.
+ *
+ * The palette is small: a slate blue-grey face, white silkscreen, blue knob
+ * caps on grey knurled skirts, black meters with white scales, and red for
+ * the maker's bolt and the mains lens. Nothing here belongs in the
+ * framework, which holds no colours.
+ */
+
+/*
+ * The palette is set on the faceplate as well as on the page, because the
+ * browse view mounts this same `Faceplate.vue` as a card preview outside any
+ * `.lab-model--bridge` wrapper. Defining the colours only on the page class
+ * left the preview's panel painting black while its knobs and silkscreen
+ * drew normally.
+ */
+.lab-model--bridge,
+.faceneve {
+  --neve-panel: #40515b;
+  --neve-panel-lit: #4c5e6a;
+  --neve-rule: #d8e0e4;
+  --neve-print: #f2f6f7;
+  --neve-cap: #0182af;
+  --neve-knurl: #6c7679;
+  --neve-knurl-lit: #a8b0b1;
+  --neve-meter-face: #14181a;
+  --neve-red: #d11428;
+  --neve-lamp: #9b010b;
+  --neve-ear: #3a4a53;
+
+  --noob-vst-webgui-framework-accent: var(--neve-cap);
+  background: #10171b;
+}
+
+/* ---------------------------------------------------------------- plate -- */
+
+.faceneve {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  aspect-ratio: 19 / 3.5;
+  filter: drop-shadow(0 10px 26px rgb(0 0 0 / 0.55));
+}
+
+.faceneve__ear {
+  position: relative;
+  flex: 0 0 2.9%;
+  background: linear-gradient(180deg, #46565f, var(--neve-ear) 55%, #33424a);
+  border-radius: 3px 0 0 3px;
+}
+.faceneve__ear.right {
+  border-radius: 0 3px 3px 0;
+}
+.faceneve__ear .slot {
+  position: absolute;
+  left: 50%;
+  width: 52%;
+  height: 5.5%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #10171b;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.8);
+}
+.faceneve__ear .slot:nth-child(1) { top: 11%; }
+.faceneve__ear .slot:nth-child(2) { bottom: 11%; }
+
+/*
+ * The container is the plate, not the whole rack unit, so one cqw is one
+ * per cent of the *panel*. Every size in this file was measured as a
+ * fraction of the panel in `ref/neve-33609n-front.jpg`, and with the
+ * container set here those fractions go in unconverted. Putting it on
+ * `.faceneve` instead makes every one of them 6 % too large, because the
+ * two rack ears take 5.8 % of the width between them.
+ */
+.faceneve__plate {
+  position: relative;
+  flex: 1 1 auto;
+  container-type: inline-size;
+}
+
+.faceneve__panel {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 160% at 62% 40%, rgb(255 255 255 / 0.10), transparent 62%),
+    linear-gradient(96deg, var(--neve-panel) 0%, var(--neve-panel-lit) 55%, var(--neve-panel) 100%);
+  overflow: hidden;
+}
+
+.faceneve .abs {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.faceneve__block {
+  position: absolute;
+  transform: none;
+  border: 0.14cqw solid var(--neve-rule);
+  border-radius: 0.5cqw;
+  pointer-events: none;
+}
+
+.screwneve {
+  width: 0.7cqw;
+  height: 0.7cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #97a1a5, #55606a 62%, #2d363c);
+  box-shadow: inset 0 0 0 0.08cqw rgb(0 0 0 / 0.4);
+}
+
+/* --------------------------------------------------------------- print -- */
+
+.faceneve__cap,
+.faceneve__title,
+.faceneve__ident,
+.nevelev__leg {
+  color: var(--neve-print);
+  font-family: 'Inter', system-ui, sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 0.05cqw 0.1cqw rgb(0 0 0 / 0.5);
+}
+
+.faceneve__cap {
+  font-size: 0.64cqw;
+  font-weight: 700;
+}
+
+.faceneve__title {
+  font-size: 0.81cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+/*
+ * The three ident lines measure 13 px of cap height on a 1942 px panel and
+ * their baselines are 0.080 of the panel height apart, which at this
+ * panel's 19:3.5 is 1.47cqw between line boxes.
+ */
+.faceneve__ident {
+  display: flex;
+  flex-direction: column;
+  gap: 0.47cqw;
+  font-size: 0.875cqw;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: left;
+}
+
+/*
+ * Left-anchored, not centred: the ident is printed against the meter
+ * block's left rule. `.faceneve .abs` sets a centring transform and outranks
+ * a single class, so this has to carry the same weight to win, exactly as
+ * the meter boxes below do.
+ */
+.faceneve .abs.faceneve__ident {
+  transform: translate(0, -50%);
+}
+
+.faceneve__mark {
+  display: flex;
+  align-items: center;
+  gap: 0.5cqw;
+}
+/*
+ * The maker's mark measures 0.101 of the panel across and 0.123 of it down,
+ * the bolt taking the first 0.028 of the width. That is a much larger mark
+ * than it looks in a full-panel view, so the sizes here are the measured
+ * ones rather than the ones that felt right.
+ */
+.faceneve__bolt {
+  color: var(--neve-red);
+  font-size: 2.6cqw;
+  font-weight: 900;
+  font-style: italic;
+  line-height: 1;
+  transform: skewX(-12deg);
+}
+.faceneve__word {
+  color: #fff;
+  font-size: 2.6cqw;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------- knob -- */
+
+.neveknob {
+  position: relative;
+}
+.neveknob__dial {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.neveknob__dial:focus-visible {
+  outline: 0.15cqw solid var(--neve-cap);
+  outline-offset: 0.2cqw;
+  border-radius: 50%;
+}
+.neveknob__marks line {
+  stroke: var(--neve-print);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+.neveknob__marks line.long {
+  stroke-width: 1.5;
+}
+/*
+ * 9.5 of the 100-unit box, which at this knob's 7.4cqw is 0.70cqw: the
+ * scale digits measure 10 px of the 1942 px panel in the photograph, so
+ * 0.72cqw of cap height, and they are set a shade larger than the captions
+ * above them rather than smaller.
+ */
+.neveknob__marks text {
+  fill: var(--neve-print);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.neveknob__cap {
+  fill: var(--neve-cap);
+}
+.neveknob__skirtrim {
+  fill: none;
+  stroke: rgb(0 0 0 / 0.28);
+  stroke-width: 0.8;
+}
+.neveknob__knurl line {
+  stroke: rgb(0 0 0 / 0.30);
+  stroke-width: 0.9;
+}
+.neveknob__caprim {
+  fill: none;
+  stroke: rgb(0 0 0 / 0.35);
+  stroke-width: 1;
+}
+.neveknob__index {
+  fill: #f4f8f9;
+}
+.neveknob__value {
+  position: absolute;
+  left: 50%;
+  top: -1.6cqw;
+  transform: translate(-50%, -100%);
+  padding: 0.2cqw 0.5cqw;
+  border-radius: 0.3cqw;
+  background: rgb(10 14 16 / 0.92);
+  color: var(--neve-print);
+  font-size: 0.72cqw;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- lever -- */
+
+.nevelev,
+.faceneve__ext {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35cqw;
+}
+
+/* "bypass" measures 11 px of cap on a 1942 px panel, "in" 9 px. */
+.nevelev__leg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+  font-size: 0.76cqw;
+  font-weight: 700;
+}
+
+/* The lamps sit 0.016 of the panel to the right of the lever's centre. */
+.nevelev__row {
+  display: flex;
+  align-items: center;
+  gap: 0.76cqw;
+}
+
+.nevelev__body {
+  position: relative;
+  width: 1.18cqw;
+  height: 2.47cqw;
+  padding: 0;
+  border: 0;
+  border-radius: 0.45cqw;
+  background: linear-gradient(180deg, #1b2226, #0b1013);
+  box-shadow: inset 0 0 0 0.1cqw rgb(0 0 0 / 0.6), 0 0.1cqw 0.2cqw rgb(0 0 0 / 0.5);
+  cursor: pointer;
+}
+.nevelev__body:focus-visible {
+  outline: 0.15cqw solid var(--neve-cap);
+  outline-offset: 0.2cqw;
+}
+
+/*
+ * The bat pivots at its bushing in the middle of the body and its pale tip
+ * swings to whichever end is selected, which is what the photograph shows:
+ * both centre-block levers are down, each with its white paddle at the
+ * bottom of a chrome shaft that runs up to a black bush. My first pass
+ * pivoted at the bottom and put the paddle on top, so the tip pointed up in
+ * both positions.
+ */
+.nevelev__bat {
+  position: absolute;
+  left: 50%;
+  width: 0.52cqw;
+  height: 1.02cqw;
+  border-radius: 0.1cqw;
+  background: linear-gradient(90deg, #636e73, #cdd5d7 45%, #66727a);
+  transition: top 90ms ease, bottom 90ms ease;
+}
+.nevelev__bat.up {
+  bottom: 46%;
+  transform: translateX(-50%) rotate(-4deg);
+  transform-origin: 50% 100%;
+}
+.nevelev__bat.down {
+  top: 46%;
+  transform: translateX(-50%) rotate(4deg);
+  transform-origin: 50% 0;
+}
+
+.nevelev__paddle {
+  position: absolute;
+  left: 50%;
+  width: 0.72cqw;
+  height: 0.48cqw;
+  transform: translateX(-50%);
+  border-radius: 0.12cqw;
+  background: linear-gradient(180deg, #f2f3ee, #cccdc6);
+}
+.nevelev__bat.up .nevelev__paddle { top: -0.34cqw; }
+.nevelev__bat.down .nevelev__paddle { bottom: -0.34cqw; }
+
+/* the bushing the bat turns in, at the centre of the body */
+.nevelev__body::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.78cqw;
+  height: 0.78cqw;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #4a5257, #22282b 62%, #101416);
+}
+
+/* Two lamps 0.112 of the panel height apart, each 0.0064 of its width. */
+.nevelev__lamps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.36cqw;
+}
+.nevelev__lamps i {
+  width: 0.64cqw;
+  height: 0.64cqw;
+  border-radius: 50%;
+  background: #2a2724;
+  box-shadow: inset 0 0 0 0.06cqw rgb(0 0 0 / 0.55);
+}
+.nevelev__lamps i.lit {
+  background: #e6cf8a;
+  box-shadow: 0 0 0.5cqw rgb(230 207 138 / 0.6);
+}
+
+/* --------------------------------------------------------------- meter -- */
+
+.faceneve .abs.faceneve__meter {
+  transform: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The movement is three parts stacked, in the proportions they measure in
+ * the photograph: the clear-bezelled glass carrying the scale plate takes
+ * 42.4 % of the unit's height, the bezel's bright bottom lip 4.8 %, and the
+ * black crinkle can the movement sits in the remaining 52.8 %. The
+ * zero-adjust screw is on the can, which is where the metal has it.
+ */
+.nevemeter {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+.nevemeter__glass {
+  flex: 0 0 42.4%;
+  min-height: 0;
+  padding: 0.22cqw 0.3cqw;
+  border-radius: 0.3cqw 0.3cqw 0 0;
+  background: linear-gradient(180deg, #e8eef0 0%, #aab4b8 26%, #79868c 58%, #55636a 100%);
+  box-shadow: 0 0.12cqw 0.3cqw rgb(0 0 0 / 0.45);
+}
+.nevemeter__lip {
+  flex: 0 0 4.8%;
+  border-radius: 0 0 0.25cqw 0.25cqw;
+  background: linear-gradient(180deg, #cfd8db, #7d8a90 70%, #4a565c);
+}
+.nevemeter__can {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 1.5%;
+  border-radius: 0 0 0.2cqw 0.2cqw;
+  background: linear-gradient(180deg, #23282a 0%, #16191b 45%, #0d0f10 100%);
+  box-shadow: inset 0 0.1cqw 0.25cqw rgb(255 255 255 / 0.06), 0 0.2cqw 0.4cqw rgb(0 0 0 / 0.5);
+}
+.nevemeter__zero {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.05cqw;
+  height: 1.05cqw;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #3a4144, #202628 62%, #14181a);
+  box-shadow: inset 0 0 0 0.07cqw rgb(0 0 0 / 0.55);
+}
+.nevemeter__zero::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 66%;
+  height: 0.11cqw;
+  transform: translate(-50%, -50%) rotate(28deg);
+  border-radius: 999px;
+  background: #4c5457;
+}
+
+.nevemeter__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.nevemeter__face { fill: var(--neve-meter-face); }
+.nevemeter__scale line {
+  stroke: #e8eef0;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.nevemeter__scale text,
+.nevemeter__unit,
+.nevemeter__recall {
+  fill: #e8eef0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 700;
+}
+.nevemeter__scale text { font-size: 16px; }
+.nevemeter__unit { font-size: 16px; }
+.nevemeter__recall { font-size: 15px; opacity: 0.75; }
+.nevemeter__needle {
+  stroke: #f4f8f9;
+  stroke-width: 3.4;
+  stroke-linecap: round;
+}
+.nevemeter.unlit .nevemeter__face { fill: #0a0d0e; }
+.nevemeter.unlit .nevemeter__needle { stroke: #6a7276; }
+
+/* --------------------------------------------------------------- mains -- */
+
+/* The red lens measures 0.0216 of the panel across; 72 % of 3cqw is that. */
+.nevepwr {
+  width: 3cqw;
+  height: 3cqw;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #6e777b, #333c41 60%, #1a2124);
+  box-shadow: 0 0.15cqw 0.3cqw rgb(0 0 0 / 0.55);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.nevepwr:focus-visible {
+  outline: 0.15cqw solid var(--neve-cap);
+  outline-offset: 0.25cqw;
+}
+.nevepwr__lens {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #7a0d16, var(--neve-lamp) 62%, #4a0207);
+  box-shadow: inset 0 0 0.3cqw rgb(0 0 0 / 0.6);
+}
+.nevepwr.on .nevepwr__lens {
+  background: radial-gradient(circle at 38% 30%, #ff5a5a, #d81020 55%, #8d0410);
+  box-shadow: inset 0 0 0.3cqw rgb(0 0 0 / 0.35), 0 0 0.9cqw rgb(216 16 32 / 0.6);
+}
+.nevepwr__bar {
+  width: 0.28cqw;
+  height: 52%;
+  border-radius: 999px;
+  background: #f3f4ef;
+  opacity: 0.9;
+}
+
+/* -------------------------------------------------------------- unlit -- */
+
+.faceneve.unlit .faceneve__panel {
+  filter: brightness(0.72) saturate(0.85);
+}
+
+/* --------------------------------------------------------- extras bar -- */
+
+.extrasneve__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.extrasneve__caption {
+  color: #8fa0aa;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.extrasneve__value {
+  color: var(--neve-cap);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.extrasneve__hint {
+  color: #6c7d87;
+  font-size: 10px;
+}
+
+/*
+ * The bar's segmented chips. Each model dresses the framework's segmented
+ * control in its own palette; without these rules the buttons keep the
+ * framework's bare defaults and the three unit names run together as
+ * "2254E33609J33609N".
+ */
+.extrasneve .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #0b1114;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+.extrasneve .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(226 236 240 / 0.5);
+  font: 700 10px var(--font-panel);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.extrasneve .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #2d3d47, #1a252b);
+  color: var(--neve-cap);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+@container (max-width: 1150px) {
+  .extrasneve__hint { display: none; }
+}

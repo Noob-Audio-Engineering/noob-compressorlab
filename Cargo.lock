@@ -1618,15 +1618,21 @@ dependencies = [
 [[package]]
 name = "noob-electrical-components"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#c6c47690d99c773087f283ff4c17533e7199daf5"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
 dependencies = [
+ "noob-electrical-components-diode-bridge",
  "noob-electrical-components-photocell",
 ]
 
 [[package]]
+name = "noob-electrical-components-diode-bridge"
+version = "0.1.0"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
+
+[[package]]
 name = "noob-electrical-components-photocell"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#c6c47690d99c773087f283ff4c17533e7199daf5"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-components#6031cb64a63b80b5b3f10626d44b2af7c922d5f3"
 
 [[package]]
 name = "noob-vst-webgui-framework"

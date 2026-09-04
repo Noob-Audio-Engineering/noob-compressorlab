@@ -1306,8 +1306,8 @@ to control voltage — then after 2.59 τ the remaining gain reduction is
 So **"release time from 10 dB of limiting" means the time to recover to within about three quarters of a
 decibel of unity**, or equivalently to give back about 92.5 % of the reduction. **The assumption that dB of
 gain reduction is proportional to control voltage is now supported rather than merely asserted**: section
-12.3a reads the 6386's transconductance law off GE's logarithmic plot and finds it close to a pure
-exponential, n between 0.7 and 1.0 from two traces, at roughly 1.2 dB per volt of grid. Close to exponential
+12.3a reads the 6386's transconductance law off GE's logarithmic plot and finds it at or below a pure
+exponential in every condition GE plot, n between 0.59 and 1.00, at roughly 1.2 to 2.2 dB per volt of grid. Close to exponential
 is enough for the release-time derivation, which needs proportionality only to the accuracy of a round
 number in a 1959 specification. That is a perfectly sensible
 1950s definition and it is not one you could have guessed. (**Derived.**)
@@ -2188,7 +2188,7 @@ published value [18]; D = my derivation; E = my estimate.
 | `Vgk` clamp | −0.5 V | **D**, eq. 1 diverges at +5 V (4.3) |
 | checked against GE curves at (250 V, −10/−30/−50 V) | 19.9 / 4.15 / 0.56 mA | **D** (4.3) |
 | eq. 1's gm at the class-A1 point | 2309 µmho against GE's 4000 — **do not use its derivative** | **D** (4.3) |
-| gm law from GE's logarithmic plot | near-exponential, **n = 0.7 to 1.0** from two traces, ≈1.2 dB per volt | **D** (12.3a) |
+| gm law from GE's logarithmic plot | at or below exponential, **n = 0.59 to 1.00** across GE's four plotted conditions | **D** (12.3a) |
 | μ, GE 6386 | 17 | **GE** [12] |
 | gm at the class-A1 point | 4000 µmhos | **GE** |
 | gm at Vg = −16 V | 100 µmhos | **GE** |
@@ -2739,58 +2739,68 @@ exponential law, meaning n = 1, so that an exponent far from 1 would be a differ
 of constants. I fitted the same form to the 6386 to settle it, and **the 176 research is right about the
 difference.**
 
-**The 6386's exponent is 1.** General Electric plot its transconductance against grid voltage on a
-**logarithmic** gm axis [12], where a pure exponential is a straight line, and the published curve is
-straight over most of its range. Reading crossings off a calibrated overlay of the Ecc2 = 300 V curve
-(working image `ref/fairchild-6386-gm-log-calibrated.png`):
+**Which figure this is, since it was challenged and the challenge was fair.** General Electric ET-T1113,
+**page 3, upper figure**, headed "AVERAGE TRANSFER CHARACTERISTICS — CASCODE CONNECTION", with
+`TRANSCONDUCTANCE IN MICROMHOS` on a **logarithmic** vertical axis from 10 to 10 000 and
+`GRID-NUMBER 1 VOLTAGE IN VOLTS` on a linear horizontal axis from 0 to −60 [12]. Four curves, labelled
+`Ecc2 = 300 VOLTS`, `250`, `200` and `150`, with an inset of the measuring circuit. **`Ecc2` is not a screen
+voltage** — the 6386 is a twin triode and has no screen. Page 2 names it: in the `CASCODE AMPLIFIER` block it
+is the **"Voltage-Divider Supply Voltage"**, the rail feeding the 470 kΩ / 470 kΩ divider that biases the
+upper, grounded-grid triode, and both the page 3 inset and the page 6 circuit diagram draw it that way [12].
 
-| gm (µmho) | 5000 | 2000 | 1000 | 500 | 200 | 100 | 50 | 20 |
-|---|---|---|---|---|---|---|---|---|
-| volts below zero | 2.4 | 7.1 | 11.5 | 16.2 | 23.2 | 28.0 | 32.6 | 38.8 |
+**And the closure check that this makes possible, which resolves an apparent contradiction.** GE's tabulated
+`Gm = 100 Micromhos at −16 Volts` sits in the **`CLASS A₁ AMPLIFIER, EACH SECTION`** block at **plate voltage
+100 V**; the logarithmic curve is the **cascode** at Eb = 250 V. Different circuits, so the two need not
+agree — but they must be consistent in direction and magnitude, and they are:
 
-Successive factors of 25 in gm span 20.8, 20.9, 21.1 and 22.6 volts — constant to 8 per cent, which is a
-straight line and therefore an exponential. Fitting the stretched form:
+| curve | reaches 100 µmho at |
+|---|---|
+| Ecc2 = 300 V | −27.5 V |
+| Ecc2 = 250 V | −23.6 V |
+| Ecc2 = 200 V | −18.9 V |
+| **Ecc2 = 150 V** | **−14.6 V** |
+| GE's tabulated single section, plate 100 V | **−16 V** |
 
-| span fitted | n | rms residual |
-|---|---|---|
-| w = 7.1 to 38.8 V, the straight part | **1.00** | 0.29 dB |
-| w = 2.4 to 38.8 V, the full published range | 0.88 | 0.71 dB |
-| w = 2.4 to 11.5 V, the 6BC8's whole range | 0.70 | poorly determined, 3 points |
+The lowest divider supply puts the lower triode at the lowest plate voltage of the four, so it should cut off
+earliest, and it does — landing 1.4 V from the tabulated figure for a section at 100 V plate. **A reading of
+this curve that had the wrong axis origin, or that was tracing another tube, could not land there.**
 
-Forcing other exponents gives rms residuals of 0.93 dB at n = 0.7, **0.37 dB at n = 1.0**, 1.61 dB at
-n = 1.6 and **2.88 dB at n = 2.16** — an order of magnitude worse than the optimum. Perturbing every read
-point by 1 V of noise over 300 trials gives n = 1.01 ± 0.16, and not one trial in 300 landed above 1.6.
+**The exponent, from all four curves.** Traced by the same method and fitted over the same range:
 
-**How much to trust that exponent.** I traced a second curve on the same plot, Ecc2 = 200 V, by the same
-method, as an internal check. It fits the same form to 0.31 dB rms but at **n = 0.71**, not 1.00. So the
-honest figure is **n between 0.7 and 1.0 for the 6386**, and the spread between two traces of one tube is
-larger than the formal noise estimate — which is what happens when four curves converge in the upper part of
-a plot and have to be told apart by eye. What survives that spread is the thing that matters: **both traces
-sit at or below 1, both fit to about a third of a decibel, and forcing 2.16 on either is roughly ten times
-worse.**
+| curve | n | V0 | rms | decade spacing (V) |
+|---|---|---|---|---|
+| Ecc2 = 300 V | **1.00** | 7.0 | 0.37 dB | 16.0, 16.3, 16.7, 15.6 |
+| Ecc2 = 250 V | **0.84** | 4.4 | 0.33 dB | 13.9, 15.1, 16.1, 15.7 |
+| Ecc2 = 200 V | **0.71** | 2.6 | 0.31 dB | 11.5, 12.9, 14.8, 15.5 |
+| Ecc2 = 150 V | **0.59** | 1.4 | 0.44 dB | 9.1, 11.1, 13.6, 15.1 |
 
-**A caveat on the span, and it cuts against me.** The 6BC8's entire control range is about 11 volts, and in
-that span the 6386's curves are in the steepest, most bunched part of GE's plot — the region I can read
-least reliably. My earlier claim that restricting the 6386 to that span pushes its exponent *down* rested on
-a three-point fit with three free parameters, which is interpolation rather than measurement. **I withdraw
-it.** The comparison I can defend is over the well-separated part of the plot, and there the 6386 is at or
-below 1 while the 6BC8 is at 2.16.
+Forcing the 6BC8's 2.16 on the same points costs 2.95, 3.59, 4.43 and 5.30 dB respectively — seven to twelve
+times the residual of the free fit.
 
-**So the two tubes do have different curvature, and my earlier conclusion that they were "the same law with
-different constants" was reached by the wrong route.** Average taper is a first-moment statistic and is
-blind to exactly the thing the exponent measures.
+**And that table is the real finding, which is not the one I set out to report.** The exponent is **not a
+property of the tube**. It runs from 0.59 to 1.00 across the four operating conditions GE plot for *one*
+tube, monotonically with the divider supply. The 176 research reports the matching instability from their
+side: their own 6BC8 figure moves from 2.16 to 1.71 depending on whether it is anchored on interior or
+endpoint points, and two published transconductance points cannot fix a three-parameter form at all.
 
-**The closure check I was asked to run, and could not.** The 176 research points out, correctly, that
-plate resistance is amplification factor over transconductance, so a pair of curve readings must reproduce
-the tabulated plate resistance — a check that turns a curve reading into a measurement and that their own
-6BC8 reading passes at 5320 Ω against 5300 tabulated. **I cannot run it on my 6386 curve**, because GE plot
-μ against *plate current* and gm against *grid voltage*, so I have no μ and gm at a common abscissa. GE's
-tabulated triple does close on itself, 17 / 4000 µmho = 4250 Ω against a tabulated "approximately 4250", but
-that validates GE's table rather than my reading of their graph. What I offer instead is weaker and worth
-stating as such: two independently traced curves agreeing on the shape, and the observation that **the
-exponent is structurally immune to the errors a closure check catches** — a wrong gm scale moves only gm0, a
-wrong voltage scale moves only V0, and n is fixed by the *ratios* of spacings along the voltage axis, which
-survive any affine error in either axis.
+**So the honest conclusion is that the published data cannot settle the shape comparison**, and I withdraw
+the clean n = 1.01 I reported earlier. What does survive, and is worth keeping:
+
+- **In every condition GE plot, the 6386's transconductance is at or below a pure exponential** — n from
+  0.59 to 1.00, never above 1 — and an exponent of 2.16 is three to five decibels worse than the free fit on
+  every one of the four curves.
+- **My earlier reasoning was wrong regardless of the number.** Comparing average tapers cannot answer a
+  question about curvature, and the taper ratio I first published had a sign error in it besides (12.3).
+- **A quantity that moves by a factor of 1.7 across one tube's own operating conditions, and by a factor of
+  1.3 across one fitter's choice of anchors, is not a quantity on which two datasheets can be compared.**
+  That is the finding, and it is more useful than either "the tubes match" or "the tubes differ".
+
+**One limitation of my curve that I should name rather than let a reader find.** It is a *cascode* curve. In
+a cascode the lower triode's plate is not held at the tube's normal operating voltage; it floats at the upper
+triode's cathode. So this is the gm law of a 6386 section under cascode loading, not of a grounded-cathode
+stage at the 230 V plate the Fairchild actually runs (3.2). GE tabulate cascode transconductance and
+Class A₁ transconductance as the same 4000 µmho, which is a point of contact, but one point is not a shape.
+**Carrying the exponent over to the Fairchild's own topology is an assumption, and I have not tested it.**
 
 **What that does and does not kill.** It kills the idea that this family has a universal shape, and with it
 any plan to fit one tube and assume the other's curve. It does *not* by itself kill a shared component,
@@ -2800,8 +2810,8 @@ its own fit against its own published curve, and the physical argument "remote c
 holds for the 6386 and demonstrably does not hold for the semiremote-cutoff 6BC8. That is a stronger reason
 to defer the component than the one in 12.1, not a weaker one.
 
-**And there is a dividend for this plug-in.** An exponent at or just below 1 means the 6386's
-transconductance is close to a pure exponential in grid voltage over its working range, so **gain in
+**And there is still a dividend for this plug-in, weaker than I first claimed.** An exponent at or below 1
+means the 6386's transconductance is close to a pure exponential in grid voltage over its working range, so **gain in
 decibels is close to linear in control voltage** — about 1.2 dB per volt (**derived**, and see the spread
 above). Section 5.4 assumed exactly that when it turned the release network's RC products into the manual's
 published release times, and the assumption now has a measurement behind it rather than only an argument

@@ -876,6 +876,28 @@ a real, published, sourced difference to implement** and it is a 2.5 dB gain dif
 
 ### 4.3 Raffensperger's fitted law, and my check on it
 
+> **One parameter of this law is refitted in the build, and the reason is that it was never
+> constrained.** The published fit is to plate **current**, and its **slope** is not fitted to
+> anything. For a variable-mu stage the audio *is* the derivative, so the slope is the quantity the
+> model actually uses, and as published it is 42 % low in transconductance at the class-A1 operating
+> point and non-monotone, dipping and climbing again in a way the maker's own curve does not.
+> Measured against the plate characteristics at 250 V it is 8.6 dB out at −50 V of grid and 35.7 dB
+> out at −70, which is where this unit spends its deepest limiting.
+>
+> The check below is the reason it survived: three points on a plot whose lower decade is squashed
+> into the bottom few per cent of the paper. A check made on a plot that cannot resolve the region it
+> is checking can hardly fail.
+>
+> So `p8`, the exponential cut-off rate, moves from 0.2 to 0.131 87 with `p1` renormalised, fitted to
+> General Electric's own plate characteristics **across the working range and in the right
+> topology** — one published source to another, never to an invention. Least-squares cost falls from
+> 20.05 to 0.09; letting three more parameters move buys 0.03 and was declined. Shallower than −30 V
+> the term is negligible and the power law carries the curve, which is exactly why three points
+> never caught it.
+>
+> What it cost is in the plug-in's own misses table: three distortion rows that used to pass now
+> fail, and they were passing because the law was low precisely where those curves live.
+
 Raffensperger fits a black-box anode-current model to the GE curves by Levenberg-Marquardt least squares
 plus hand tuning [18]:
 
@@ -1374,6 +1396,25 @@ Fairchild publishes identical release times for them, 2 seconds, position 5's be
 individual peaks" [1]. That is an internal consistency check on my reading of the switch that costs nothing
 and passes.
 
+> **Ruled against by the build, and 5.5 wins.** The derivation above takes position 5's
+> individual-peak figure from `R_T·C_T` alone, treating the uncharged slow leg as not yet loading the
+> node. Section 5.5 needs the exact opposite, uncharged legs pulling the effective resistance *down*,
+> to reach position 6's 0.3 s, and this file admits the two cannot both hold: "no single simple
+> reading reproduces all of positions 5 and 6."
+>
+> Building the network settles it, and the mechanism is real but conditional. It is one inequality
+> pointing opposite ways at the two positions. At position 6 the node's own constant is 0.44 s,
+> genuinely fast against the legs' 0.8 s and 2.0 s, so while the legs are empty they do pull the
+> resistance down. At position 5 the node's constant is 0.88 s, which is **slower than its one leg's
+> 0.8 s**; a leg cannot be "not yet charged" relative to a node that moves more slowly than it does,
+> so the 8 µF joins immediately whatever the stimulus, and the tail is 220 kΩ into 12 µF from the
+> first millisecond.
+>
+> The consequence is a recorded miss rather than a fix: position 5's individual peak comes out 3.3 s
+> against the published 2. Its multiple-peaks figure is met. No component value was touched to chase
+> it, and all four fixed positions and all three of position 6's figures fall out of the same
+> integration.
+
 ### 5.5 The two program-dependent positions, and why position 6 is fast *and* slow
 
 Positions 5 and 6 add series-RC legs, and this is the mechanism that makes the Fairchild's automatic
@@ -1431,6 +1472,10 @@ sample, it is cheaper than the branchy program-dependent logic it replaces, and 
 release that depends on how long the last twenty seconds were loud. Section 10.3 writes it out and section
 12.3 tests the emergent times against the manual's six published figures.
 
+> **Confirmed by the build.** This section's mechanism is the one that survives; 5.4's arithmetic is
+> the one that does not. See the block at the end of 5.4 for the inequality that decides which
+> position each applies at.
+
 ### 5.6 The attack times, and a correction to the manual
 
 The manual publishes attack as **0.2 ms in positions 1, 2 and 6; 0.4 ms in positions 3, 4 and 5** [1]. Sound
@@ -1469,6 +1514,14 @@ That also puts a number on the control voltage. With `I_max = 0.5 A` and 0.10 ms
 ```
 ΔV = I_max · t / C = 0.5 A × 0.1 ms / 1 µF = 50 V
 ```
+
+> **Built as a circuit, not imposed as a constant.** The 0.10 ms per microfarad above is derived by
+> holding the sidechain output stage at its current limit for the whole of the attack, which assumes
+> the rectifier conducts continuously; a sine drives it on peaks. The model therefore builds the
+> circuit, a hard current limit with a softplus knee, and asserts this constant as a **check on** that
+> circuit rather than an **input to** it. It holds: all six positions land within 20 % of it and the
+> ordering is exactly proportional to `C_T`. Where a derived constant and the circuit it came from
+> could have disagreed, what ships is the circuit.
 
 **about fifty volts of control voltage between no limiting and full limiting** (**derived**, and dependent
 on Raffensperger's `I_max`). Which is a satisfying number to arrive at, because it is what the manual is
@@ -1739,6 +1792,11 @@ against a superimposed grid; the working image is
 6. **The DC threshold really does change the shape and not just the position.** Curves 4 and 5 have the AC
    threshold in the same place, fully clockwise, and differ only in the DC threshold — and they plateau
    14 dB apart, at 0 dBm and +10 dBm out. That is the internal trimmer doing exactly what Overloud say it
+
+> **Corrected by the build: 10.2 dB, not 14.** This paragraph's own transcribed table of the same
+> chart gives the two plateaux at 0.0 and +10.2 dBm out. The table is a reading and the prose is an
+> arithmetic slip on two numbers printed three lines above it, so the test asserts **10.2 dB**.
+> Asserting 14 would have meant asserting a figure this document's own data contradicts.
    does [40].
 
 ### 7.3 What has never been measured
@@ -2495,7 +2553,16 @@ oversampling, run at 44.1, 48 and 96 kHz.
     hard-coded the test is worthless and this is the test the whole design exists to pass.
 
 13. **Position 6 is fast and slow.** `fc_time` = 6. (a) A single 50 ms burst producing 10 dB of gain
-    reduction must release to 0.75 dB in **0.3 s ± 40 %**. (b) Thirty seconds of continuous material holding
+    reduction must release to 0.75 dB in **0.3 s ± 40 %**.
+
+    > **The 50 ms stimulus cannot produce the figure it checks.** Fifty milliseconds is already long
+    > against the 0.8 s charging constant of the first slow leg, so the network is well into its
+    > multiple-peaks state by then and reads about 1.6 s, where the figure under test is 0.3 s. An
+    > individual peak in programme material is a few milliseconds. The build uses **2 ms** and gets
+    > 0.32 s, and records the 50 ms reading in the test's own comment. The same trap sits in test
+    > 12's proposed two-second hold: harmless at positions 1 to 4, where nothing depends on history
+    > and that is the point of those positions, but the wrong stimulus at 5 and 6. The build uses one
+    > second there. (b) Thirty seconds of continuous material holding
     10 dB of gain reduction, then silence: release to 0.75 dB must take **at least 8 seconds**, and the
     model must still be more than 1 dB down after **6 seconds**.
     *Figures:* "Position 6: Automatic function of program material: .3 seconds for individual peaks, 10

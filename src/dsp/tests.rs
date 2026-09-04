@@ -141,6 +141,24 @@ fn the_parameter_contract_holds() {
             "ssl_drive",
             "ssl_range",
             "ssl_oversample",
+            "fc_model",
+            "fc_input_gain_l",
+            "fc_threshold_l",
+            "fc_time_l",
+            "fc_dc_threshold_l",
+            "fc_zero_l",
+            "fc_balance_l",
+            "fc_meter_l",
+            "fc_input_gain_r",
+            "fc_threshold_r",
+            "fc_time_r",
+            "fc_dc_threshold_r",
+            "fc_zero_r",
+            "fc_balance_r",
+            "fc_meter_r",
+            "fc_agc",
+            "fc_tube",
+            "fc_oversample",
             "link",
             "mix",
             "sc_hpf",
@@ -162,11 +180,11 @@ fn the_parameter_contract_holds() {
     assert_eq!(by_id("opto_cell").default, 1.0);
     assert_eq!(by_id("src_kind").labels.len(), 7);
     assert_eq!(by_id("src_level").default, 0.4);
-    assert_eq!(param_specs(false).len(), 104);
+    assert_eq!(param_specs(false).len(), 122);
 
     let (bridge, ix) = build_bridge("test", SR);
     assert_eq!(ix.model, 0);
-    assert_eq!(ix.src_freq, Some(106));
+    assert_eq!(ix.src_freq, Some(124));
     let streams = streams(SR);
     assert_eq!(streams[STREAM_IX.meter].id, "meter");
     assert_eq!(streams[STREAM_IX.cell].id, "cell");
@@ -543,5 +561,63 @@ fn the_transfer_curve_follows_every_model() {
         for w in out.windows(2) {
             assert!(w[1] >= w[0] - 0.5, "{}: the curve must not fall", m.label());
         }
+    }
+}
+
+/// Every model's needle must run **one** VU ballistic, not two.
+///
+/// The movement is specified at 99 % of the deflection in 300 ms and it
+/// runs once, in the audio thread, so that what the needle does cannot
+/// depend on how often the page redraws. The lab owns that movement: each
+/// model publishes at slot 5 of its meter frame the level its needle is
+/// **chasing**, and [`Processor::advance_meter`] drives the single shared
+/// [`vu::Vu`] with it.
+///
+/// A model that runs its own `Vu` and then publishes `vu.value()` there is
+/// handing a position to something that expects a target, so the deflection
+/// passes through two cascaded movements and the needle lags badly. This
+/// test measures the rise end to end and fails when that happens.
+#[test]
+fn every_needle_runs_one_ballistic() {
+    // 300 ms is the specification; the extra is the block quantisation and
+    // the time the model's own detector takes to settle, which is part of
+    // the reading rather than of the movement.
+    const LIMIT_MS: f32 = 400.0;
+    let block_ms = 1000.0 * BLOCK as f32 / SR;
+
+    for model in Model::ALL {
+        let mut p = Processor::new(SR);
+        p.configure(&settings(model));
+
+        // Where the needle sits before any signal, and where it ends up.
+        let rest = p.meter_vu();
+        run(&mut p, 0.5, 400);
+        let settled = p.meter_vu();
+        let swing = settled - rest;
+        if swing.abs() < 1.0 {
+            // This model's needle does not move for a steady sine at this
+            // level, so there is no rise to time.
+            continue;
+        }
+
+        // Now the same step from cold, timed.
+        let mut p = Processor::new(SR);
+        p.configure(&settings(model));
+        let mut ms = f32::INFINITY;
+        for b in 1..=400 {
+            run(&mut p, 0.5, 1);
+            if ((p.meter_vu() - rest) / swing) >= 0.99 {
+                ms = b as f32 * block_ms;
+                break;
+            }
+        }
+        assert!(
+            ms <= LIMIT_MS,
+            "{}: needle reached 99 % after {ms:.0} ms, limit {LIMIT_MS:.0}. \
+             Two cascaded movements look exactly like this: check that slot 5 \
+             of this model's meter frame is the target and not its own \
+             `vu.value()`",
+            model.label(),
+        );
     }
 }

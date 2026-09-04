@@ -26,6 +26,7 @@
 @import './models/dbx/dbx.css';
 @import './models/tg/tg.css';
 @import './models/gbus/gbus.css';
+@import './models/vmu/vmu.css';
 /*
  * Tailwind scans only this app's sources by default. The shared Vue
  * components live in the linked `@noob-audio-engineering/noob-vst-webgui-framework` package and
@@ -357,6 +358,21 @@
   font-size: 13px;
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.74);
+}
+/*
+ * What the unit is for, under what it is. Dimmer than the description
+ * because it is the second thing you read, and the lead-in is bold so the
+ * eye can find it without a heading: these cards are already three lines
+ * deep and a fourth label would cost more than it earns.
+ */
+.browse__uses {
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.58);
+}
+.browse__uses b {
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 700;
 }
 /*
  * The lede carries the promise that settings are kept, which is the reason

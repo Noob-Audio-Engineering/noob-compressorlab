@@ -124,13 +124,45 @@
   text-shadow: 0 0.05cqw 0.1cqw rgb(0 0 0 / 0.5);
 }
 
+/*
+ * **Every legend on this panel carries an 8 px floor, and the long ones
+ * wrap rather than collide.**
+ *
+ * A 19-inch 2U panel is width-limited in a short window: at 900 x 520 the
+ * plate is 825 px across, where 0.64cqw is 5.28 px. Type that small is not
+ * small, it is absent, and the audit counted fifty pieces of it here. The
+ * complaint has been raised on three models.
+ *
+ * A floor on its own does not work, and this is the part worth writing
+ * down. The tightest pair on the panel is a block's `threshold dBu` and
+ * `recovery ms`, whose boxes sit 15.7 px apart at the minimum window. Taken
+ * to 8 px they grow about 17.5 px toward each other, so they overlap by
+ * roughly two pixels, and overlapping labels are worse than small ones.
+ * Measured, the largest size that keeps the audit's three-pixel gap on one
+ * line is 7.4 px, which is still under the floor.
+ *
+ * Letting them **wrap** buys the difference. `threshold dBu` over two lines
+ * is as wide as `threshold`, and the pair then clears by 13 px at 8 px of
+ * type. The width is a fraction of the panel, so the wrap happens only
+ * where it is needed: at 1100 x 620 and above the captions stay on one line
+ * because they already fit, and nothing changes on a large window.
+ *
+ * That is why this is a floor and a width rather than a suppression. The
+ * SSL's panel next door had to drop its numerals, because it is portrait
+ * and its width follows a short window's height; this one is landscape and
+ * has the room, once the long captions are allowed to use two lines of it.
+ */
 .faceneve__cap {
-  font-size: 0.64cqw;
+  font-size: max(8px, 0.64cqw);
   font-weight: 700;
+  white-space: normal;
+  max-width: 5cqw;
+  line-height: 1.05;
+  text-align: center;
 }
 
 .faceneve__title {
-  font-size: 0.81cqw;
+  font-size: max(8px, 0.81cqw);
   font-weight: 800;
   letter-spacing: 0.08em;
 }
@@ -144,7 +176,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.47cqw;
-  font-size: 0.875cqw;
+  font-size: max(8px, 0.875cqw);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-align: left;
@@ -277,7 +309,7 @@
   flex-direction: column;
   align-items: center;
   line-height: 1.2;
-  font-size: 0.76cqw;
+  font-size: max(8px, 0.76cqw);
   font-weight: 700;
 }
 

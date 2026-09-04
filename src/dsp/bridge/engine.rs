@@ -10,7 +10,6 @@ use noob_electrical_components::diode_bridge as bridge;
 use crate::dsp::fet::oversample::{Downsampler, DryDelay, LATENCY, Upsampler};
 use crate::dsp::flush;
 use crate::dsp::opto::filters::OnePole;
-use crate::dsp::vu::Vu;
 
 use super::{LIMIT_ATTACK_FAST, MODEL_2254E, MODEL_33609N, RATIO_TRUE, RECOVERY_AUTO1};
 
@@ -730,7 +729,6 @@ pub struct Compressor {
     law: ControlLaw,
     ch: [Channel; 2],
     oversample: bool,
-    vu: Vu,
     // Per-block meter accumulators.
     gr_db: [f32; 2],
     in_peak: [f32; 2],
@@ -754,7 +752,6 @@ impl Compressor {
             law: ControlLaw::fit(&net),
             ch: [Channel::new(sr), Channel::new(sr)],
             oversample: sr < 88_200.0,
-            vu: Vu::new(sr),
             gr_db: [0.0; 2],
             in_peak: [0.0; 2],
             out_peak: [0.0; 2],
@@ -774,7 +771,6 @@ impl Compressor {
         for c in &mut self.ch {
             c.set_sample_rate(sr);
         }
-        self.vu.set_sample_rate(sr);
         self.reset();
     }
 
@@ -785,7 +781,6 @@ impl Compressor {
         for c in &mut self.ch {
             c.reset();
         }
-        self.vu.reset();
         self.gr_db = [0.0; 2];
         self.in_peak = [0.0; 2];
         self.out_peak = [0.0; 2];
@@ -1074,8 +1069,6 @@ impl Compressor {
             self.comp_gr = [comp_sum[0] * inv, comp_sum[1] * inv];
             self.lim_gr = [lim_sum[0] * inv, lim_sum[1] * inv];
             self.frames = n;
-            let target = self.meter_target();
-            self.vu.advance(target, n);
         }
     }
 
@@ -1102,9 +1095,16 @@ impl Compressor {
         }
     }
 
-    /// `[in_l, in_r, out_l, out_r, gr_db, meter_vu]` for the last block,
-    /// with `gr_db` **positive** for reduction, which is the lab's frame
-    /// convention; the lab negates it on the way out.
+    /// `[in_l, in_r, out_l, out_r, gr_db, meter_target]` for the last
+    /// block, with `gr_db` **positive** for reduction, which is the lab's
+    /// frame convention; the lab negates it on the way out.
+    ///
+    /// Slot 5 is the level the needle is **chasing**, not where it is. The
+    /// lab owns the movement and runs it once, in the audio thread. This
+    /// used to publish a `Vu` of its own here, which handed a position to
+    /// something expecting a target and put two cascaded movements in
+    /// series: the needle reached 99 % after 464 ms against the standard's
+    /// 300. `dsp::tests::every_needle_runs_one_ballistic` measures it.
     pub fn meter_frame(&self) -> [f32; 6] {
         [
             self.in_peak[0],
@@ -1112,7 +1112,7 @@ impl Compressor {
             self.out_peak[0],
             self.out_peak[1],
             0.5 * (self.gr_db[0] + self.gr_db[1]),
-            self.vu.value(),
+            self.meter_target(),
         ]
     }
 

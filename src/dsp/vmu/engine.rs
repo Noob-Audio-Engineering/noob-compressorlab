@@ -64,11 +64,11 @@
 //!
 //! | constant | source |
 //! |---|---|
-//! | the tube law's eight parameters | Raffensperger [18], dossier 10.4 |
-//! | `R_k`, `n_par`, the plate rail, the balance pot | the 670 schematic [4] and the 660 factory drawing [5] |
-//! | the sidechain pad and `N_sc` | the 670 schematic [4] and Raffensperger |
+//! | the tube law's eight parameters | Raffensperger, dossier 10.4 |
+//! | `R_k`, `n_par`, the plate rail, the balance pot | the 670 schematic and the 660 factory drawing |
+//! | the sidechain pad and `N_sc` | the 670 schematic and Raffensperger |
 //! | the dead-zone map, the clip, the rectifier, `I_max` | Raffensperger, all marked **E** in the dossier |
-//! | every timing component | the 660 factory drawing [5], see [`super::network`] |
+//! | every timing component | the 660 factory drawing, see [`super::network`] |
 //! | [`A_V`] | **fitted** to the published input/output curve 3 |
 //! | [`GRID_V_AT_PLUS24_DBM`] | **fitted** to the published IM chart |
 //! | [`REST_GAIN_DB`] | published input/output curve 1 |
@@ -78,7 +78,6 @@ use std::f32::consts::{PI, SQRT_2};
 
 use crate::dsp::opto::filters::OnePole;
 use crate::dsp::pre::filters::{Hp1, Hp2, Lp1};
-use crate::dsp::vu::Vu;
 
 use super::network::{Network, POSITIONS, position};
 use super::oversample::{MAX_FACTOR, Resampler};
@@ -113,7 +112,7 @@ pub fn amp_dbm(a: f32) -> f32 {
 // --------------------------------------------------------------- the stage
 
 /// Sections in parallel per push-pull half (V101–V104 a channel, one
-/// section each side: the 670 schematic [4] and the 660 drawing [5]).
+/// section each side: the 670 schematic and the 660 drawing).
 pub const N_PAR: f32 = 4.0;
 /// Plate rail, from the schematic's own annotation (the transformer centre
 /// tap is marked 240 V and the plate rail 230 V).
@@ -146,7 +145,7 @@ const NEWTON_STEPS: usize = 2;
 // ----------------------------------------------------------- the sidechain
 
 /// Sidechain pad: four 150 Ω in series into two 680 Ω, off T102's second
-/// secondary (670 schematic [4]; Raffensperger's `R_in = 600 Ω`,
+/// secondary (670 schematic; Raffensperger's `R_in = 600 Ω`,
 /// `R_term = 1360 Ω` are the same components).
 pub const G_PAD: f32 = 1360.0 / 1960.0;
 /// T103's step-up, `N_p/N_s = 1/17` (Raffensperger).
@@ -555,7 +554,6 @@ pub struct Compressor {
     /// T101's step-up to each grid, from the two published anchors.
     n_in: f32,
     ch: [Channel; 2],
-    vu: Vu,
     in_peak: [f32; 2],
     out_peak: [f32; 2],
     gr_db: [f32; 2],
@@ -582,7 +580,6 @@ impl Compressor {
             n_in,
             law,
             ch: [Channel::new(sr, 3), Channel::new(sr, 3)],
-            vu: Vu::new(sr),
             in_peak: [0.0; 2],
             out_peak: [0.0; 2],
             gr_db: [0.0; 2],
@@ -594,7 +591,6 @@ impl Compressor {
 
     pub fn set_sample_rate(&mut self, sr: f32) {
         self.sr = sr;
-        self.vu.set_sample_rate(sr);
         for ch in self.ch.iter_mut() {
             ch.retune(sr);
         }
@@ -607,7 +603,6 @@ impl Compressor {
             ch.reset();
             ch.vk = vk;
         }
-        self.vu.reset();
         self.in_peak = [0.0; 2];
         self.out_peak = [0.0; 2];
         self.gr_db = [0.0; 2];
@@ -866,8 +861,6 @@ impl Compressor {
         }
         self.in_peak = in_peak;
         self.out_peak = out_peak;
-        let target = 0.5 * (self.meter_db[0] + self.meter_db[1]);
-        self.vu.advance(target, n);
     }
 
     /// Gain reduction in dB (positive) of one channel over the last block.
@@ -896,7 +889,12 @@ impl Compressor {
             self.out_peak[0],
             self.out_peak[1],
             0.5 * (self.gr_db[0] + self.gr_db[1]),
-            self.vu.value(),
+            // The needle's **target**, not its position: the VU movement
+            // runs once, in the processor above, for every model in the lab.
+            // Smoothing it here as well would put two sets of ballistics in
+            // series, which is exactly what
+            // `every_needle_runs_one_ballistic` exists to catch.
+            0.5 * (self.meter_db[0] + self.meter_db[1]),
         ]
     }
 

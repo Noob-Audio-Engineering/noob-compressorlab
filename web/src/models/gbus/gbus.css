@@ -377,7 +377,19 @@
   align-items: stretch;
   gap: 0.75rem;
   flex: 1 1 auto;
-  padding: 0 0.75rem 0.75rem;
+  /*
+   * The top inset is the gap between the bench bar and the panel, and it is
+   * 0.75rem because that is what the landscape faces show: the Neve's plate
+   * sits in a `pt-3` holder and measures 12 px below the bar at 900 x 520,
+   * 1100 x 620 and 1900 x 1000 alike. With no top padding here the only
+   * separation was the bar's own margin and the gap read as about half.
+   *
+   * The left inset matches too, and was already right: this stage and the
+   * Neve's holder both begin 12 px from the window edge, exactly where the
+   * bar's box begins. The Neve's *visible* plate starts 25 px further in
+   * only because its rack ears are part of the face; this module has none.
+   */
+  padding: 0.75rem 0.75rem 0.75rem;
   /*
    * **Not `min-height: 0`.** A flex item that may shrink to nothing will,
    * and with the development panel open at the 900 x 520 minimum this
@@ -444,3 +456,86 @@
     display: none;
   }
 }
+
+/*
+ * **The browse preview, where this panel is the only one driven by height.**
+ *
+ * `FacePreview.vue` lays every face out in a box that is out of flow and
+ * `RENDER_W` wide, with no height. A landscape face fills that width and
+ * its height falls out; this one asks for `height: 100%` of a parent whose
+ * height is `auto`, takes its width from an aspect ratio off that, and
+ * collapses because neither axis is definite. The card then drew an empty
+ * row.
+ *
+ * Giving it a definite layout height fixes it, and the height is
+ * `RENDER_W x 1.769`, so the module is drawn at 1100 px of its own long
+ * axis exactly as a 19-inch panel is drawn at 1100 px of its. The preview
+ * then scales it down to the row.
+ *
+ * It has to be this large rather than the row's own height, because the
+ * panel is a size container and its two suppression queries below would
+ * otherwise fire at thumbnail width and turn the preview into the
+ * small-window variant. A preview should be the panel made smaller, not a
+ * different panel.
+ */
+.facepv .facessl {
+  height: 1946px;
+}
+
+/*
+ * The bar's segmented chips. The framework's segmented control ships
+ * undressed and each model puts it in its own palette; without these rules
+ * the buttons keep the bare defaults and the four link modes run together
+ * as "DominantSumDualM/S", with the oversample switch reading "1x2x" beside
+ * it. That is what a user saw.
+ *
+ * The palette is this unit's own: one blue on a grey ground, so the chosen
+ * chip carries the knob caps' colour and the rest stay quiet. The Neve's
+ * rules next door have the same shape and different colours, which is the
+ * arrangement the framework rule asks for.
+ */
+.extrasssl .noob-vst-webgui-framework-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #14181c;
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.extrasssl .noob-vst-webgui-framework-segment {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: rgb(226 232 240 / 0.5);
+  font: 700 10px var(--font-panel, 'Inter', system-ui, sans-serif);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.extrasssl .noob-vst-webgui-framework-segment:hover {
+  color: rgb(226 232 240 / 0.75);
+}
+
+.extrasssl .noob-vst-webgui-framework-segment.is-on {
+  background: linear-gradient(180deg, #33506a, #21384c);
+  color: #a9c9e4;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+}
+
+/*
+ * The bar has to stay on one row. Dressing the segmented controls widened
+ * them enough to wrap the bar at 900 px, which cost about 90 px of height
+ * and clipped the bottom of the panel: this stage claims a minimum height,
+ * so what the bar takes comes off the faceplate rather than off the drawer.
+ * The hints are the first thing to go, exactly as the Neve drops its own
+ * below 1150 px. A window query rather than a container one, because the
+ * bar is not inside the panel container.
+ */
+@media (max-width: 1150px) {
+  .extrasssl__hint {
+    display: none;
+  }
+}
+

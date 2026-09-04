@@ -21,7 +21,7 @@
 //! its mu is a function of bias rather than a number. Raffensperger says so
 //! in as many words — *"Existing triode models were designed for tubes like
 //! the 12AX7 which do not have the remote cutoff characteristic of the
-//! 6386"* [18] — and the difference is in the functional form, not the
+//! 6386"* — and the difference is in the functional form, not the
 //! parameters (dossier 4.1).
 //!
 //! The law is Raffensperger's eight-parameter fit to General Electric's

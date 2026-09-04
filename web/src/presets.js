@@ -282,6 +282,66 @@ export const FACTORY_PRESETS = {
   // ssl_release the console's as 0 to 4, with 4 the two-section automatic
   // network. ssl_ratio is 0 to 2 for 2:1, 4:1 and 10:1. The threshold is
   // marked as the panel marks it, so more negative compresses more.
+  // The Fairchild. `fc_threshold_*` is the panel's own 0 to 10 and not
+  // decibels; `fc_dc_threshold_*` is the internal trimmer's travel, whose
+  // 0.20 is the factory-adjusted condition; `fc_time_*` is 0..5 for the
+  // printed positions 1 to 6. **Every preset here turns the stereo link
+  // off**, because the hardware has none: its lateral-and-vertical mode is
+  // two matrices and two entirely independent limiters, and the link is the
+  // lab's own addition.
+  vmu: [
+    {
+      name: 'Factory',
+      description:
+        "The factory-adjusted condition, which is curve 3 of Fairchild's own December 1959 chart: threshold fully clockwise, the internal trimmer where the factory set it, time constant 3 — the manual's general-purpose suggestion — and the input attenuator at the unity-gain setting.",
+      values: { link: 0 },
+    },
+    {
+      name: 'Vocal',
+      description:
+        "Position 2 for the faster release the manual suggests for speech, a little more input so it works, and the side-chain high-passed so plosives do not duck the line. Two or three decibels, where the colour arrives with the compression rather than instead of it.",
+      values: { link: 0, fc_input_gain_l: 7, fc_input_gain_r: 7, fc_time_l: 1, fc_time_r: 1, sc_hpf: 80 },
+    },
+    {
+      name: 'Drums',
+      description:
+        "What Abbey Road did with it from 1966. Position 1 is the fastest release on the switch, the input is up so the tubes are working, and the meter is left in ZERO where the needle reads the bridge going out of balance.",
+      values: { link: 0, fc_input_gain_l: 4, fc_input_gain_r: 4, fc_time_l: 0, fc_time_r: 0 },
+    },
+    {
+      name: 'Mix bus, lat/vert',
+      description:
+        "The mode Fairchild built it for, used the way people use it now: the matrix in, the lateral channel held gently and the vertical held harder, which narrows the image on the loud parts. Fairchild's own words for that are 'some loss of separation', and they meant it as a feature.",
+      values: {
+        link: 0,
+        fc_agc: 1,
+        fc_time_l: 3,
+        fc_time_r: 2,
+        fc_threshold_l: 9,
+        fc_threshold_r: 10,
+        fc_input_gain_l: 8,
+        fc_input_gain_r: 6,
+      },
+    },
+    {
+      name: 'Position 6',
+      description:
+        "The programme-dependent position, which releases in a third of a second after a peak and takes twenty-odd seconds to let go of a loud passage. Nothing else in this lab does that, and the three capacitor bars on the bench panel are the way to see it happening.",
+      values: { link: 0, fc_time_l: 5, fc_time_r: 5, fc_input_gain_l: 6, fc_input_gain_r: 6 },
+    },
+    {
+      name: 'Line amplifier',
+      description:
+        "Threshold fully anticlockwise, which the manual says makes it 'a simple Unity Gain Line Amplifier'. No limiting at all, and still eight tubes a channel: this is the setting that shows what the box does when it is doing nothing.",
+      values: { link: 0, fc_threshold_l: 0, fc_threshold_r: 0, fc_input_gain_l: 4, fc_input_gain_r: 4 },
+    },
+    {
+      name: 'The 660',
+      description:
+        "The mono unit, which is not the 670 in mono: its cathode resistors are 1800 ohms against the 670's 680, which is a different operating point in the one stage that does all the work. Both channels follow the single row, as a pair of 660s would.",
+      values: { link: 0, fc_model: 0, fc_input_gain_l: 8, fc_time_l: 2 },
+    },
+  ],
   gbus: [
     {
       name: 'Bus',

@@ -30,8 +30,9 @@ import BridgeView from '../models/bridge/BridgeView.vue';
 import DbxView from '../models/dbx/DbxView.vue';
 import TgView from '../models/tg/TgView.vue';
 import GbusView from '../models/gbus/GbusView.vue';
+import VmuView from '../models/vmu/VmuView.vue';
 
-const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View, cl1b: Cl1bView, bridge: BridgeView, dbx: DbxView, tg: TgView, gbus: GbusView };
+const VIEWS = { fet: FetView, opto: OptoView, la3a: La3aView, vca: VcaView, pre6176: Pre6176View, cl1b: Cl1bView, bridge: BridgeView, dbx: DbxView, tg: TgView, gbus: GbusView, vmu: VmuView };
 const lab = useLab();
 useWindow();
 const key = lab.key;

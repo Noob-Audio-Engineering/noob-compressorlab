@@ -157,7 +157,7 @@ pub use source::{SOURCE_NAMES, Source};
 
 /// Labels of `model`, in parameter order. The first two keep their places
 /// so that a project saved before the lab grew still loads.
-pub const MODEL_NAMES: [&str; 10] = [
+pub const MODEL_NAMES: [&str; 11] = [
     "1176",
     "LA-2A",
     "LA-3A",
@@ -168,6 +168,7 @@ pub const MODEL_NAMES: [&str; 10] = [
     "160",
     "TG12413",
     "4000 G",
+    "670",
 ];
 /// Points in the `transfer` stream (both engines draw the same grid).
 pub const TRANSFER_POINTS: usize = fet::TRANSFER_POINTS;
@@ -210,11 +211,13 @@ pub enum Model {
     Tg,
     /// The SSL 4000 G bus compressor ([`gbus`]).
     Gbus,
+    /// The Fairchild 660 and 670 ([`vmu`]).
+    Vmu,
 }
 
 impl Model {
     /// Every model in parameter order.
-    pub const ALL: [Model; 10] = [
+    pub const ALL: [Model; 11] = [
         Model::Fet,
         Model::Opto,
         Model::Opto3,
@@ -225,6 +228,7 @@ impl Model {
         Model::Rms,
         Model::Tg,
         Model::Gbus,
+        Model::Vmu,
     ];
 
     /// From the parameter value / label index (clamped).
@@ -284,6 +288,7 @@ pub struct Settings {
     pub tg: tg::Settings,
     pub rms: rms::Settings,
     pub gbus: gbus::Settings,
+    pub vmu: vmu::Settings,
 }
 
 impl Default for Settings {
@@ -300,6 +305,7 @@ impl Default for Settings {
             tg: tg::Settings::default(),
             rms: rms::Settings::default(),
             gbus: gbus::Settings::default(),
+            vmu: vmu::Settings::default(),
         }
         .with_shared(Shared::default())
     }
@@ -362,6 +368,10 @@ impl Settings {
         self.gbus.mix = s.mix;
         self.gbus.sc_hpf = s.sc_hpf_hz;
         self.gbus.bypass = s.bypass;
+        self.vmu.link = s.link;
+        self.vmu.mix = s.mix;
+        self.vmu.sc_hpf = s.sc_hpf_hz;
+        self.vmu.bypass = s.bypass;
         self
     }
 
@@ -480,6 +490,24 @@ pub struct ParamIx {
     pub ssl_drive: usize,
     pub ssl_range: usize,
     pub ssl_oversample: usize,
+    pub fc_model: usize,
+    pub fc_input_gain_l: usize,
+    pub fc_input_gain_r: usize,
+    pub fc_threshold_l: usize,
+    pub fc_threshold_r: usize,
+    pub fc_time_l: usize,
+    pub fc_time_r: usize,
+    pub fc_dc_threshold_l: usize,
+    pub fc_dc_threshold_r: usize,
+    pub fc_zero_l: usize,
+    pub fc_zero_r: usize,
+    pub fc_balance_l: usize,
+    pub fc_balance_r: usize,
+    pub fc_meter_l: usize,
+    pub fc_meter_r: usize,
+    pub fc_agc: usize,
+    pub fc_tube: usize,
+    pub fc_oversample: usize,
     pub link: usize,
     pub mix: usize,
     pub sc_hpf: usize,
@@ -1096,6 +1124,138 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
             .default(1.0)
             .not_automatable()
             .group("4000 G"),
+        // The Fairchild. Every control the hardware has twice is here
+        // twice, because the 670 is two complete limiters and its two
+        // channels are meant to be set differently: that is the whole point
+        // of the lateral-and-vertical mode. The two screwdriver adjustments
+        // on the front panel are live, and so is the DC threshold that
+        // lives inside the chassis, because it is the ratio and knee
+        // control (research/Fairchild-670.md 5.2) and hiding it would be
+        // hiding the most interesting thing on the unit.
+        ParamSpec::new("fc_model", "Unit")
+            .labels(vmu::UNIT_NAMES)
+            .default(vmu::MODEL_670 as f32)
+            .not_automatable()
+            .group("670"),
+        // The step attenuator: 21 detents, 1 dB apart, printed as
+        // attenuation from fully clockwise. The default is the manual's own
+        // unity-gain setting, "approx 10 db attenuation".
+        ParamSpec::new("fc_input_gain_l", "Left Input Gain")
+            .range(0.0, vmu::INPUT_GAIN_MAX_DB)
+            .steps(21)
+            .default(10.0)
+            .unit("dB")
+            .group("670"),
+        // **Panel units, not decibels.** The ring is printed 0 to 10 and
+        // the pot is linear with a 24 kΩ resistor on its centre tap, so its
+        // law has a kink; what it sets jointly with the DC threshold is a
+        // curve rather than a point. The law lives in the engine
+        // (`vmu::engine::ac_threshold_law`) and the panel prints the metal's
+        // numbers.
+        ParamSpec::new("fc_threshold_l", "Left Threshold")
+            .range(0.0, vmu::THRESHOLD_MAX)
+            .default(vmu::THRESHOLD_MAX)
+            .group("670"),
+        ParamSpec::new("fc_time_l", "Left Time Constant")
+            .labels(vmu::TIME_NAMES)
+            .default(2.0)
+            .group("670"),
+        // R117, the trimmer inside the chassis, as travel from fully
+        // anticlockwise. The default is the factory-adjusted condition,
+        // fitted to the published input/output curve 3.
+        ParamSpec::new("fc_dc_threshold_l", "Left DC Threshold")
+            .range(0.0, 1.0)
+            .default(0.20)
+            .group("670"),
+        // R142, the front-panel screwdriver marked ZERO. It is a bias trim
+        // wearing a meter-calibration label: moving it moves the operating
+        // point of all eight 6386 sections, so it changes the standing
+        // gain, the available gain reduction and the standing distortion
+        // together, and it moves the needle.
+        ParamSpec::new("fc_zero_l", "Left Zero")
+            .range(vmu::ZERO_MIN_V, vmu::ZERO_MAX_V)
+            .default(vmu::engine::V_BIAS_NOMINAL)
+            .unit("V")
+            .group("670"),
+        ParamSpec::new("fc_balance_l", "Left Balance")
+            .range(-1.0, 1.0)
+            .default(0.0)
+            .group("670"),
+        ParamSpec::new("fc_meter_l", "Left Metering")
+            .labels(vmu::METER_NAMES)
+            .default(vmu::METER_ZERO as f32)
+            .not_automatable()
+            .group("670"),
+        // The step attenuator: 21 detents, 1 dB apart, printed as
+        // attenuation from fully clockwise. The default is the manual's own
+        // unity-gain setting, "approx 10 db attenuation".
+        ParamSpec::new("fc_input_gain_r", "Right Input Gain")
+            .range(0.0, vmu::INPUT_GAIN_MAX_DB)
+            .steps(21)
+            .default(10.0)
+            .unit("dB")
+            .group("670"),
+        // **Panel units, not decibels.** The ring is printed 0 to 10 and
+        // the pot is linear with a 24 kΩ resistor on its centre tap, so its
+        // law has a kink; what it sets jointly with the DC threshold is a
+        // curve rather than a point. The law lives in the engine
+        // (`vmu::engine::ac_threshold_law`) and the panel prints the metal's
+        // numbers.
+        ParamSpec::new("fc_threshold_r", "Right Threshold")
+            .range(0.0, vmu::THRESHOLD_MAX)
+            .default(vmu::THRESHOLD_MAX)
+            .group("670"),
+        ParamSpec::new("fc_time_r", "Right Time Constant")
+            .labels(vmu::TIME_NAMES)
+            .default(2.0)
+            .group("670"),
+        // R117, the trimmer inside the chassis, as travel from fully
+        // anticlockwise. The default is the factory-adjusted condition,
+        // fitted to the published input/output curve 3.
+        ParamSpec::new("fc_dc_threshold_r", "Right DC Threshold")
+            .range(0.0, 1.0)
+            .default(0.20)
+            .group("670"),
+        // R142, the front-panel screwdriver marked ZERO. It is a bias trim
+        // wearing a meter-calibration label: moving it moves the operating
+        // point of all eight 6386 sections, so it changes the standing
+        // gain, the available gain reduction and the standing distortion
+        // together, and it moves the needle.
+        ParamSpec::new("fc_zero_r", "Right Zero")
+            .range(vmu::ZERO_MIN_V, vmu::ZERO_MAX_V)
+            .default(vmu::engine::V_BIAS_NOMINAL)
+            .unit("V")
+            .group("670"),
+        ParamSpec::new("fc_balance_r", "Right Balance")
+            .range(-1.0, 1.0)
+            .default(0.0)
+            .group("670"),
+        ParamSpec::new("fc_meter_r", "Right Metering")
+            .labels(vmu::METER_NAMES)
+            .default(vmu::METER_ZERO as f32)
+            .not_automatable()
+            .group("670"),
+        // S301: ten wafers that put a sum-and-difference matrix in front of
+        // both channels and another behind them. Not a stereo link — the
+        // two limiters stay entirely independent and are now working on mid
+        // and side.
+        ParamSpec::new("fc_agc", "AGC Mode")
+            .labels(vmu::AGC_NAMES)
+            .default(vmu::AGC_LEFT_RIGHT as f32)
+            .group("670"),
+        // Ours. GE publish 4000 µmhos for the 6386 and JJ 3000 for their
+        // modern replacement at the same operating point, which is a real
+        // published difference of 2.5 dB rather than a flavour.
+        ParamSpec::new("fc_tube", "Tube")
+            .labels(vmu::TUBE_NAMES)
+            .default(vmu::TUBE_GE_6386 as f32)
+            .not_automatable()
+            .group("670"),
+        ParamSpec::new("fc_oversample", "Oversampling")
+            .labels(vmu::OVERSAMPLE_NAMES)
+            .default(1.0)
+            .not_automatable()
+            .group("670"),
         ParamSpec::new("link", "Stereo Link")
             .toggle()
             .default(1.0)
@@ -1266,6 +1426,24 @@ pub fn param_index(s: &NoobVstWebguiFramework) -> ParamIx {
         ssl_drive: ix("ssl_drive"),
         ssl_range: ix("ssl_range"),
         ssl_oversample: ix("ssl_oversample"),
+        fc_model: ix("fc_model"),
+        fc_input_gain_l: ix("fc_input_gain_l"),
+        fc_input_gain_r: ix("fc_input_gain_r"),
+        fc_threshold_l: ix("fc_threshold_l"),
+        fc_threshold_r: ix("fc_threshold_r"),
+        fc_time_l: ix("fc_time_l"),
+        fc_time_r: ix("fc_time_r"),
+        fc_dc_threshold_l: ix("fc_dc_threshold_l"),
+        fc_dc_threshold_r: ix("fc_dc_threshold_r"),
+        fc_zero_l: ix("fc_zero_l"),
+        fc_zero_r: ix("fc_zero_r"),
+        fc_balance_l: ix("fc_balance_l"),
+        fc_balance_r: ix("fc_balance_r"),
+        fc_meter_l: ix("fc_meter_l"),
+        fc_meter_r: ix("fc_meter_r"),
+        fc_agc: ix("fc_agc"),
+        fc_tube: ix("fc_tube"),
+        fc_oversample: ix("fc_oversample"),
         link: ix("link"),
         mix: ix("mix"),
         sc_hpf: ix("sc_hpf"),
@@ -1412,6 +1590,39 @@ pub fn read_settings(audio: &AudioHandle, ix: &ParamIx) -> Settings {
             oversample: audio.param(ix.ssl_oversample) >= 0.5,
             ..gbus::Settings::default()
         },
+        // The Fairchild reads two of everything, because it is two
+        // complete limiters. The three switches come from the normalised
+        // value, which is the detent index; the rest are plain, because
+        // their panel numbers are what they are.
+        vmu: vmu::Settings {
+            model: audio.param(ix.fc_model).round().clamp(0.0, 1.0) as usize,
+            input_gain: [
+                audio.param(ix.fc_input_gain_l),
+                audio.param(ix.fc_input_gain_r),
+            ],
+            threshold: [
+                audio.param(ix.fc_threshold_l),
+                audio.param(ix.fc_threshold_r),
+            ],
+            time: [
+                audio.param(ix.fc_time_l).round().clamp(0.0, 5.0) as usize,
+                audio.param(ix.fc_time_r).round().clamp(0.0, 5.0) as usize,
+            ],
+            dc_threshold: [
+                audio.param(ix.fc_dc_threshold_l),
+                audio.param(ix.fc_dc_threshold_r),
+            ],
+            zero: [audio.param(ix.fc_zero_l), audio.param(ix.fc_zero_r)],
+            balance: [audio.param(ix.fc_balance_l), audio.param(ix.fc_balance_r)],
+            meter: [
+                audio.param(ix.fc_meter_l).round().clamp(0.0, 2.0) as usize,
+                audio.param(ix.fc_meter_r).round().clamp(0.0, 2.0) as usize,
+            ],
+            agc: audio.param(ix.fc_agc).round().clamp(0.0, 1.0) as usize,
+            tube: audio.param(ix.fc_tube).round().clamp(0.0, 1.0) as usize,
+            oversample: audio.param(ix.fc_oversample).round().clamp(0.0, 2.0) as usize,
+            ..vmu::Settings::default()
+        },
         vca: vca::Settings {
             input: audio.param(ix.dist_input),
             output: audio.param(ix.dist_output),
@@ -1467,6 +1678,7 @@ pub struct Processor {
     tg: tg::Compressor,
     gbus: gbus::Compressor,
     rms: rms::Compressor,
+    vmu: vmu::Compressor,
     /// The engine fading out (only meaningful while `xfade > 0`).
     outgoing: Model,
     /// Samples of crossfade left.
@@ -1504,6 +1716,7 @@ impl Processor {
             tg: tg::Compressor::new(sr),
             gbus: gbus::Compressor::new(sr),
             rms: rms::Compressor::new(sr),
+            vmu: vmu::Compressor::new(sr),
             outgoing: Model::Fet,
             xfade: 0,
             xfade_len: (XFADE_SECONDS * sr).round() as usize,
@@ -1537,6 +1750,7 @@ impl Processor {
         self.tg.set_sample_rate(sr);
         self.gbus.set_sample_rate(sr);
         self.rms.set_sample_rate(sr);
+        self.vmu.set_sample_rate(sr);
         self.first = true;
         self.reset();
     }
@@ -1589,6 +1803,7 @@ impl Processor {
             // only the resampler's round trip can cost anything.
             Model::Gbus => self.gbus.latency(),
             Model::Rms => self.rms.latency(),
+            Model::Vmu => self.vmu.latency(),
             Model::Opto => 0,
         }
     }
@@ -1638,6 +1853,7 @@ impl Processor {
                 Model::Tg => self.tg.reset(),
                 Model::Gbus => self.gbus.reset(),
                 Model::Rms => self.rms.reset(),
+                Model::Vmu => self.vmu.reset(),
             }
             changed = true;
         }
@@ -1650,6 +1866,7 @@ impl Processor {
         changed |= self.bridge.configure(s.bridge);
         changed |= self.tg.configure(s.tg);
         changed |= self.rms.configure(s.rms);
+        changed |= self.vmu.configure(s.vmu);
         self.settings = *s;
         self.first = false;
         if changed {
@@ -1676,6 +1893,7 @@ impl Processor {
             Model::Tg => self.tg.process_block(l, r),
             Model::Gbus => self.gbus.process_block(l, r),
             Model::Rms => self.rms.process_block(l, r),
+            Model::Vmu => self.vmu.process_block(l, r),
         }
     }
 
@@ -1760,6 +1978,15 @@ impl Processor {
                 self.gr_db = -f[4];
                 f[5]
             }
+            // The meter is a plate-current bridge across the output stage,
+            // not a gain-reduction movement: what the needle shows is how
+            // far the current has moved from its standing value, which is
+            // why the ZERO screw moves it too.
+            Model::Vmu => {
+                let f = self.vmu.meter_frame();
+                self.gr_db = -f[4];
+                f[5]
+            }
             Model::Gbus => {
                 let f = self.gbus.meter_frame();
                 self.gr_db = -f[4];
@@ -1832,6 +2059,10 @@ impl Processor {
             // drive fraction, which are the three quantities the whole
             // circuit is actually about.
             Model::Tg => self.tg.cell_state(),
+            // Not a photocell: the three timing capacitors of the
+            // Fairchild's network, which positions 5 and 6 are
+            // incomprehensible without.
+            Model::Vmu => self.vmu.cell_state(),
             _ => [0.0; 3],
         }
     }
@@ -1889,6 +2120,9 @@ impl Processor {
             Model::Gbus => self
                 .gbus
                 .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
+            Model::Vmu => self
+                .vmu
+                .transfer_curve(out, TRANSFER_MIN_DB, TRANSFER_MAX_DB),
         }
     }
 
@@ -1925,7 +2159,7 @@ impl Processor {
     pub fn publish(&mut self, audio: &mut AudioHandle) {
         audio.publish_slice(STREAM_IX.meter, &self.meter_frame());
         match self.settings.model {
-            Model::Opto | Model::Opto3 | Model::Opto1b | Model::Tg => {
+            Model::Opto | Model::Opto3 | Model::Opto1b | Model::Tg | Model::Vmu => {
                 audio.publish_slice(STREAM_IX.cell, &self.cell_state());
                 self.cell_zeroed = false;
             }

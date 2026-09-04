@@ -1,0 +1,714 @@
+/*
+ * The Fairchild's look: a satin near-black plate with white silkscreen,
+ * black two-part knobs, chrome bat toggles, brass screwdriver slots and two
+ * cream VU faces recessed into moulded bezels.
+ *
+ * **On the colours.** The dossier's 2.4 measured them off the rectified
+ * photograph and then said, in as many words, not to take the hex values as
+ * the answer: the image is underexposed on the panel, its darkest one per
+ * cent sits at luminance 0.7 of 255, and the whole frame has a warm cast, so
+ * the black is clipped and the "white" silkscreen measures warm off-white.
+ * What is safe from that table is the **relative ordering** and the meter's
+ * cream face, which is well exposed and clearly warmer than the silkscreen.
+ * So this uses a neutral near-black plate, white legends and a red over-zero
+ * arc — which is what a VU meter is by convention — and takes the cream from
+ * the measurement. Both photographs show a satin rather than gloss finish
+ * with visible fine scratching, so the plate carries a little surface noise.
+ *
+ * Everything here is the plug-in's own look. The framework supplies
+ * behaviour and nothing else.
+ */
+
+.lab-model--vmu {
+  --fair-plate: #0d0d0e;
+  --fair-plate-hi: #191a1c;
+  --fair-ink: #e6e2dd;
+  --fair-ink-dim: #9d9a95;
+  --fair-cream: #f3e5d5;
+  --fair-red: #b4453a;
+  --fair-brass: #b39a63;
+  --fair-chrome: #cdd2d6;
+  background: linear-gradient(180deg, #17181a 0%, #101112 100%);
+}
+
+/* ------------------------------------------------------------- the plate */
+
+.facefair {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+.facefair__plate {
+  flex: 1;
+  container-type: inline-size;
+  position: relative;
+  border-radius: 0.6cqw;
+  background: var(--fair-plate);
+  box-shadow:
+    inset 0 0 3cqw rgba(0, 0, 0, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.facefair__panel {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.6cqw;
+  overflow: hidden;
+  /* The satin finish: fine scratching, not a flat fill. */
+  background-image:
+    repeating-linear-gradient(102deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 30% 10%, var(--fair-plate-hi) 0%, var(--fair-plate) 62%);
+  color: var(--fair-ink);
+}
+.facefair.unlit .facefair__panel {
+  filter: brightness(0.6) saturate(0.7);
+}
+.facefair__ear {
+  width: 2.2%;
+  min-width: 10px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2a2b2d, #171819);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+  padding: 3% 0;
+}
+.facefair__ear .slot {
+  width: 46%;
+  height: 1.1%;
+  min-height: 3px;
+  border-radius: 2px;
+  background: #0a0a0b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/*
+ * Everything on this panel is placed by its measured centre, so `.abs` is
+ * translate(-50%, -50%) as it is on the 1176's face. The `.facefair__bezel`
+ * and `.facefair__dial` rules override the transform, because those two are
+ * given as boxes rather than centres.
+ */
+.lab-model--vmu .abs {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+/* --------------------------------------------------------- the silkscreen */
+
+.facefair__cap,
+.facefair__mini,
+.facefair__model,
+.facefair__onlabel,
+.facefair__fusecap,
+.facefair__fuseamp {
+  /*
+   * The legends are set in container units so the panel scales as one piece,
+   * with an 8 px floor: this face is nearly square and at the smallest
+   * window it is only a few hundred pixels wide, where a faithful 0.12 inch
+   * silkscreen would be three pixels tall and unreadable. Legibility wins
+   * over proportion at that size and nowhere else.
+   */
+  font-size: max(8px, 1.05cqw);
+  letter-spacing: 0.09em;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
+  line-height: 1.15;
+  color: var(--fair-ink);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+}
+.facefair__mini {
+  font-size: max(8px, 0.85cqw);
+  color: var(--fair-ink-dim);
+}
+.facefair__logo {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: max(13px, 2.4cqw);
+  letter-spacing: 0.01em;
+  color: var(--fair-ink);
+  white-space: nowrap;
+}
+.facefair__address {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15cqw;
+  font-size: max(7px, 0.62cqw);
+  letter-spacing: 0.05em;
+  color: var(--fair-ink-dim);
+  white-space: nowrap;
+  text-align: left;
+}
+.facefair__model {
+  font-size: max(8px, 0.9cqw);
+  letter-spacing: 0.22em;
+}
+
+/* --------------------------------------------------------- mains and fuse */
+
+.facefair__on {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5cqw;
+}
+.facefair__onlabel {
+  font-size: max(8px, 0.95cqw);
+}
+.facefair__screw {
+  width: 1.1cqw;
+  height: 1.1cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6e6f71, #2a2b2c 70%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+.facefair__fuse {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4cqw;
+}
+.facefair__fusecap {
+  width: 4.5cqw;
+  height: 4.5cqw;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: max(7px, 0.62cqw);
+  color: #d8d4cf;
+  background: radial-gradient(circle at 34% 28%, #3a3b3d, #131415 72%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* ------------------------------------------------------------- the meters */
+
+.facefair__bezel {
+  position: absolute;
+  transform: none;
+  border-radius: 1.2cqw;
+  background: linear-gradient(180deg, #0a0a0b, #131415);
+  box-shadow:
+    inset 0 0 1.4cqw rgba(0, 0, 0, 0.95),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.facefair__dial {
+  position: absolute;
+  transform: none;
+}
+.fairvu {
+  width: 100%;
+  height: 100%;
+}
+.fairvu svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.fairvu__face {
+  fill: var(--fair-cream);
+}
+.fairvu.unlit .fairvu__face {
+  fill: #8f877c;
+}
+.fairvu__arc {
+  fill: none;
+  stroke: #1b1a18;
+  stroke-width: 2.2;
+}
+.fairvu__arc.red {
+  stroke: var(--fair-red);
+  stroke-width: 4.2;
+}
+.fairvu__ticks line {
+  stroke: #1b1a18;
+  stroke-width: 2.4;
+}
+.fairvu__ticks line.minor {
+  stroke-width: 1.4;
+}
+.fairvu__ticks line.red {
+  stroke: var(--fair-red);
+}
+.fairvu__nums text {
+  fill: #1b1a18;
+  font-size: 15px;
+  font-weight: 600;
+}
+.fairvu__nums text.red {
+  fill: var(--fair-red);
+}
+.fairvu__pct line {
+  stroke: #4a463f;
+  stroke-width: 1.4;
+}
+.fairvu__pct text {
+  fill: #4a463f;
+  font-size: 11px;
+}
+.fairvu__vu {
+  fill: #1b1a18;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+}
+.fairvu__maker {
+  fill: #3a3630;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 22px;
+}
+.fairvu__needle {
+  stroke: #14120f;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+.fairvu__hub {
+  fill: #14120f;
+}
+
+/* -------------------------------------------------------------- the knobs */
+
+.fairknob {
+  position: relative;
+}
+.fairknob__dial {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+.fairknob__dial:focus-visible {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.55));
+}
+.fairknob__marks line {
+  stroke: var(--fair-ink-dim);
+  stroke-width: 0.7;
+}
+.fairknob__marks line.long {
+  stroke: var(--fair-ink);
+  stroke-width: 1.1;
+}
+.fairknob__marks text {
+  fill: var(--fair-ink);
+  font-size: 5.4px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.fairknob__skirt {
+  fill: radial-gradient(#000, #000);
+  fill: #101010;
+}
+.fairknob__skirtrim {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 0.7;
+}
+.fairknob__cap {
+  fill: #060606;
+}
+.fairknob__caprim {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 0.6;
+}
+.fairknob__dot {
+  fill: #f0ece6;
+}
+.fairknob__wing {
+  fill: #f0ece6;
+}
+.fairknob__value {
+  position: absolute;
+  left: 50%;
+  top: 104%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--fair-ink);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ------------------------------------------------------------- the levers */
+
+.fairlev {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqw;
+}
+.fairlev__legends {
+  display: flex;
+  gap: 0.7cqw;
+  align-items: flex-end;
+}
+.fairlev__leg {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-size: max(8px, 0.78cqw);
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: var(--fair-ink-dim);
+}
+.fairlev__leg.left {
+  transform: rotate(-16deg);
+}
+.fairlev__leg.right {
+  transform: rotate(16deg);
+}
+.fairlev__leg.on {
+  color: var(--fair-ink);
+}
+.fairlev__body {
+  position: relative;
+  width: 2.4cqw;
+  height: 5.6cqw;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: end center;
+}
+.fairlev__bat {
+  position: absolute;
+  bottom: 22%;
+  width: 0.85cqw;
+  height: 4.4cqw;
+  border-radius: 0.5cqw;
+  background: linear-gradient(180deg, #2b2c2e, #0d0d0e);
+  transform-origin: 50% 100%;
+  transition: transform 90ms ease;
+}
+.fairlev__bat i {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 0.5cqw solid transparent;
+  border-right: 0.5cqw solid transparent;
+  border-bottom: 0.8cqw solid #eeeae4;
+}
+.fairlev__bat.at0 {
+  transform: rotate(-26deg);
+}
+.fairlev__bat.at1 {
+  transform: rotate(0deg);
+}
+.fairlev__bat.at2 {
+  transform: rotate(26deg);
+}
+.fairlev__bush {
+  position: absolute;
+  bottom: 0;
+  width: 2.2cqw;
+  height: 1.1cqw;
+  border-radius: 0.6cqw;
+  background: linear-gradient(180deg, var(--fair-chrome), #7c8288);
+}
+.fairlev__caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: max(8px, 0.9cqw);
+}
+
+/* -------------------------------------------------------- the screwdrivers */
+
+.fairscrew {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.fairscrew__caption {
+  font-size: max(7px, 0.62cqw);
+  letter-spacing: 0.08em;
+  color: var(--fair-ink-dim);
+}
+.fairscrew__head {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: ns-resize;
+  touch-action: none;
+  outline: none;
+}
+.fairscrew__head:focus-visible {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.55));
+}
+.fairscrew__recess {
+  fill: #060607;
+}
+.fairscrew__body {
+  fill: var(--fair-brass);
+}
+.fairscrew.inside .fairscrew__body {
+  fill: #6f7276;
+}
+.fairscrew__slot {
+  fill: #17140e;
+}
+.fairscrew__rim {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.65);
+  stroke-width: 4;
+}
+.fairscrew__value {
+  position: absolute;
+  left: 50%;
+  top: 108%;
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--fair-ink);
+  font-size: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ------------------------------------------------------------ the toggles */
+
+.fairtog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqw;
+}
+.fairtog__label {
+  font-size: max(8px, 0.95cqw);
+  letter-spacing: 0.16em;
+  font-weight: 600;
+}
+.fairtog__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+}
+.fairtog__leg {
+  display: flex;
+  flex-direction: column;
+  font-size: max(8px, 0.78cqw);
+  letter-spacing: 0.06em;
+  color: var(--fair-ink-dim);
+  white-space: nowrap;
+}
+.fairtog__leg.on {
+  color: var(--fair-ink);
+}
+.fairtog__leg.left {
+  text-align: right;
+}
+.fairtog__body {
+  position: relative;
+  width: 3.2cqw;
+  height: 2.6cqw;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.fairtog__body.up {
+  width: 2.4cqw;
+  height: 4.4cqw;
+}
+.fairtog__bush {
+  position: absolute;
+  width: 1.9cqw;
+  height: 1.9cqw;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #e4e8ea, #7b8085 72%);
+}
+.fairtog__bat {
+  position: absolute;
+  width: 0.7cqw;
+  height: 2.6cqw;
+  border-radius: 0.4cqw;
+  background: linear-gradient(180deg, #33353a, #101113);
+  transform-origin: 50% 100%;
+  transition: transform 90ms ease;
+  z-index: 1;
+}
+.fairtog__bat.left {
+  transform: rotate(-32deg) translateY(-14%);
+}
+.fairtog__bat.right {
+  transform: rotate(32deg) translateY(-14%);
+}
+.fairtog__bat.up {
+  transform: translateY(-32%);
+}
+.fairtog__bat.down {
+  transform: translateY(6%) rotate(180deg);
+}
+
+/* ---------------------------------------------------------- the extras bar */
+
+.extrasfair__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.extrasfair__caption {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(230, 226, 221, 0.55);
+}
+.extrasfair__hint {
+  font-size: 10px;
+  color: rgba(230, 226, 221, 0.38);
+  max-width: 26ch;
+  line-height: 1.25;
+}
+.extrasfair__pair {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+/* ------------------------------------------------------- the charts panel */
+
+.lab-model--vmu .lab-bench.has-charts {
+  grid-template-columns: 292px 1fr 300px;
+}
+@media (max-height: 640px) {
+  .lab-model--vmu .lab-bench.has-charts {
+    grid-template-columns: 1fr;
+  }
+  .lab-model--vmu .lab-bench .lab-panel--charts {
+    display: none;
+  }
+}
+@media (max-width: 1180px) {
+  .lab-model--vmu .lab-bench.has-charts {
+    grid-template-columns: 1fr 300px;
+  }
+  .lab-model--vmu .lab-bench .lab-panel--charts {
+    display: none;
+  }
+}
+.fairchart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.fairchart__bars {
+  display: grid;
+  grid-template-columns: repeat(3, 22px) 1fr;
+  gap: 8px;
+  align-items: end;
+  height: 56px;
+  flex: none;
+}
+.fairchart__bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.fairchart .bar {
+  width: 12px;
+  flex: 1;
+  min-height: 0;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.fairchart .bar .fill {
+  width: 100%;
+  border-radius: 2px;
+}
+.fairchart .bar.ct .fill {
+  background: #d8a24a;
+}
+.fairchart .bar.cu .fill {
+  background: #7fa8c9;
+}
+.fairchart .bar.cv .fill {
+  background: #8fb98a;
+}
+.fairchart__barlabel {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(230, 226, 221, 0.5);
+}
+.fairchart__note {
+  font-size: 10px;
+  line-height: 1.3;
+  color: rgba(230, 226, 221, 0.4);
+  margin: 6px 0 0;
+}
+.fairchart__plots {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 6px;
+}
+.fairchart__plot {
+  margin: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fairchart__plot figcaption {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(230, 226, 221, 0.45);
+  margin-bottom: 2px;
+}
+.fairchart__plot svg {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+.fairchart__plot .grid line {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+.fairchart__plot .pub {
+  fill: none;
+  stroke: rgba(230, 226, 221, 0.34);
+  stroke-width: 1.4;
+}
+.fairchart__plot .axis text {
+  fill: rgba(230, 226, 221, 0.4);
+  font-size: 9px;
+}
+.fairchart__plot .live {
+  fill: #d8a24a;
+  stroke: #191713;
+  stroke-width: 1.2;
+}
+
+/* Short panels drop the prose and keep the plots, as the T4 panel does. */
+@container (max-height: 260px) {
+  .fairchart__note {
+    display: none;
+  }
+}

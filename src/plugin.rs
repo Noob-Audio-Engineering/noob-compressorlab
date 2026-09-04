@@ -28,7 +28,7 @@ use noob_vst_webgui_framework_nih::{EditorConfig, NoobVstWebguiFrameworkEditor, 
 
 use crate::dsp::{
     self, Model, Processor, Settings, Shared, bridge, fet, gbus, opto, opto1b, opto3, pre, rms, tg,
-    vca,
+    vca, vmu,
 };
 
 static UI: Dir = include_dir!("$CARGO_MANIFEST_DIR/web/dist");
@@ -60,6 +60,8 @@ pub enum ModelParam {
     Tg,
     #[name = "4000 G"]
     Gbus,
+    #[name = "670"]
+    Vmu,
 }
 
 /// The 1176's ratio buttons, as the host sees them.
@@ -332,6 +334,81 @@ pub enum SslOversampleParam {
     X1,
     #[name = "2x"]
     X2,
+}
+
+/// Which of the pair the Fairchild model wears. The dossier's 1.3 reads the
+/// two schematics side by side and finds one difference worth modelling: the
+/// cathode resistors, 680 ohm against 1800.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcUnitParam {
+    #[name = "660"]
+    U660,
+    #[name = "670"]
+    U670,
+}
+
+/// The Fairchild's TIME CONSTANT switch, printed 1 to 6.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcTimeParam {
+    #[name = "1"]
+    P1,
+    #[name = "2"]
+    P2,
+    #[name = "3"]
+    P3,
+    #[name = "4"]
+    P4,
+    #[name = "5"]
+    P5,
+    #[name = "6"]
+    P6,
+}
+
+/// The METERING lever, which reads plate current through the output stage
+/// rather than programme level: the push leg, the centre tap, the pull leg.
+/// The panel prints `BAL ZERO BAL`; these are POM Audio Design's names for
+/// the same three positions.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcMeterParam {
+    #[name = "Bal Push"]
+    BalPush,
+    #[name = "Zero"]
+    Zero,
+    #[name = "Bal Pull"]
+    BalPull,
+}
+
+/// S301: two independent limiters, or a matrix on both sides with the two
+/// channels working on lateral and vertical. **Not a stereo link.**
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcAgcParam {
+    #[name = "Left/Right"]
+    LeftRight,
+    #[name = "Lat/Vert"]
+    LatVert,
+}
+
+/// Which 6386 is fitted. GE publish 4000 micromhos and JJ 3000 at the same
+/// operating point, which is 2.5 dB.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcTubeParam {
+    #[name = "GE 6386"]
+    Ge,
+    #[name = "JJ 6386 LGP"]
+    Jj,
+}
+
+/// The Fairchild's oversampling. Three positions, because the loop is closed
+/// around the tube's own nonlinearity and the delay has to stay short
+/// against a 200 microsecond attack.
+#[derive(Enum, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FcOversampleParam {
+    #[name = "4x"]
+    X4,
+    #[name = "8x"]
+    X8,
+    #[name = "16x"]
+    X16,
 }
 
 /// The 33609's limiter attack lever.
@@ -730,6 +807,26 @@ pub struct NoobCompressorLabParams {
     pub ssl_drive: FloatParam,
     pub ssl_range: FloatParam,
     pub ssl_oversample: EnumParam<SslOversampleParam>,
+    /// The Fairchild. Two of everything, because it is two complete
+    /// limiters and its two channels are meant to be set differently.
+    pub fc_model: EnumParam<FcUnitParam>,
+    pub fc_input_gain_l: IntParam,
+    pub fc_input_gain_r: IntParam,
+    pub fc_threshold_l: FloatParam,
+    pub fc_threshold_r: FloatParam,
+    pub fc_time_l: EnumParam<FcTimeParam>,
+    pub fc_time_r: EnumParam<FcTimeParam>,
+    pub fc_dc_threshold_l: FloatParam,
+    pub fc_dc_threshold_r: FloatParam,
+    pub fc_zero_l: FloatParam,
+    pub fc_zero_r: FloatParam,
+    pub fc_balance_l: FloatParam,
+    pub fc_balance_r: FloatParam,
+    pub fc_meter_l: EnumParam<FcMeterParam>,
+    pub fc_meter_r: EnumParam<FcMeterParam>,
+    pub fc_agc: EnumParam<FcAgcParam>,
+    pub fc_tube: EnumParam<FcTubeParam>,
+    pub fc_oversample: EnumParam<FcOversampleParam>,
     /// Distressor knobs, 0..10.5.
     pub dist_input: FloatParam,
     pub dist_output: FloatParam,
@@ -1116,6 +1213,94 @@ impl Default for NoobCompressorLabParams {
             .with_step_size(0.1),
             ssl_oversample: EnumParam::new("Oversampling", SslOversampleParam::X2)
                 .non_automatable(),
+            fc_model: EnumParam::new("Unit", FcUnitParam::U670).non_automatable(),
+            fc_input_gain_l: IntParam::new(
+                "Left Input Gain",
+                10,
+                IntRange::Linear { min: 0, max: 20 },
+            )
+            .with_unit(" dB"),
+            fc_threshold_l: FloatParam::new(
+                "Left Threshold",
+                10.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 10.0,
+                },
+            )
+            .with_step_size(0.1),
+            fc_time_l: EnumParam::new("Left Time Constant", FcTimeParam::P3),
+            fc_dc_threshold_l: FloatParam::new(
+                "Left DC Threshold",
+                0.20,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            )
+            .with_step_size(0.01),
+            fc_zero_l: FloatParam::new(
+                "Left Zero",
+                vmu::engine::V_BIAS_NOMINAL,
+                FloatRange::Linear {
+                    min: vmu::ZERO_MIN_V,
+                    max: vmu::ZERO_MAX_V,
+                },
+            )
+            .with_unit(" V")
+            .with_step_size(0.1),
+            fc_balance_l: FloatParam::new(
+                "Left Balance",
+                0.0,
+                FloatRange::Linear {
+                    min: -1.0,
+                    max: 1.0,
+                },
+            )
+            .with_step_size(0.01),
+            fc_meter_l: EnumParam::new("Left Metering", FcMeterParam::Zero).non_automatable(),
+            fc_input_gain_r: IntParam::new(
+                "Right Input Gain",
+                10,
+                IntRange::Linear { min: 0, max: 20 },
+            )
+            .with_unit(" dB"),
+            fc_threshold_r: FloatParam::new(
+                "Right Threshold",
+                10.0,
+                FloatRange::Linear {
+                    min: 0.0,
+                    max: 10.0,
+                },
+            )
+            .with_step_size(0.1),
+            fc_time_r: EnumParam::new("Right Time Constant", FcTimeParam::P3),
+            fc_dc_threshold_r: FloatParam::new(
+                "Right DC Threshold",
+                0.20,
+                FloatRange::Linear { min: 0.0, max: 1.0 },
+            )
+            .with_step_size(0.01),
+            fc_zero_r: FloatParam::new(
+                "Right Zero",
+                vmu::engine::V_BIAS_NOMINAL,
+                FloatRange::Linear {
+                    min: vmu::ZERO_MIN_V,
+                    max: vmu::ZERO_MAX_V,
+                },
+            )
+            .with_unit(" V")
+            .with_step_size(0.1),
+            fc_balance_r: FloatParam::new(
+                "Right Balance",
+                0.0,
+                FloatRange::Linear {
+                    min: -1.0,
+                    max: 1.0,
+                },
+            )
+            .with_step_size(0.01),
+            fc_meter_r: EnumParam::new("Right Metering", FcMeterParam::Zero).non_automatable(),
+            fc_agc: EnumParam::new("AGC Mode", FcAgcParam::LeftRight),
+            fc_tube: EnumParam::new("Tube", FcTubeParam::Ge).non_automatable(),
+            fc_oversample: EnumParam::new("Oversampling", FcOversampleParam::X8).non_automatable(),
             dist_input: knob("Input"),
             dist_output: knob("Output"),
             dist_attack: knob("Attack"),
@@ -1381,6 +1566,40 @@ unsafe impl Params for NoobCompressorLabParams {
                 self.ssl_oversample.as_ptr(),
                 g("4000 G"),
             ),
+            (g("fc_model"), self.fc_model.as_ptr(), g("670")),
+            (
+                g("fc_input_gain_l"),
+                self.fc_input_gain_l.as_ptr(),
+                g("670"),
+            ),
+            (
+                g("fc_input_gain_r"),
+                self.fc_input_gain_r.as_ptr(),
+                g("670"),
+            ),
+            (g("fc_threshold_l"), self.fc_threshold_l.as_ptr(), g("670")),
+            (g("fc_threshold_r"), self.fc_threshold_r.as_ptr(), g("670")),
+            (g("fc_time_l"), self.fc_time_l.as_ptr(), g("670")),
+            (g("fc_time_r"), self.fc_time_r.as_ptr(), g("670")),
+            (
+                g("fc_dc_threshold_l"),
+                self.fc_dc_threshold_l.as_ptr(),
+                g("670"),
+            ),
+            (
+                g("fc_dc_threshold_r"),
+                self.fc_dc_threshold_r.as_ptr(),
+                g("670"),
+            ),
+            (g("fc_zero_l"), self.fc_zero_l.as_ptr(), g("670")),
+            (g("fc_zero_r"), self.fc_zero_r.as_ptr(), g("670")),
+            (g("fc_balance_l"), self.fc_balance_l.as_ptr(), g("670")),
+            (g("fc_balance_r"), self.fc_balance_r.as_ptr(), g("670")),
+            (g("fc_meter_l"), self.fc_meter_l.as_ptr(), g("670")),
+            (g("fc_meter_r"), self.fc_meter_r.as_ptr(), g("670")),
+            (g("fc_agc"), self.fc_agc.as_ptr(), g("670")),
+            (g("fc_tube"), self.fc_tube.as_ptr(), g("670")),
+            (g("fc_oversample"), self.fc_oversample.as_ptr(), g("670")),
             (g("link"), self.link.as_ptr(), g("extras")),
             (g("mix"), self.mix.as_ptr(), g("extras")),
             (g("sc_hpf"), self.sc_hpf.as_ptr(), g("extras")),
@@ -1475,6 +1694,32 @@ impl NoobCompressorLabParams {
                 range_db: self.ssl_range.value(),
                 oversample: matches!(self.ssl_oversample.value(), SslOversampleParam::X2),
                 ..gbus::Settings::default()
+            },
+            vmu: vmu::Settings {
+                model: self.fc_model.value() as usize,
+                input_gain: [
+                    self.fc_input_gain_l.value() as f32,
+                    self.fc_input_gain_r.value() as f32,
+                ],
+                threshold: [self.fc_threshold_l.value(), self.fc_threshold_r.value()],
+                time: [
+                    self.fc_time_l.value() as usize,
+                    self.fc_time_r.value() as usize,
+                ],
+                dc_threshold: [
+                    self.fc_dc_threshold_l.value(),
+                    self.fc_dc_threshold_r.value(),
+                ],
+                zero: [self.fc_zero_l.value(), self.fc_zero_r.value()],
+                balance: [self.fc_balance_l.value(), self.fc_balance_r.value()],
+                meter: [
+                    self.fc_meter_l.value() as usize,
+                    self.fc_meter_r.value() as usize,
+                ],
+                agc: self.fc_agc.value() as usize,
+                tube: self.fc_tube.value() as usize,
+                oversample: self.fc_oversample.value() as usize,
+                ..vmu::Settings::default()
             },
             tg: tg::Settings {
                 mode: self.tg_mode.value() as usize,

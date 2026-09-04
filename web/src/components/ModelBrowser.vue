@@ -92,6 +92,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
               <span class="browse__name">{{ m.label }}<span v-if="m.index === current" class="browse__badge">loaded</span></span>
               <span class="browse__sub">{{ m.sub }}</span>
               <span class="browse__blurb">{{ m.blurb }}</span>
+              <span class="browse__uses"><b>Good for</b> {{ m.uses }}</span>
             </span>
           </button>
           </div>

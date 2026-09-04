@@ -35,6 +35,7 @@ import BridgeFace from '../models/bridge/Faceplate.vue';
 import DbxFace from '../models/dbx/Faceplate.vue';
 import TgFace from '../models/tg/Faceplate.vue';
 import GbusFace from '../models/gbus/Faceplate.vue';
+import VmuFace from '../models/vmu/Faceplate.vue';
 
 const props = defineProps({
   modelKey: { type: String, required: true },
@@ -42,6 +43,36 @@ const props = defineProps({
 
 /** The width the faces are laid out at before scaling: a comfortable full-size panel. */
 const RENDER_W = 1100;
+
+/*
+ * **The portrait faces, which need both a layout height and a scale of
+ * their own.**
+ *
+ * Every landscape face is driven by width: the inner box is `RENDER_W`
+ * across, the panel fills it, and the height falls out. The 4000 G is a
+ * double 500-series module and is driven the other way, `height: 100%` with
+ * the width following from its aspect ratio. In the live view the stage
+ * gives it a definite height; here the inner box is out of flow with no
+ * height, so its height resolves to `auto`, the width comes from an aspect
+ * ratio off that, both axes end up indefinite and the panel collapses to
+ * nothing. `offsetHeight` then reads zero and the card drew an empty row,
+ * which is what a user reported.
+ *
+ * So a portrait face is laid out at `RENDER_W` of **its own long axis**,
+ * which keeps the two bases comparable: a 19-inch panel and a 3-inch module
+ * are each drawn at their full size and then scaled down, and the type in
+ * the two thumbnails lands within a fraction of a pixel of the same size.
+ * The layout height is set in the model's own stylesheet, since it is a
+ * fact about that panel's proportions.
+ *
+ * Scaling it by card width over `RENDER_W` the way a landscape face is
+ * scaled would give a row twelve hundred pixels tall, so a portrait preview
+ * is scaled to a target height instead: a third of the card, which stands
+ * it a little taller than the landscape panels beside it, as the hardware
+ * is.
+ */
+const PORTRAIT = new Set(['gbus']);
+const PORTRAIT_H_FRACTION = 1 / 3;
 
 /*
  * One entry per model in `MODELS`. A key missing here draws an empty card
@@ -59,6 +90,7 @@ const FACES = {
   dbx: DbxFace,
   tg: TgFace,
   gbus: GbusFace,
+  vmu: VmuFace,
 };
 const face = computed(() => FACES[props.modelKey] || null);
 
@@ -67,18 +99,35 @@ const inner = ref(null);
 const shown = shallowRef(false);
 const scale = ref(0.3);
 const height = ref(0);
+/*
+ * How far to push the laid-out box across. Zero for a landscape face, which
+ * fills the card; a portrait one is a fraction of the card wide and hugging
+ * the left edge of an otherwise empty row reads as a mistake rather than as
+ * a small module.
+ */
+const offsetX = ref(0);
 let io = null;
 let ro = null;
 
 function measure() {
   if (!host.value) return;
   const w = host.value.clientWidth;
-  if (w > 0) scale.value = w / RENDER_W;
   // `offsetHeight` ignores the transform, so this is the panel's own height
-  // at RENDER_W; the box it needs is that times the scale. Measuring the
-  // transformed rect instead reads back the scaled value and, before the
+  // at its layout size; the box it needs is that times the scale. Measuring
+  // the transformed rect instead reads back the scaled value and, before the
   // face has laid out, a short one, which clipped the preview.
   const h = inner.value ? inner.value.offsetHeight : 0;
+  if (PORTRAIT.has(props.modelKey)) {
+    if (w > 0 && h > 0) {
+      const target = w * PORTRAIT_H_FRACTION;
+      scale.value = target / h;
+      height.value = target;
+      offsetX.value = Math.max(0, (w - RENDER_W * scale.value) / 2);
+    }
+    return;
+  }
+  offsetX.value = 0;
+  if (w > 0) scale.value = w / RENDER_W;
   if (h > 0) height.value = h * scale.value;
 }
 
@@ -119,7 +168,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="host" class="facepv" :class="`facepv--${modelKey}`" :style="{ height: height ? `${Math.round(height)}px` : null }" aria-hidden="true">
-    <div ref="inner" class="facepv__inner" :style="{ width: `${RENDER_W}px`, transform: `scale(${scale})` }">
+    <div ref="inner" class="facepv__inner" :style="{ width: `${RENDER_W}px`, left: `${Math.round(offsetX)}px`, transform: `scale(${scale})` }">
       <component :is="face" v-if="shown && face" />
     </div>
   </div>

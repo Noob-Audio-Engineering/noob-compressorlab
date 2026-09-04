@@ -284,7 +284,7 @@ fn invert3(m: &[[f32; 3]; 3]) -> [[f32; 3]; 3] {
         let cols: Vec<usize> = (0..3).filter(|&x| x != s).collect();
         let d =
             m[rows[0]][cols[0]] * m[rows[1]][cols[1]] - m[rows[0]][cols[1]] * m[rows[1]][cols[0]];
-        if (r + s) % 2 == 0 { d } else { -d }
+        if (r + s).is_multiple_of(2) { d } else { -d }
     };
     let det = m[0][0] * c(0, 0) + m[0][1] * c(0, 1) + m[0][2] * c(0, 2);
     let mut out = [[0.0f32; 3]; 3];

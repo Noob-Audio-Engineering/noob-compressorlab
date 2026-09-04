@@ -41,7 +41,6 @@
 
 use crate::dsp::flush;
 use crate::dsp::opto::filters::OnePole;
-use crate::dsp::vu::Vu;
 
 use super::element::{Element, R_SERIES};
 use super::oversample::{Chain, Delay, latency};
@@ -671,7 +670,6 @@ pub struct Compressor {
     element: Element,
     k_i: f32,
     ch: [Channel; 2],
-    vu: Vu,
     gr_db: [f32; 2],
     in_peak: [f32; 2],
     out_peak: [f32; 2],
@@ -690,7 +688,6 @@ impl Compressor {
             element,
             k_i: fit_k_i(&element),
             ch: [Channel::new(sr), Channel::new(sr)],
-            vu: Vu::new(sr),
             gr_db: [0.0; 2],
             in_peak: [0.0; 2],
             out_peak: [0.0; 2],
@@ -711,7 +708,6 @@ impl Compressor {
     /// Change the sample rate, rebuilding everything that depends on it.
     pub fn set_sample_rate(&mut self, sr: f32) {
         self.sr = sr;
-        self.vu.set_sample_rate(sr);
         self.retune();
         self.reset();
     }
@@ -721,7 +717,6 @@ impl Compressor {
         for c in &mut self.ch {
             c.reset();
         }
-        self.vu.reset();
         self.gr_db = [0.0; 2];
         self.in_peak = [0.0; 2];
         self.out_peak = [0.0; 2];
@@ -891,14 +886,17 @@ impl Compressor {
             self.gr_db = [gr_sum[0] * inv, gr_sum[1] * inv];
             self.ctrl_a = [ctrl_sum[0] * inv, ctrl_sum[1] * inv];
             self.frames = n;
-            let target = -0.5 * (self.gr_db[0] + self.gr_db[1]);
-            self.vu.advance(target, n);
         }
     }
 
-    /// `[in_l, in_r, out_l, out_r, gr_db, meter_vu]` for the last block,
-    /// with `gr_db` **positive** for reduction, which is the lab's frame
-    /// convention; the lab negates it on the way out.
+    /// `[in_l, in_r, out_l, out_r, gr_db, meter_target]` for the last
+    /// block, with `gr_db` **positive** for reduction, which is the lab's
+    /// frame convention; the lab negates it on the way out.
+    ///
+    /// Slot 5 is the level the needle is **chasing**, not where it is. The
+    /// lab owns the movement and runs it once, in the audio thread; a `Vu`
+    /// here as well would put two cascaded movements in series. See
+    /// `dsp::tests::every_needle_runs_one_ballistic`.
     pub fn meter_frame(&self) -> [f32; 6] {
         [
             self.in_peak[0],
@@ -906,7 +904,7 @@ impl Compressor {
             self.out_peak[0],
             self.out_peak[1],
             0.5 * (self.gr_db[0] + self.gr_db[1]),
-            self.vu.value(),
+            -0.5 * (self.gr_db[0] + self.gr_db[1]),
         ]
     }
 

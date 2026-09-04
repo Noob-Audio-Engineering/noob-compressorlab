@@ -44,7 +44,7 @@ const VU_REF_DBFS = -18;
  * page, so every step in `MODEL_NAMES` needs an entry even if its view is
  * not built yet.
  */
-const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176', 'cl1b', 'bridge', 'dbx', 'tg', 'gbus'];
+const MODEL_KEYS = ['fet', 'opto', 'la3a', 'vca', 'pre6176', 'cl1b', 'bridge', 'dbx', 'tg', 'gbus', 'vmu'];
 const modelKey = () => MODEL_KEYS[Math.round(plain('model'))] || 'fet';
 
 /**
@@ -105,7 +105,7 @@ export const offline = {
   // source card has to say the host is the input rather than offer controls.
   // It exists so that presentation can be checked without a host.
   params: dropSource(stepped([
-    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B', '33609', '160', 'TG12413', '4000 G'], default: 0, group: 'lab', automatable: false },
+    { id: 'model', name: 'Model', labels: ['1176', 'LA-2A', 'LA-3A', 'Distressor', '6176', 'CL-1B', '33609', '160', 'TG12413', '4000 G', '670'], default: 0, group: 'lab', automatable: false },
 
     { id: 'fet_input', name: 'Input', min: 0, max: 48, default: 24, group: '1176' },
     { id: 'fet_output', name: 'Output', min: 0, max: 48, default: 24, group: '1176' },
@@ -243,6 +243,31 @@ export const offline = {
     { id: 'ssl_drive', name: 'Drive', min: 0, max: 100, default: 0, unit: '%', group: '4000 G' },
     { id: 'ssl_range', name: 'Range', min: 0, max: 20, default: 20, unit: 'dB', group: '4000 G' },
     { id: 'ssl_oversample', name: 'Oversampling', labels: ['1x', '2x'], default: 1, group: '4000 G', automatable: false },
+
+    // The Fairchild. Two of everything, because it is two complete limiters
+    // and its two channels are meant to be set differently — that is the
+    // whole point of the lateral-and-vertical mode. The threshold's 0 to 10
+    // is the panel's own scale and not decibels; the DC threshold is the
+    // trimmer inside the chassis, exposed because it is the ratio and knee
+    // control. Ranges and defaults are research/Fairchild-670.md 10.2.
+    { id: 'fc_model', name: 'Unit', labels: ['660', '670'], default: 1, group: '670', automatable: false },
+    { id: 'fc_input_gain_l', name: 'Left Input Gain', min: 0, max: 20, steps: 21, default: 10, unit: 'dB', group: '670' },
+    { id: 'fc_threshold_l', name: 'Left Threshold', min: 0, max: 10, default: 10, group: '670' },
+    { id: 'fc_time_l', name: 'Left Time Constant', labels: ['1', '2', '3', '4', '5', '6'], default: 2, group: '670' },
+    { id: 'fc_dc_threshold_l', name: 'Left DC Threshold', min: 0, max: 1, default: 0.2, group: '670' },
+    { id: 'fc_zero_l', name: 'Left Zero', min: -12, max: -3, default: -7.2, unit: 'V', group: '670' },
+    { id: 'fc_balance_l', name: 'Left Balance', min: -1, max: 1, default: 0, group: '670' },
+    { id: 'fc_meter_l', name: 'Left Metering', labels: ['Bal Push', 'Zero', 'Bal Pull'], default: 1, group: '670', automatable: false },
+    { id: 'fc_input_gain_r', name: 'Right Input Gain', min: 0, max: 20, steps: 21, default: 10, unit: 'dB', group: '670' },
+    { id: 'fc_threshold_r', name: 'Right Threshold', min: 0, max: 10, default: 10, group: '670' },
+    { id: 'fc_time_r', name: 'Right Time Constant', labels: ['1', '2', '3', '4', '5', '6'], default: 2, group: '670' },
+    { id: 'fc_dc_threshold_r', name: 'Right DC Threshold', min: 0, max: 1, default: 0.2, group: '670' },
+    { id: 'fc_zero_r', name: 'Right Zero', min: -12, max: -3, default: -7.2, unit: 'V', group: '670' },
+    { id: 'fc_balance_r', name: 'Right Balance', min: -1, max: 1, default: 0, group: '670' },
+    { id: 'fc_meter_r', name: 'Right Metering', labels: ['Bal Push', 'Zero', 'Bal Pull'], default: 1, group: '670', automatable: false },
+    { id: 'fc_agc', name: 'AGC Mode', labels: ['Left/Right', 'Lat/Vert'], default: 0, group: '670' },
+    { id: 'fc_tube', name: 'Tube', labels: ['GE 6386', 'JJ 6386 LGP'], default: 0, group: '670', automatable: false },
+    { id: 'fc_oversample', name: 'Oversampling', labels: ['4x', '8x', '16x'], default: 1, group: '670', automatable: false },
 
     { id: 'link', name: 'Stereo Link', toggle: true, default: 1, group: 'extras' },
     { id: 'mix', name: 'Mix', min: 0, max: 100, default: 100, unit: '%', group: 'extras' },

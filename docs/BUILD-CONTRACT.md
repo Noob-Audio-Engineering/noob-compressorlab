@@ -149,7 +149,15 @@ squashed into the bottom few per cent of the paper; the reading agreed and the l
 8.6 dB wrong at one end of the real operating range and 35.7 dB wrong at the other. A check made on a
 plot that cannot resolve the region it is checking can hardly fail, which is what makes it worse than
 no check: it produces a validated-looking model. If the region you cannot read is the region the unit
-actually works in, that is not a tail to be waved off, it is the behaviour. Three datasheets agreeing that a tube's amplification factor is 33
+actually works in, that is not a tail to be waved off, it is the behaviour.
+
+Two independent fits, to two different valves, by two people, in two different functional forms, both
+failed in the same direction: both cut the valve off far too early. The cause was shared. Both were
+fitted where linear-axis plots are legible and then extrapolated into a region those plots cannot
+show. **A remote-cutoff valve's whole purpose is its long shallow tail, and the tail is exactly what
+fitting to readable data throws away.** A logarithmic axis, a plate-resistance curve, or plate
+characteristics at constant grid voltage each resolve that region on its own terms, and any one of
+the three would have caught both fits. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

@@ -120,8 +120,12 @@ the repo where that is the only honest way.
 A figure from another vendor's emulation is not a target for us. Benchmark against the hardware.
 
 **A tabulated value at one operating point is never evidence about how a quantity varies, and neither
-is an average over one interval.** This caught three researchers in one afternoon, in three different
-disguises, so it is written down. Three datasheets agreeing that a tube's amplification factor is 33
+is an average over one interval.** This caught three researchers and me in one afternoon, in four
+different disguises, so it is written down. I wrote the rule and then broke it in the next message,
+arguing that two tubes shared a law because the ratio between their tapers was a constant, which is
+an average of averages and is the same inadmissible statistic one layer up. A researcher caught me.
+That is the reason this paragraph is phrased as a standing rule rather than as a war story: knowing
+it does not protect you from it. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

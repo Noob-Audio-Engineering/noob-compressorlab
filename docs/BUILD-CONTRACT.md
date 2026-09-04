@@ -169,7 +169,14 @@ A last caution on accuracy claims. Two manufacturers' curves for one valve diffe
 wherever both can be read, and that disagreement is a **measured accuracy floor**: a fitted law cannot
 be more accurate than its sources agree. Where only one datasheet exists, as for the other valve here,
 there is no floor at all, only a fit residual — and a residual says how well a curve was fitted, not
-how right the curve is. Do not quote a tolerance that implies cross-validation you do not have. Three datasheets agreeing that a tube's amplification factor is 33
+how right the curve is. Do not quote a tolerance that implies cross-validation you do not have. State a validity range as
+bounded below by the inter-source spread where two sources exist, and declared **unbounded** where
+only one does.
+
+That produces an asymmetry worth saying out loud, because it reads backwards otherwise: of the two
+valve laws in this project, the one with the **narrower** usable range has the better foundation, and
+the one with the wider range rests on a single document. A wider range is not a stronger result. It
+is often just a claim nobody has been able to check. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

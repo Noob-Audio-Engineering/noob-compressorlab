@@ -119,6 +119,16 @@ the repo where that is the only honest way.
 
 A figure from another vendor's emulation is not a target for us. Benchmark against the hardware.
 
+**A tabulated value at one operating point is never evidence about how a quantity varies, and neither
+is an average over one interval.** This caught three researchers in one afternoon, in three different
+disguises, so it is written down. Three datasheets agreeing that a tube's amplification factor is 33
+to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
+compared without checking they were quoted to the same endpoints will differ by whatever the
+endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that
+accelerates, because averaging is exactly the operation that destroys the shape. When the question is
+about a **shape**, the answer is a fit with its residual, over a stated span, of the same quantity on
+both sides. A slope is not a shape and a single point is neither.
+
 ## Verification
 
 `cargo test`, `cargo clippy --all-targets`, `cargo clippy --features plugin` in dev and `--release`,

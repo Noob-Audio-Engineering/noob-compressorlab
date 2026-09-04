@@ -157,7 +157,19 @@ fitted where linear-axis plots are legible and then extrapolated into a region t
 show. **A remote-cutoff valve's whole purpose is its long shallow tail, and the tail is exactly what
 fitting to readable data throws away.** A logarithmic axis, a plate-resistance curve, or plate
 characteristics at constant grid voltage each resolve that region on its own terms, and any one of
-the three would have caught both fits. Three datasheets agreeing that a tube's amplification factor is 33
+the three would have caught both fits.
+
+Reach for the **plate-resistance quotient first**, because it works from almost any sheet: resistance
+is the amplification factor over the transconductance, so it can be formed wherever both are plotted,
+and it grows without limit as the device cuts off. Constant-parameter plate characteristics are more
+direct where a maker chose to publish curves that deep, and one of the two makers in this project did
+while the other did not.
+
+A last caution on accuracy claims. Two manufacturers' curves for one valve differ by 1.3 to 1.5 dB
+wherever both can be read, and that disagreement is a **measured accuracy floor**: a fitted law cannot
+be more accurate than its sources agree. Where only one datasheet exists, as for the other valve here,
+there is no floor at all, only a fit residual — and a residual says how well a curve was fitted, not
+how right the curve is. Do not quote a tolerance that implies cross-validation you do not have. Three datasheets agreeing that a tube's amplification factor is 33
 to 35 say nothing about its bias dependence if all three quote the same operating point. Two ranges
 compared without checking they were quoted to the same endpoints will differ by whatever the
 endpoints differ by. And a two-point average slope cannot distinguish a constant taper from one that

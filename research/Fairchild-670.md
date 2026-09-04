@@ -946,6 +946,31 @@ region for the Fairchild.** Raffensperger's own simulation swings the control vo
 operates squarely in the range where its own tube law is 8 to 36 dB wrong. **Use eq. 1 inside roughly
 0 to −30 V and treat anything below −40 V as unmodelled**; section 10.4 records the range.
 
+**The same fault appears in the 176's tube law, in the same direction, and that is not a coincidence.** Their
+fitted 6BC8 law is usable from 0 to −8 V of grid to about ±4 dB and is **16 dB low by −10 V** [56]; mine is
+good to −30 V and 8.6 dB low by −50 V. **Both cut the tube off too early**, and both were fitted where
+linear-axis plots are readable and then extrapolated into a region those plots could not show. A
+remote-cutoff tube's whole purpose is the long shallow tail, and the tail is exactly what fitting to readable
+data discards. Two tubes, two functional forms, two people working independently, one fault: that is a
+property of the method, not an accident.
+
+**So the rule, which belongs beside any procedure for fitting these tubes.** A tube law must be validated
+against a plot that resolves deep cutoff *on its own terms* before it is trusted in the region a limiter
+actually works in. Three plots do that and any of them would have caught both fits: a **logarithmic**
+transconductance axis (GE page 3, 12.3a), **constant-parameter plate characteristics** (GE page 5, the table
+above), and a **plate-resistance** curve, which works because resistance grows without limit as the tube cuts
+off and so is legible exactly where current and transconductance are not [56].
+
+**And a floor on how accurate any of this can be, which I cannot compute for the 6386.** The 176 research
+observes that the two manufacturers' published gm curves for the 6BC8 differ from each other by 1.3 to
+1.5 dB where both are readable, so **a fitted law cannot be more accurate than its sources are consistent**,
+and their ±4 dB is bounded below by that rather than by their residual [56]. I cannot apply the same bound
+here: probing every volume on `frank.pocnet.net` for `6386`, `6386A` and `6386LGP` returns **exactly one
+sheet**, the General Electric ET-T1113 in volume 142 [12]. So there is no second manufacturer's curve for
+this tube to cross-check against, and any accuracy I claim for a 6386 law rests on a single source. **That is
+an asymmetry between the two units and it should be recorded rather than glossed**: the 176's law has a
+measured consistency floor and this one has none.
+
 **A deficiency in it that matters more than the divergence, and that I only found when the shared-component
 question forced me to differentiate it (12.3a).** The equation is fitted to plate *current*, and it
 reproduces current well — that is what my three-point check above tested. Its *slope* is a different matter,
@@ -3090,6 +3115,11 @@ voltage (5.6, 7.1, 2.6) — both are cited and the disagreement is stated rather
 53. `noob-compressorlab`, `research/Neve-33609.md`. The diode-bridge dossier, whose structure and standards
     this file follows.
 54. `noob-compressorlab`, `research/CL-1B.md`. The optical dossier, likewise.
+
+56. `noob-compressorlab`, `research/UA-176.md`. The variable-mu sibling dossier. Cited for the 6BC8's
+    measured μ behaviour (12.3), its fitted transconductance law and that law's validity range and
+    accuracy floor (4.3), and the observation that two manufacturers' curves for one tube differ by 1.3 to
+    1.5 dB. Several corrections in this file came from that research and are attributed where they land.
 
 **Unreachable, listed so nobody repeats the search**
 

@@ -16,7 +16,7 @@ A row whose published column reads *(none published)* is deliberate. Knowing tha
 |---|---|
 | sample rate | 48000 Hz |
 | block size | 256 samples |
-| generated | see the commit that carries this file |
+| generated | 2026-09-04 |
 
 Every measurement drives the real engine offline with generated signal and reads the same accessors the plug-in does. Nothing here is computed from a formula the model also uses.
 
@@ -166,7 +166,7 @@ Notes:
 - **high shelf at its printed corner, +9 dB step**: the corner is the half-gain point, which is where a feedback shelf's label conventionally sits
 - **THD at the +5 dBu equivalent output**: driven to -14.00 dBFS peak, the +5 dBu equivalent
 - **THD at the +15 dBu equivalent output**: driven to -4.04 dBFS peak, the +15 dBu equivalent
-- **worst in-band alias, 15 kHz into a hot microphone setting**: known miss, recorded in README: a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes, and the panel's own pad exists for that setting. This figure is the maximum of a 25 Hz sweep across the whole band below 10 kHz and is worse than the README's −51 dB, which was measured differently; the disagreement is worth resolving rather than picking whichever number flatters the model
+- **worst in-band alias, 15 kHz into a hot microphone setting**: known miss, recorded in README. **The method matters, so it is stated here.** This is the worst single product anywhere below 10 kHz, found by sweeping the band in 25 Hz steps, because the question an aliasing figure answers is whether anything audible got in, not whether one particular product did. The worst is the third harmonic of the 15 kHz tone folded to 3 kHz, and it is a discrete tone sitting 48 dB above its own neighbourhood rather than a noise floor. A narrower measurement had put this at −51 dB and missed it; the README now carries this figure
 - **610A versus 610B voicing**: the manufacturer describes the two voicings with adjectives; no measurement of one against the other exists
 
 ## CL-1B — Tube-Tech CL 1B
@@ -175,9 +175,9 @@ Figures from [`research/CL-1B.md`](research/CL-1B.md).
 
 | quantity | published | measured | verdict | source |
 |---|---|---|---|---|
-| 2:1 stop, 10 dB in from 3 dB of reduction | 5 ± 1 dB out | 6.005 dB out | **misses** | research/CL-1B.md §10, from the manual's worked example |
-| 2:1 stop, 10 dB in from 8 dB of reduction | 5 ± 1 dB out | 4.840 dB out | meets | research/CL-1B.md §10, from the manual's worked example |
-| 2:1 stop, 10 dB in from 14 dB of reduction | 5 ± 1 dB out | 4.424 dB out | meets | research/CL-1B.md §10, from the manual's worked example |
+| 2:1 stop, 10 dB in from 3 dB of reduction | 5 ± 1 dB out | 6.434 dB out | **misses** | research/CL-1B.md §10, from the manual's worked example |
+| 2:1 stop, 10 dB in from 8 dB of reduction | 5 ± 1 dB out | 5.154 dB out | meets | research/CL-1B.md §10, from the manual's worked example |
+| 2:1 stop, 10 dB in from 14 dB of reduction | 5 ± 1 dB out | 4.810 dB out | meets | research/CL-1B.md §10, from the manual's worked example |
 | Fixed attack, 63 % of an 18 dB step | 0.5 to 3 ms | 1.500 ms | meets | research/CL-1B.md §10.3 test 13, from the manual's 1 ms |
 | Fixed release, 63 % recovery | 20 to 120 ms | 101.167 ms | meets | research/CL-1B.md §10.3 test 18, from the manual's 50 ms |
 | Manual attack at the fast stop | 0.3 to 1.5 ms | 1.000 ms | meets | research/CL-1B.md §10.3 test 14, from the manual's 0.5 ms |
@@ -194,19 +194,18 @@ Notes:
 - **release at quarter travel, full recovery**: a logarithmic taper would put this at about 0.35 s; the pot is linear, which is why the manufacturer's own recommended vocal setting sits where it does
 - **the optical element's internals**: the manufacturer has never published what is inside the gain-reduction element, and a twenty-year forum thread asking directly never gets an answer
 
-## Where this disagrees with the README
+## Where this disagreed with the README, and how it was settled
 
-The README carries its own table of the figures these models do not reach, and it lists five. This run reports seven. A disagreement between the two is a finding in its own right, so rather than reconcile them silently, here is what differs.
+A benchmark and a README that contradict each other are worse than either alone, so each disagreement this run first produced was chased to a cause rather than reconciled by choosing a number. All four are settled and the two documents now agree.
 
-One earlier disagreement turned out to be this benchmark's fault and is recorded here rather than quietly deleted: the 610's distortion at the +15 dBu equivalent was reported as far below its published band, because the drive used the wrong decibel calibration and under-drove the stage. Corrected, it lands inside the published range and agrees with the repository's own test. A benchmark that disagrees with a passing test is at least as likely to be wrong as the test.
-
-| difference | what to do about it |
+| disagreement | what it turned out to be |
 |---|---|
-| The LA-3A's maximum gain reduction in Compress is short of the published 40 dB, and the README does not list it | The engine records this as a real divergence at its own test, on the grounds that in Compress every decibel of reduction takes a decibel off the side-chain so the loop starves itself. If that reasoning stands, the README's table should carry the row too. |
-| The 610's response at 20 kHz falls outside the published +0 / −1 dB, and the README does not list it | The README does discuss high-frequency droop from the anti-aliasing, and says the stage runs at 4x rather than 2x for exactly that reason. This measurement suggests 4x has not removed all of it. |
-| The 610's response at 20 kHz has no test at all | Nothing in `src/dsp/pre/tests.rs` asserts the published bandwidth at the top end, so this row is checking a figure the suite does not. That is a gap in the tests, not only in the model. |
-| The 610's worst alias measures −34.6 dB here against the README's −51 dB | Both cannot be right. This run takes the maximum of a 25 Hz sweep across everything below 10 kHz, which is a wider net than a measurement aimed at specific products. The method needs settling before either number is quoted. |
-| The CL 1B's 2:1 stop gives 6.0 dB here against the README's 6.4 dB | The same miss, measured from a slightly different operating point. Worth pinning one procedure. |
+| The 610's worst alias measured -34.6 dB here against the README's -51 dB | **The benchmark was right and the README is corrected.** Sweeping the whole band finds the third harmonic folded to 3 kHz, a discrete tone 48 dB above its neighbours that a narrower measurement had missed. The worst product anywhere is the honest figure for an aliasing claim, and the method is stated beside the row. |
+| The 610's 20 kHz response fell outside the published +0 / -1 dB, and nothing tested it | **Both faults were real.** A test now pins it. The cause is not the antiderivative anti-aliasing: that is exact in the linear region where this is measured, and the droop tracks the oversampling factor instead of shrinking with sample rate as segment averaging would. The two modelled transformer low-passes account for about 1.6 dB on their own, and their corners are estimates rather than measurements, so the design was over its own budget before anything else was added. The README carries the row. |
+| The LA-3A reached 37.7 dB against a published 40 in Compress | **The engine's reasoning holds, and the README carries the row.** Measured, depth rises about 4.3 dB for every 6 dB of extra drive, so the loop does starve itself: 40 dB is reachable in Compress, but only with about 12 dB more drive than the published figure specifies. Limit reaches it at the published level. |
+| The CL 1B's 2:1 stop gave 6.0 dB here against the README's 6.4 dB | **The benchmark was measuring nonsense.** Its search for the operating point silently clamped at 0 dBFS, so the 10 dB step ran into clipping. It now follows the repository's own procedure exactly, reading the static curve from -10 dBu to 0 dBu with the threshold calibrated there, and the two agree to a hundredth of a decibel. |
+
+One thing this run cannot settle, flagged rather than buried: at 192 kHz the 610 stage shows a **+2.8 dB rise at 10 kHz**, which no passive roll-off produces and which looks like a defect rather than a response. Fixing it is outside this benchmark’s remit, but it should not go unrecorded.
 
 ## Reading a miss
 

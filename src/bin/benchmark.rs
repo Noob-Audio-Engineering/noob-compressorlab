@@ -1592,11 +1592,13 @@ fn bench_pre() -> Section {
             },
         )
         .because(
-            "known miss, recorded in README: a hard-clipped 15 kHz tone has more harmonics than \
-             first-order anti-aliasing removes, and the panel's own pad exists for that setting. \
-             This figure is the maximum of a 25 Hz sweep across the whole band below 10 kHz and is \
-             worse than the README's −51 dB, which was measured differently; the disagreement is \
-             worth resolving rather than picking whichever number flatters the model",
+            "known miss, recorded in README. **The method matters, so it is stated here.** This is \
+             the worst single product anywhere below 10 kHz, found by sweeping the band in 25 Hz \
+             steps, because the question an aliasing figure answers is whether anything audible got \
+             in, not whether one particular product did. The worst is the third harmonic of the \
+             15 kHz tone folded to 3 kHz, and it is a discrete tone sitting 48 dB above its own \
+             neighbourhood rather than a noise floor. A narrower measurement had put this at −51 dB \
+             and missed it; the README now carries this figure",
         ),
     );
 
@@ -2024,43 +2026,55 @@ fn bench_opto1b() -> Section {
     }
 }
 
-/// Output change for a 10 dB input rise, starting from `depth` dB of
-/// reduction at the 2:1 stop.
-fn opto1b_ten_in(depth: f32) -> f32 {
-    // Find the input that gives the requested depth.
-    let mut lo = -50.0f32;
-    let mut hi = 0.0f32;
-    let measure = |dbfs: f32| {
+/// A sine amplitude at `x` dBu, on the CL 1B's own calibration where 0 VU
+/// is +4 dBu.
+fn opto1b_dbu(x: f32) -> f32 {
+    opto::model::VU_REF_AMP * 10f32.powf((x - 4.0) / 20.0)
+}
+
+/// The threshold knob giving `want` dB of reduction at `amp`, read off the
+/// static curve.
+fn opto1b_threshold_static(want: f32, amp: f32) -> f32 {
+    let (mut lo, mut hi) = (0.0f32, 1.0f32);
+    for _ in 0..40 {
+        let mid = 0.5 * (lo + hi);
         let mut c = opto1b::Compressor::new(SR);
         c.configure(opto1b::Settings {
             ratio: 0.0,
-            threshold: 0.7,
-            mode: opto1b::MODE_MANUAL,
+            threshold: mid,
             ..opto1b::Settings::default()
         });
-        let (_, gr) = steady(&mut c, 1000.0, amp_dbfs(dbfs), 4.0, 0.25, SR);
-        -gr
-    };
-    for _ in 0..18 {
-        let mid = 0.5 * (lo + hi);
-        if measure(mid) < depth {
+        if c.static_gr_db(amp) < want {
             lo = mid;
         } else {
             hi = mid;
         }
     }
-    let base = 0.5 * (lo + hi);
-    let out = |dbfs: f32| {
-        let mut c = opto1b::Compressor::new(SR);
-        c.configure(opto1b::Settings {
-            ratio: 0.0,
-            threshold: 0.7,
-            mode: opto1b::MODE_MANUAL,
-            ..opto1b::Settings::default()
-        });
-        settled_out_dbfs(&mut c, 1000.0, amp_dbfs(dbfs), 4.0, SR)
-    };
-    out(base + 10.0) - out(base)
+    0.5 * (lo + hi)
+}
+
+/// Output change for a 10 dB input step at the 2:1 stop, starting from
+/// `depth` dB of reduction.
+///
+/// This follows the repository's own test procedure exactly: the threshold
+/// is calibrated so the static curve gives `depth` at −10 dBu, and the step
+/// runs from −10 dBu to 0 dBu, read off that same static curve. An earlier
+/// version of this row drove the engine with signal from an operating point
+/// found by a search that silently clamped at 0 dBFS, so it stepped into
+/// clipping and reported a number that meant nothing. Where a repository
+/// test already defines how a published figure is measured, the benchmark
+/// has to measure it the same way or the two cannot be compared.
+fn opto1b_ten_in(depth: f32) -> f32 {
+    let p = opto1b_threshold_static(depth, opto1b_dbu(-10.0));
+    let mut c = opto1b::Compressor::new(SR);
+    c.configure(opto1b::Settings {
+        ratio: 0.0,
+        threshold: p,
+        ..opto1b::Settings::default()
+    });
+    let a = -10.0 - c.static_gr_db(opto1b_dbu(-10.0));
+    let b = 0.0 - c.static_gr_db(opto1b_dbu(0.0));
+    b - a
 }
 
 fn opto1b_manual_attack(knob: f32) -> f32 {
@@ -2234,50 +2248,31 @@ fn render(sections: &[Section]) -> String {
         }
     }
 
-    out.push_str("## Where this disagrees with the README\n\n");
     out.push_str(
-        "The README carries its own table of the figures these models do not reach, and it lists \
-         five. This run reports seven. A disagreement between the two is a finding in its own right, \
-         so rather than reconcile them silently, here is what differs.\n\n",
-    );
-    out.push_str(
-        "One earlier disagreement turned out to be this benchmark's fault and is recorded here \
-         rather than quietly deleted: the 610's distortion at the +15 dBu equivalent was reported as \
-         far below its published band, because the drive used the wrong decibel calibration and \
-         under-drove the stage. Corrected, it lands inside the published range and agrees with the \
-         repository's own test. A benchmark that disagrees with a passing test is at least as likely \
-         to be wrong as the test.\n\n",
-    );
-    out.push_str("| difference | what to do about it |\n|---|---|\n");
-    out.push_str(
-        "| The LA-3A's maximum gain reduction in Compress is short of the published 40 dB, and the \
-         README does not list it | The engine records this as a real divergence at its own test, on \
-         the grounds that in Compress every decibel of reduction takes a decibel off the side-chain \
-         so the loop starves itself. If that reasoning stands, the README's table should carry the \
-         row too. |\n",
-    );
-    out.push_str(
-        "| The 610's response at 20 kHz falls outside the published +0 / −1 dB, and the README does \
-         not list it | The README does discuss high-frequency droop from the anti-aliasing, and \
-         says the stage runs at 4x rather than 2x for exactly that reason. This measurement suggests \
-         4x has not removed all of it. |\n",
-    );
-    out.push_str(
-        "| The 610's response at 20 kHz has no test at all | Nothing in `src/dsp/pre/tests.rs` \
-         asserts the published bandwidth at the top end, so this row is checking a figure the suite \
-         does not. That is a gap in the tests, not only in the model. |\n",
-    );
-    out.push_str(
-        "| The 610's worst alias measures −34.6 dB here against the README's −51 dB | Both cannot be \
-         right. This run takes the maximum of a 25 Hz sweep across everything below 10 kHz, which is \
-         a wider net than a measurement aimed at specific products. The method needs settling before \
-         either number is quoted. |\n",
-    );
-    out.push_str(
-        "| The CL 1B's 2:1 stop gives 6.0 dB here against the README's 6.4 dB | The same miss, \
-         measured from a slightly different operating point. Worth pinning one procedure. |\n\n",
-    );
+        "## Where this disagreed with the README, and how it was settled
 
+",
+    );
+    out.push_str("A benchmark and a README that contradict each other are worse than either alone, so each disagreement this run first produced was chased to a cause rather than reconciled by choosing a number. All four are settled and the two documents now agree.
+
+");
+    out.push_str(
+        "| disagreement | what it turned out to be |
+|---|---|
+",
+    );
+    out.push_str("| The 610's worst alias measured -34.6 dB here against the README's -51 dB | **The benchmark was right and the README is corrected.** Sweeping the whole band finds the third harmonic folded to 3 kHz, a discrete tone 48 dB above its neighbours that a narrower measurement had missed. The worst product anywhere is the honest figure for an aliasing claim, and the method is stated beside the row. |
+");
+    out.push_str("| The 610's 20 kHz response fell outside the published +0 / -1 dB, and nothing tested it | **Both faults were real.** A test now pins it. The cause is not the antiderivative anti-aliasing: that is exact in the linear region where this is measured, and the droop tracks the oversampling factor instead of shrinking with sample rate as segment averaging would. The two modelled transformer low-passes account for about 1.6 dB on their own, and their corners are estimates rather than measurements, so the design was over its own budget before anything else was added. The README carries the row. |
+");
+    out.push_str("| The LA-3A reached 37.7 dB against a published 40 in Compress | **The engine's reasoning holds, and the README carries the row.** Measured, depth rises about 4.3 dB for every 6 dB of extra drive, so the loop does starve itself: 40 dB is reachable in Compress, but only with about 12 dB more drive than the published figure specifies. Limit reaches it at the published level. |
+");
+    out.push_str("| The CL 1B's 2:1 stop gave 6.0 dB here against the README's 6.4 dB | **The benchmark was measuring nonsense.** Its search for the operating point silently clamped at 0 dBFS, so the 10 dB step ran into clipping. It now follows the repository's own procedure exactly, reading the static curve from -10 dBu to 0 dBu with the threshold calibrated there, and the two agree to a hundredth of a decibel. |
+
+");
+    out.push_str("One thing this run cannot settle, flagged rather than buried: at 192 kHz the 610 stage shows a **+2.8 dB rise at 10 kHz**, which no passive roll-off produces and which looks like a defect rather than a response. Fixing it is outside this benchmark’s remit, but it should not go unrecorded.
+
+");
     out.push_str("## Reading a miss\n\n");
     out.push_str(
         "A miss here is not a defect to be hidden. Three audits of this repository found tests \

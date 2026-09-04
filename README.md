@@ -501,14 +501,16 @@ Three audits went through these engines against their research documents and fou
 been written to assert the model's own output instead of the figure they existed to check. Those are
 fixed: a test that exists to check a published number now asserts that number, and where the model
 cannot meet one, the gap is recorded here and in a comment at the test rather than legislated away.
-Five remain.
+Seven remain.
 
 | model | published | measured | why |
 |---|---|---|---|
 | 1176 | attack 7 below 60 µs at the 63 % criterion | about 350 µs | the knob map reaches 20 µs, but the closed loop adds the detector's own charging time and nothing compensates for it |
 | 1176 | soft knee, first 3 dB at least 30 % gentler than 10 dB up | about 8 % gentler at 4:1, and very slightly hard at 8:1 and 12:1 | the knee is whatever the diode detector's curvature makes it; nothing shapes it further |
 | 1176 | attack OFF below 0.1 % distortion at −18 dBFS | 0.14 % | the preamp and line amp are both a little into their curves at the 24 / 24 setting |
-| 610 | no alias above −80 dB with a 15 kHz tone into a hot microphone setting | −51 dB at the Gain switch's top, −64 dB at a normal setting | a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes; the pad on the front panel exists for exactly that setting |
+| 610 | no alias above −80 dB with a 15 kHz tone into a hot microphone setting | −34.6 dB at the Gain switch's top | a hard-clipped 15 kHz tone has more harmonics than first-order anti-aliasing removes; the pad on the front panel exists for exactly that setting. **The figure was −51 dB here until the benchmark swept the whole band below 10 kHz rather than checking selected products: the worst is the third harmonic folded to 3 kHz, a discrete tone 48 dB above its neighbours, which the narrower measurement had missed** |
+| 610 | +0 / −1 dB from 20 Hz to 20 kHz | −2.3 dB at 20 kHz; the low end meets it | the two modelled transformer low-passes account for about 1.6 dB of it on their own, and their corners are estimates in the research rather than measured values, so the design was over its own budget before anything else was added. It is **not** the antiderivative anti-aliasing, which is exact in the linear region where this is measured |
+| LA-3A | 40 dB of gain reduction at Peak Reduction 10 | about 34 dB at the published drive, reaching 40 dB only with 12 dB more | in Compress every decibel of reduction takes a decibel off the side-chain, so the loop starves itself: measured, depth rises about 4.3 dB for every 6 dB of extra drive. Limit reaches 40 dB at the published level, and both figures are asserted |
 | CL 1B | at the 2:1 stop, ten decibels in gives five out at every depth from 3 dB | 5.2, 4.8 and 4.8 dB from 8 dB of reduction and deeper; 6.4 dB from 3 dB | a feedback optical compressor has a soft knee near its threshold, which is what the reviews describe; the manual's sentence is a description of what the Ratio control selects rather than a knee specification |
 
 The 610's tube stages use **first-order antiderivative anti-aliasing**, which its research prescribes

@@ -423,6 +423,43 @@ fn the_output_transformer_bends_only_the_bottom() {
     );
 }
 
+/// 9.1, the other end of the same published figure.
+///
+/// **A recorded divergence, not a widened bound.** The specification is
+/// +0 / −1 dB from 20 Hz to 20 kHz [1 p.40], and the low end meets it in
+/// the test above. The top end does not: this stage measures about −2.3 dB
+/// at 20 kHz. Nothing asserted the top end at all until a benchmark of the
+/// published figures went looking for it, which is why it went unnoticed.
+///
+/// **It is not the antiderivative anti-aliasing**, which would have been
+/// the obvious suspect, because the shaper is exact in its linear region
+/// and this is measured at −40 dBFS. Driving the two modelled transformer
+/// low-passes through the published corners accounts for about 1.6 dB of
+/// it on their own, and those corners are estimates in the research rather
+/// than measured values, so the design was over its own budget before
+/// anything else was added.
+///
+/// The figure is pinned here so a regression is caught, and the README's
+/// table of missed figures carries the row.
+#[test]
+fn the_top_end_falls_outside_the_published_response() {
+    let mut st = stage(|s| {
+        s.gain = 0;
+        s.level = 5.0;
+    });
+    let mut at = |hz: f32| -> f32 {
+        st.reset();
+        let o = run(&mut st, db_to_lin(-40.0), hz, 1.0);
+        db(bin(&o, hz))
+    };
+    let top = at(20_000.0) - at(1000.0);
+    assert!(
+        (-3.0..=-1.5).contains(&top),
+        "the model measures about −2.3 dB at 20 kHz against a published +0 / −1 dB; \
+         measured {top:.2}, which is outside the range this divergence is pinned to"
+    );
+}
+
 #[test]
 fn the_a_voicing_is_dirtier_and_darker() {
     // 9.13.

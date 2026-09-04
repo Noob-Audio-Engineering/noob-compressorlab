@@ -2559,7 +2559,20 @@ family the plug-ins do not cover yet, so it will arrive with the first unit that
 So the question is not whether it is wanted but whether it qualifies on the second half of the rule, the way
 the diode bridge did.
 
-### 12.1 Yes — and it qualifies on the same footing as the diode bridge, no better
+### 12.1 Specify it, but do not create it yet
+
+**Read 12.3a before this section.** This section was written first and argued that a variable-mu component
+should be admitted now, on the same "about to be shared" footing the diode bridge was admitted on. **I no
+longer think that, for two reasons that arrived afterwards and are both recorded below.** The diode bridge's
+own footing collapsed when its predicted second user, the EMI TG12413, turned out not to contain a bridge at
+all, and the repository's rule has since been tightened to require two units *documented* to contain the
+part rather than one that does and one that is expected to. And 12.3a measures the two candidate tubes'
+control laws and finds their exponents genuinely different, 1.0 against 2.16, which means a second user
+cannot inherit the first one's curve and must be fitted independently before anyone knows what the shared
+part's parameterisation has to cover. The conclusion I would now defend is the one in 12.3a: **specify the
+component, write the plug-in's tube so it is separable, and lift it out when a second real fit exists.**
+The reasoning below about *what* would go in it and what would not still stands, and is why the
+specification is worth having now.
 
 **What the component would be: a remote-cutoff triode.** Not "the Fairchild's gain stage". The part is one
 triode section whose anode current is a function of grid and anode voltage, parameterised by a fitted law.

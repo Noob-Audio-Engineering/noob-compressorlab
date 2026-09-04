@@ -70,7 +70,7 @@
 //! | the dead-zone map, the clip, the rectifier, `I_max` | Raffensperger, all marked **E** in the dossier |
 //! | every timing component | the 660 factory drawing, see [`super::network`] |
 //! | [`A_V`] | **fitted** to the published input/output curve 3 |
-//! | [`GRID_V_AT_PLUS24_DBM`] | **fitted** to the published IM chart |
+//! | the grid swing at clipping | **derived** from the published +27 dBm clipping point |
 //! | [`REST_GAIN_DB`] | published input/output curve 1 |
 //! | [`CATHODE_HP_HZ`] | **fitted** to the published 40 Hz / −1 dB response |
 
@@ -157,9 +157,16 @@ pub const N_SC: f32 = 17.0;
 /// simulation* and the dossier marks it **E**; curve 3 is a factory
 /// measurement of the hardware and marks the ratio at five input levels. The
 /// two anchors are not of the same strength and this follows the stronger
-/// one. With this value the model reproduces the five published points of
-/// curve 3 to 0.16 dB RMS.
-pub const A_V: f32 = 20.0;
+/// one. With this value, and with the DC trimmer's factory setting fitted
+/// alongside it, the model reproduces the five published points of curve 3 to
+/// 0.16 dB RMS.
+///
+/// **Two constants fitted to one curve makes the tests that read that curve
+/// residuals rather than independent checks**, and tests 3, 4 and 5 say so.
+/// Two parameters against five points leaves three degrees of freedom, so the
+/// agreement is not empty; it is just not evidence in the way the IM chart
+/// and the release times are.
+pub const A_V: f32 = 55.0;
 /// Where stages two and three clip (Raffensperger, **E**).
 const V_CLIP: f32 = 100.0;
 /// Rectifier: germanium drop, softness and output resistance
@@ -195,16 +202,32 @@ pub const REST_GAIN_DB: f32 = 2.0;
 /// The attenuator setting the published curves were taken at, in dB. The
 /// manual's own unity-gain setting, and the model's default.
 pub const REF_ATTEN_DB: f32 = 10.0;
-/// Grid half-swing, in volts, that produces +24 dBm at the output with no
-/// limiting.
+/// The output level at which the unit clips, in dBm.
 ///
-/// **Fitted**, to the published IM chart's curve 7 (+24 dBm out), which
-/// reads about 3.8 % IM at zero limiting. It is the one constant that sets
-/// how hard the tubes are driven for a given output, and fixing it fixes the
-/// whole family: the model then reads 0.22 / 0.60 / 1.6 % at +12 / +16 /
-/// +20 dBm against the chart's 0.2–0.3 / 0.5–0.7 / 1.6–1.7 %, which is six
-/// published curves reproduced from one number.
-pub const GRID_V_AT_PLUS24_DBM: f32 = 13.0;
+/// **Published**, on the specification page: "output level +4 or +8 VU
+/// (+27 dbm clipping point)".
+///
+/// This is what sets how hard the tubes are driven for a given output, and
+/// it is **derived** rather than fitted: a triode stage clips when its grid
+/// reaches its cathode, so the grid half-swing at the clipping point is the
+/// standing bias, which the operating-point solve already gives. Nothing is
+/// chosen.
+///
+/// It used to be fitted to the published IM chart's top curve instead, and
+/// that is worth recording because of what changed. With the tube law as
+/// Raffensperger published it, a grid swing of 13 V at +24 dBm out
+/// reproduced the whole IM family — 0.21 / 0.57 / 1.61 / 3.56 % against the
+/// chart's 0.25 / 0.6 / 1.65 / 3.9. That agreement was a coincidence: the
+/// law it rested on is 5 to 37 dB wrong below −40 V, which is where a stage
+/// driven that hard spends its peaks (see [`super::triode`]). With the law
+/// corrected the stage is more linear than the unit is measured to be, its
+/// IM tops out near 1.4 %, and the two lowest readable curves of the chart
+/// still land — 0.24 and 0.55 % against 0.25 and 0.6 — while the top two do
+/// not. The two independent anchors agree at the bottom, which is the check
+/// that makes the derived swing believable; what the model does not have is
+/// four transformers a channel, and the dossier's 8.3 says not to model
+/// them.
+pub const CLIPPING_DBM: f32 = 27.0;
 
 /// The low corner, in Hz, of the first-order high-pass that stands for the
 /// 4 µF cathode bridge.
@@ -567,10 +590,14 @@ impl Compressor {
         let law = ControlLaw::build(&tube, R_K_670, V_BIAS_NOMINAL);
         // The two published anchors, solved together. At the reference
         // attenuator setting the unit's small-signal gain is REST_GAIN_DB,
-        // and at +24 dBm out the grids see GRID_V_AT_PLUS24_DBM volts:
+        // and at the published clipping point the grid swing equals the
+        // standing bias, because that is when a triode's grid reaches its
+        // cathode:
         //   K·G0·N_in = 10^((rest + ref_atten)/20)
-        //   K·G0      = peak(+24 dBm) / grid volts
-        let k_g0 = dbm_amp(24.0) * VOLTS_PER_AMP / GRID_V_AT_PLUS24_DBM;
+        //   K·G0      = peak(clipping) / |Vgk at rest|
+        let vk0 = quiescent_vk(&tube, R_K_670, V_BIAS_NOMINAL, 14.0);
+        let grid_at_clip = vk0 - V_BIAS_NOMINAL;
+        let k_g0 = dbm_amp(CLIPPING_DBM) * VOLTS_PER_AMP / grid_at_clip;
         let n_in = 10f32.powf((REST_GAIN_DB + REF_ATTEN_DB) / 20.0) / k_g0;
         let mut c = Compressor {
             sr,

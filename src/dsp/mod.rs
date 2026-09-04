@@ -85,7 +85,7 @@
 //! | `fc_input_gain_l`, `fc_input_gain_r` | 0..20 dB of attenuation, 21 detents | 10 | 670 |
 //! | `fc_threshold_l`, `fc_threshold_r` | 0..10, the panel's own scale and **not decibels** | 10 | 670 |
 //! | `fc_time_l`, `fc_time_r` | positions 1..6 | 3 | 670 |
-//! | `fc_dc_threshold_l`, `fc_dc_threshold_r` | 0..1, the trimmer inside the chassis | 0.20 | 670 |
+//! | `fc_dc_threshold_l`, `fc_dc_threshold_r` | 0..1, the trimmer inside the chassis | 0.07 | 670 |
 //! | `fc_zero_l`, `fc_zero_r` | −12..−3 V of standing grid bias | −7.2 | 670 |
 //! | `fc_balance_l`, `fc_balance_r` | −1..1 | 0 | 670 |
 //! | `fc_meter_l`, `fc_meter_r` | Bal Push / Zero / Bal Pull | Zero | 670 |
@@ -1177,7 +1177,7 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
         // fitted to the published input/output curve 3.
         ParamSpec::new("fc_dc_threshold_l", "Left DC Threshold")
             .range(0.0, 1.0)
-            .default(0.20)
+            .default(0.07)
             .group("670"),
         // R142, the front-panel screwdriver marked ZERO. It is a bias trim
         // wearing a meter-calibration label: moving it moves the operating
@@ -1226,7 +1226,7 @@ pub fn param_specs(with_source: bool) -> Vec<ParamSpec> {
         // fitted to the published input/output curve 3.
         ParamSpec::new("fc_dc_threshold_r", "Right DC Threshold")
             .range(0.0, 1.0)
-            .default(0.20)
+            .default(0.07)
             .group("670"),
         // R142, the front-panel screwdriver marked ZERO. It is a bias trim
         // wearing a meter-calibration label: moving it moves the operating

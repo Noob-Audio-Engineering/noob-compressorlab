@@ -151,7 +151,7 @@ impl Default for Settings {
             input_gain: [10.0; 2],
             threshold: [10.0; 2],
             time: [2; 2],
-            dc_threshold: [0.20; 2],
+            dc_threshold: [0.07; 2],
             zero: [engine::V_BIAS_NOMINAL; 2],
             balance: [0.0; 2],
             meter: [METER_ZERO; 2],

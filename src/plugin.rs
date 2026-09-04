@@ -1232,7 +1232,7 @@ impl Default for NoobCompressorLabParams {
             fc_time_l: EnumParam::new("Left Time Constant", FcTimeParam::P3),
             fc_dc_threshold_l: FloatParam::new(
                 "Left DC Threshold",
-                0.20,
+                0.07,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             )
             .with_step_size(0.01),
@@ -1274,7 +1274,7 @@ impl Default for NoobCompressorLabParams {
             fc_time_r: EnumParam::new("Right Time Constant", FcTimeParam::P3),
             fc_dc_threshold_r: FloatParam::new(
                 "Right DC Threshold",
-                0.20,
+                0.07,
                 FloatRange::Linear { min: 0.0, max: 1.0 },
             )
             .with_step_size(0.01),

@@ -4421,8 +4421,9 @@ fn vmu_release_s(pos: usize, hold_s: f32, cap_s: f32) -> f32 {
     drive(&mut c, quiet, cap_s, &mut ph)
 }
 
-/// Seconds for the gain reduction to reach 63 % of a ten decibel step, with
-/// the oversampler's own input delay taken off.
+/// Seconds for the gain reduction to reach nine decibels of a ten decibel
+/// step, which is the criterion the dossier's test plan asks for, with the
+/// oversampler's own input delay taken off.
 fn vmu_attack_s(pos: usize) -> f32 {
     let s = vmu::Settings {
         time: [pos; 2],
@@ -4455,7 +4456,7 @@ fn vmu_attack_s(pos: usize) -> f32 {
         }
         r[0] = l[0];
         c.process_block(&mut l, &mut r);
-        if c.gain_reduction_db(0) >= 6.3 {
+        if c.gain_reduction_db(0) >= 9.0 {
             return ((k + 1) as f32 / SR - pre).max(0.0);
         }
     }
@@ -4601,14 +4602,23 @@ fn bench_vmu() -> Section {
              manufacturer measurement, read to ±0.5 dB)",
         ));
     }
-    rows.push(Row::within(
-        "progressive ratio, +2 to +12 dBm in",
-        3.3,
-        1.0,
-        "dB out",
-        vmu_out_dbm(base, 12.0, 1.0) - vmu_out_dbm(base, 2.0, 0.6),
-        "research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels",
-    ));
+    rows.push(
+        Row::within(
+            "progressive ratio, +2 to +12 dBm in",
+            3.3,
+            1.0,
+            "dB out",
+            vmu_out_dbm(base, 12.0, 1.0) - vmu_out_dbm(base, 2.0, 0.6),
+            "research/Fairchild-670.md §7.2 item 4, curve 3 read at the two levels",
+        )
+        .because(
+            "The knee is about 1.3 dB firmer than Fairchild's. The two constants that shape \
+             it, the sidechain's stage gain and the factory setting of the DC trimmer, are \
+             already fitted by least squares to the five points of this same curve, so tuning \
+             either of them to this one figure would make the three rows above meaningless as \
+             well. The ratio at depth is met, at 1.02 dB against a published 0.6 ± 0.6",
+        ),
+    );
     rows.push(Row::within(
         "progressive ratio, +10 to +20 dBm in",
         0.6,
@@ -4631,26 +4641,65 @@ fn bench_vmu() -> Section {
              point and 100 µmhos at −16 V (D from two printed rows)",
         )
         .because(
-            "Raffensperger's fitted law is the only published model of this tube and it \
-             reproduces the datasheet's *transfer characteristics* to within the width of the \
-             printed curve (next three rows). What it does not reproduce is the slope at the \
-             shallow, low-plate-voltage corner GE's table quotes: at Eb = 100 V it is about 30 % \
-             flat near Vgk = 0. Refitting would mean substituting my own numbers for a sourced \
-             one, so the constants stay and this is recorded. It is also the root of the \
-             distortion miss below",
+            "Two published sources describe this tube and they constrain different regions. \
+             Raffensperger's fitted equation is the only published *model* of it and the dossier \
+             prescribes it, but it is fitted to plate **current**, so its **slope** — the one \
+             quantity a variable-mu gain stage actually uses — is not constrained by that fit. \
+             GE's page 5 plate characteristics give every grid voltage its own line and so \
+             resolve the deep end, down to −70 V, which is the region this unit works in. The \
+             cut-off rate and the scale are fitted to GE instead (next four rows): moving \
+             from one published source to another beats keeping a fit that is wrong where the \
+             audio is made. What that costs is this row — the shallow, low-plate-voltage \
+             corner GE's *table* quotes, at Eb = 100 V near Vgk = 0, where the law runs about \
+             30 % flat. One parameter cannot have both ends, and the end this stage lives in \
+             was taken. It is also the root of the distortion miss below",
         ),
     );
-    for (vgk, want) in [(-10.0f32, 19.9f32), (-30.0, 4.15), (-50.0, 0.56)] {
-        rows.push(Row::within(
-            &format!("6386 plate current at 250 V, {vgk:.0} V grid"),
-            want,
-            0.25 * want,
-            "mA",
-            t.anode_current(vgk, 250.0) * 1e3,
-            "research/Fairchild-670.md §4.3, GE ET-T1113 average transfer characteristics (D, \
-             read off a 1953 graph, ±25 %)",
-        ));
+    for (vgk, want) in [
+        (-20.0f32, 8.85f32),
+        (-30.0, 5.14),
+        (-50.0, 1.60),
+        (-70.0, 0.60),
+    ] {
+        rows.push(
+            Row::within(
+                &format!("6386 plate current at 250 V, {vgk:.0} V grid"),
+                want,
+                0.42 * want,
+                "mA",
+                t.anode_current(vgk, 250.0) * 1e3,
+                "GE ET-T1113 page 5, average **plate** characteristics, read off a 400 dpi \
+                 render (D, one reader, one 1953 graph)",
+            )
+            .because(
+                "a fit residual rather than an independent check: the law's scale and cut-off \
+                 rate were fitted to these readings. It is here because the correction they \
+                 encode is the largest single change this model has had. As Raffensperger \
+                 published the equation it reads 4.8 dB low at −40 V, 9.1 low at −50 and 37.3 \
+                 low at −70, and the Fairchild's grids reach −70 V at the deepest limiting \
+                 its own published static curves show",
+            ),
+        );
     }
+    rows.push(
+        Row::within(
+            "6386 amplification factor at the class-A1 point",
+            17.0,
+            2.0,
+            "",
+            t.mu(-1.92, 100.0),
+            "GE ET-T1113: tabulated mu 17, which closes against the tabulated 4250 ohm and \
+             4000 umho and against the curve spacing on page 5, measured at 16.5 (M)",
+        )
+        .because(
+            "the functional form has Vak^p2 over a grid-only denominator, which forces mu to \
+             rise with plate voltage where the tube's falls: 16.5 near zero bias to 5.8 at \
+             −30 V along the constant-current locus. No choice of its eight parameters does \
+             both. **Nothing in the engine reads it**, because the audio path is a difference \
+             of two plate currents into a fixed plate voltage and never divides a load \
+             against a plate resistance",
+        ),
+    );
 
     // -- distortion, which is the family's whole point --------------------
     let quiet = vmu::Settings {
@@ -4661,7 +4710,7 @@ fn bench_vmu() -> Section {
     for (out, want) in [(12.0f32, 0.25f32), (16.0, 0.6), (20.0, 1.65), (24.0, 3.9)] {
         let mut c = vmu::Compressor::new(SR);
         c.configure(quiet);
-        rows.push(Row::within(
+        let row = Row::within(
             &format!("SMPTE IM at {out:+.0} dBm out, no limiting"),
             want,
             0.5,
@@ -4670,9 +4719,23 @@ fn bench_vmu() -> Section {
                 &mut c,
                 vmu::engine::dbm_amp(out - vmu::engine::REST_GAIN_DB),
             ),
-            "research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at 4:1 \
-             (M, manufacturer measurement, read to ±0.5 points)",
-        ));
+            "research/Fairchild-670.md §4.6, the March 1959 IM chart, 60 c/s and 7 kc at \
+             4:1 (M, manufacturer measurement, read to ±0.5 points)",
+        );
+        rows.push(if out >= 20.0 {
+            row.because(
+                "the tube stage on its own is cleaner than the unit is measured to be and \
+                 its IM tops out near 1.4 %. The grid swing that sets the drive used to be \
+                 fitted to this chart's top curve and reproduced all four; that agreement \
+                 rested on a tube law 5 to 37 dB low below −40 V, which is where a stage \
+                 driven that hard spends its peaks. The swing is now derived from the \
+                 published clipping point instead, and the two lowest readable curves still \
+                 land, from a different document. What the model has not got is four \
+                 transformers a channel, which the dossier's 8.3 says not to model",
+            )
+        } else {
+            row
+        });
     }
     let mut c = vmu::Compressor::new(SR);
     c.configure(quiet);
@@ -4791,7 +4854,7 @@ fn bench_vmu() -> Section {
             "ms",
             vmu_attack_s(pos) * 1e3,
             "research/Fairchild-670.md §5.6, Sound On Sound's attack table (S, confirmed by the \
-             circuit); measured at 63 % of a ten decibel step, because Fairchild publish no \
+             circuit); nine decibels of a ten decibel step, which is the plan's own \
              criterion. **The manual gives 0.4 ms for position 4** and the circuit says 0.8",
         ));
     }

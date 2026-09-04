@@ -960,7 +960,7 @@ behind resistors of their own. Those two charge on their own clock, so while the
 pull the effective resistance down and the release is fast, and once they are charged the charge has
 to come back out through the same resistors and the release grows a long tail. All four fixed
 release times and **all three** of position 6's programme-dependent figures fall out of it — 0.3 s
-after a two-millisecond peak, 8.1 s after a third of a second of limiting, 18 s after three seconds
+after a two-millisecond peak, 6.6 s after a third of a second of limiting, 16.6 s after three seconds
 — and nobody, including Fairchild, had quantified those three before. The switch does not discharge
 the capacitors when it moves, which `t24` checks.
 
@@ -994,32 +994,101 @@ There is **no ratio control, no attack control and no release control**, and add
 be papering over a mechanism. The ratio is what the two threshold controls jointly produce; the
 attack and the release are what the timing network does.
 
+### The tube law, which had to be corrected against the datasheet it came from
+
+**Raffensperger's published equation cuts the 6386 off far too early, and this unit operates in
+exactly that region.** His is the only published model of the tube and the dossier prescribes it, so
+that is what this engine was built on; the dossier's check of it was three points on General
+Electric's *transfer* characteristics (page 4), where the whole family is crushed into the bottom few
+per cent of a linear current axis below −30 V. Read against the *plate* characteristics on page 5,
+which give every grid voltage its own line and so resolve the deep end:
+
+| Vgk at 250 V | GE | as published | corrected |
+|---|---|---|---|
+| −20 V | 8.85 mA | −1.0 dB | −0.2 dB |
+| −30 V | 5.14 mA | −1.9 dB | −0.5 dB |
+| −40 V | 3.61 mA | **−4.8 dB** | −1.7 dB |
+| −50 V | 1.60 mA | **−9.1 dB** | +1.7 dB |
+| −70 V | 0.60 mA | **−37.3 dB** | −0.2 dB |
+
+A remote-cutoff valve still passing half a milliamp at −70 V *is* the point of the type. The
+Fairchild's grids sit 22 V down at rest and reach −70 V at the deepest limiting its own published
+static curves show, so the model was spending its entire working range on the wrong part of its own
+valve law. **The correction is one parameter**: `p8`, the rate of the exponential cut-off term, which
+is the only part of the expression that is wrong — shallower than about −30 V that term is negligible
+and the power law carries the curve, which is why the published fit looks right on the plots it was
+checked against. Refitting it against the nine readings above, with `p1` renormalised, takes the
+least-squares residual from 20.05 to 0.09. Letting three more parameters move buys 0.03 more and is
+not taken.
+
+**What the correction bought, beyond being right.** Gain reduction became near-linear in control
+voltage — 2.2, 4.3, 8.3, 11.4 dB at 5, 10, 20 and 30 V — where the published law was strongly convex
+and exploded past 40 V. That is the assumption section 5.4 makes when it turns the timing network's
+RC products into the manual's six published release times, so the best derivation in the dossier now
+rests on a measured property rather than an asserted one. The six attack times now meet the published
+table at **the criterion the test plan asks for**, nine decibels of a ten decibel step; before the
+correction they missed at that criterion and only met at 63 %, and the fix was in the valve rather
+than in the criterion. And the distortion at ten decibels of limiting came down from 3.7 % to 2.1 %.
+
+**What it cost, and this is the more interesting half.** The corrected stage is *more linear* than
+the unit is measured to be. Its intermodulation tops out near 1.4 % where the March 1959 chart's top
+curve reads 3.9 %, so the two highest curves of that chart are now recorded misses. Before the
+correction one fitted constant — the grid swing at +24 dBm out — reproduced all four curves of that
+family, and that agreement was a coincidence: it rested on a law five to thirty-seven decibels low
+below −40 V, which is where a stage driven that hard spends its peaks. **A worse-looking model on a
+better footing** is the trade the testing standard exists to make, and the drive is no longer fitted
+to anything: a triode stage clips when its grid reaches its cathode, so the grid swing at the
+published +27 dBm clipping point is the standing bias, which the operating-point solve already gives.
+The two lowest readable curves of the chart still land — 0.24 and 0.55 % against 0.25 and 0.6 — from
+a completely different document, and that agreement between a derived swing and a measured chart is
+what makes the derivation believable.
+
+**The accuracy floor, stated rather than implied.** Only one datasheet for the 6386 exists, so there
+is no second manufacturer's curve to disagree with and no measured floor. The 0.89 dB RMS quoted
+above is a **fit residual** — how well the curve was fitted, by one person reading one 1953 graph —
+and not a statement about how right the curve is.
+
+**One quantity the functional form cannot reach.** The amplification factor is `dVp/dVg` at constant
+plate current, which is the *horizontal* spacing of the grid curves and a far easier reading than a
+current near the baseline. Measured off page 5 at 10 mA, the 0 V curve crosses at 75 V and the −2 V
+curve at 108 V, so μ = 16.5, falling to 5.8 at −30 V. That closes against GE's tabulated block, which
+closes against itself: 17 / 4250 Ω is 4000 µmho on the nose. This model's valve gives 9.7, because
+`Vak^p2` over a grid-only denominator forces μ to *rise* with plate voltage where the valve's falls,
+and no choice of the eight parameters does both. **Nothing in the engine reads it.** The audio path
+is a difference of two plate currents into a fixed plate voltage, so the gain is proportional to
+transconductance and no load is ever divided against a plate resistance — which is stated plainly
+here because it is the shortcut a variable-mu stage can hide, and the honest answer is that this
+model takes it. Over the working range the plate resistance rises 3.6-fold, from 3.6 kΩ a half at
+rest to 13 kΩ at depth, so a stage with a finite plate load would give measurably less gain
+reduction; the load the transformer reflects is not published anywhere, and inventing it would be
+inventing a constant that only a test could then justify.
+
 ### Its numbers, and where they come from
 
-Two of the anchors are manufacturer *measurements* rather than specifications, which is unusual here
-and is why this model is calibrated more tightly than most: the December 1959 input/output chart
-(five static curves with the control positions that produce each) and the March 1959 IM chart (seven
-curves of IM against limiting at seven output levels).
+Two of the anchors are manufacturer *measurements* rather than specifications, which is unusual here:
+the December 1959 input/output chart (five static curves with the control positions that produce
+each) and the March 1959 IM chart (seven curves of IM against limiting at seven output levels).
 
 | quantity | published | this model |
 |---|---|---|
-| straight-amplifier gain at 0 dBm in | +2.0 dBm | +2.00 |
-| factory curve at 0 / +5 / +10 / +15 / +20 dBm in | +2.0 / +4.3 / +5.3 / +5.7 / +5.9 dBm | +1.82 / +4.12 / +5.39 / +5.83 / +6.07 |
-| IM at +12 / +16 / +20 / +24 dBm out, no limiting | ≈0.25 / 0.6 / 1.65 / 3.9 % | 0.21 / 0.57 / 1.61 / 3.56 |
-| distortion at +18 dBm out, no limiting | under 1 % | 0.36 % |
-| release, positions 1 to 4 | 0.3 / 0.8 / 2 / 5 s | 0.30 / 0.82 / 2.33 / 4.72 |
-| release, position 6, peak / multiple / sustained | 0.3 / 10 / 25 s | 0.41 / 8.1 / 18.2 |
-| attack, positions 1 to 6 | 0.2 / 0.2 / 0.4 / **0.8** / 0.4 / 0.2 ms | 0.167 / 0.167 / 0.333 / 0.667 / 0.333 / 0.167 |
+| straight-amplifier gain at 0 dBm in | +2.0 dBm | +1.99 |
+| factory curve at 0 / +5 / +10 / +15 / +20 dBm in | +2.0 / +4.3 / +5.3 / +5.7 / +5.9 dBm | +1.93 / +4.29 / +5.08 / +5.62 / +6.10 |
+| IM at +12 / +16 dBm out, no limiting | ≈0.25 / 0.6 % | 0.24 / 0.55 |
+| IM at +20 / +24 dBm out, no limiting | ≈1.65 / 3.9 % | **1.09 / 1.39** |
+| distortion at +18 dBm out, no limiting | under 1 % | 0.29 % |
+| release, positions 1 to 4 | 0.3 / 0.8 / 2 / 5 s | 0.28 / 0.76 / 2.14 / 4.35 |
+| release, position 6, peak / multiple / sustained | 0.3 / 10 / 25 s | 0.32 / 6.6 / 16.6 |
+| attack, positions 1 to 6 | 0.2 / 0.2 / 0.4 / **0.8** / 0.4 / 0.2 ms | 0.167 / 0.167 / 0.375 / 0.771 / 0.375 / 0.167 |
 | frequency response, 40 Hz and 15 kHz | ±1 dB | −0.68 and −0.45 |
 | left-right separation, matrix in, channels matched | 60 dB | 232 dB |
 
-Three fitted constants, each named at its own definition in `src/dsp/vmu/engine.rs` and each fitted
-to a published figure rather than to taste: the sidechain's stage gain, fitted to curve 3 (which it
-then reproduces to 0.16 dB RMS across five points); the grid swing at +24 dBm out, fitted to the IM
-chart's top curve (which fixes the other three); and the cathode bridge's low corner, fitted to the
-published response band, because the dossier says outright that the corner is not established and
-instructs that it be set to meet the figure and then allowed to move with the operating point, which
-it does — from about 35 Hz at rest to 14 Hz at ten decibels of reduction.
+**Which of these are evidence and which are residuals.** Two engine constants — the sidechain's stage
+gain and the factory setting of the DC trimmer — are fitted by least squares to curve 3's five
+points, so that row is how well the fit closed rather than an independent check. Two valve constants
+are fitted to the nine plate-characteristic readings, so those are residuals too. Everything else in
+the table was fitted to nothing: the IM chart, every release and attack figure, the response and the
+separation are independent, and so are the valve's transconductance range and amplification factor,
+which is why both of those are misses rather than agreements.
 
 ### Two places the dossier contradicts itself, and how this rules
 
@@ -1055,8 +1124,8 @@ The table also carries a second kind of row: a **control the research specifies 
 not have**. Those are not missed figures, but they are the other way a model can quietly fall short
 of its document, and the reason each one is absent belongs where people look for gaps rather than
 buried in the model's own section.
-Twenty-four remain, four of them the 33609's, four the TG12413's, four the dbx 160's, three the
-670's and two the 4000 G's.
+Twenty-seven remain, six of them the 670's, four the 33609's, four the TG12413's, four the dbx
+160's and two the 4000 G's.
 
 | model | published | measured | why |
 |---|---|---|---|
@@ -1077,9 +1146,12 @@ Twenty-four remain, four of them the 33609's, four the TG12413's, four the dbx 1
 | 4000 G | `ssl_revision`, switching the panel between the console and the module | not implemented | the console's release switch has five positions and the module's six, and the ratio three against six, so one parameter cannot serve both without a dead detent. The research's section 2.5 settles which set is live: draw the module, because SSL publish a render and a dimensioned recall sheet of it and nothing legible of the console, and print the console's values on it, because card 82E27 gives those and nothing gives the module's |
 | 4000 G | `ssl_bypass` and `ssl_mix`, in the research's parameter table | not implemented | both duplicate a control the lab already shares. The research's own note calls `ssl_bypass` "the plug-in's own sample-exact bypass", which is `bypass`, and `ssl_mix` is `mix`. The hardware's IN switch is a separate thing and does have its own parameter, because it is not a bypass: it removes the sidechain and leaves the VCA and the make-up gain in circuit |
 | 4000 G | `ssl_oversample`'s 4x position | not implemented | both nonlinearities in this audio path are exactly second order, a squarer and a product of two signals, so their output bandwidth is exactly twice their input bandwidth and 2x already contains it with nothing left to fold. A 4x position could not differ audibly from 2x. 1x and 2x are offered |
-| 670 | the 6386's gain-control range, 32.0 dB ± 3 between GE's class-A₁ point and −16 V of grid | 26.1 dB | Raffensperger's is the only published fit of this tube and it is what the dossier prescribes. It reproduces the datasheet's *transfer characteristics* to within the width of the printed curve at three points across two decades of current, which is the check the dossier itself made; what it does not reproduce is the **slope** at the shallow, low-plate-voltage corner GE's table quotes, where it is about 30 % flat. Refitting the law would mean substituting my own numbers for a sourced one, so the constants stay |
-| 670 | distortion under 1 % at +12 dBm out and 10 dB of limiting | 3.7 % | the same cause. Holding the output while taking ten decibels of reduction means driving the grids ten decibels harder, which is the identity this engine exists to express and which no model of this circuit can avoid; what decides the cost is the shape of the tube's curve at the bias the control voltage has moved to, and the fitted law steepens faster below −35 V than the hardware evidently does. Because that law is also 6 dB short on the tube's control range, the model needs a larger control voltage to reach a given reduction and lands further down its own curve than the hardware does. **The direction is right and the specification's two no-limiting figures are met**: 0.08 % at +12 dBm and 0.36 % at +18 |
-| 670 | position 5's release, 2 s for individual peaks | 3.9 s | the dossier contradicts itself here and the section above gives the ruling: the mechanism it describes works at position 6, where the node's 0.44 s is fast against the legs' 0.8 and 2.0 s, and cannot work at position 5, where the node's 0.88 s is slower than its one leg's 0.8. Its multiple-peaks figure, 10 s, is met at 7.2 |
+| 670 | the 6386's gain-control range, 32.0 dB ± 3 between GE's class-A₁ point and −16 V of grid | 26.4 dB | Raffensperger's is the only published fit of this valve and its shallow end is the part this model does not use. Its cut-off rate has been corrected against GE's plate characteristics, which is the part the model does use and where the published version was 5 to 37 dB low; the shallow-end slope is untouched, because refitting it would have to be traded against the deep end this unit lives in |
+| 670 | the 6386's amplification factor at the class-A₁ point, 17 | 10.4 | the functional form has `Vak^p2` over a grid-only denominator, which forces μ to rise with plate voltage where the valve's falls: measured off the curve spacing on page 5, 16.5 near zero bias down to 5.8 at −30 V. No choice of its eight parameters does both. **Nothing in the engine reads it** — the audio path is a difference of two plate currents into a fixed plate voltage, so the gain is proportional to transconductance and no load is divided against a plate resistance |
+| 670 | intermodulation at +20 and +24 dBm out with no limiting, ≈1.65 and 3.9 % | 1.09 and 1.39 % | with the valve law corrected the stage is more linear than the unit is measured to be, and its IM tops out near 1.4 %. The drive is no longer fitted to this chart — it is derived from the published +27 dBm clipping point, since a triode clips when its grid reaches its cathode — and the two lowest readable curves still land, 0.24 and 0.55 % against 0.25 and 0.6, from a different document. What the model has not got is four transformers a channel, and the dossier's 8.3 says not to model them |
+| 670 | distortion under 1 % at +12 dBm out and 10 dB of limiting | 2.1 % | holding the output while taking ten decibels of reduction means driving the grids ten decibels harder, which is the identity this engine exists to express and which no model of this circuit can avoid; what decides the cost is the shape of the valve's curve at the bias the control voltage has moved to. Correcting the cut-off rate took this from 3.7 % to 2.1 %, which is most of the way and not all of it. **The specification's two no-limiting figures are met**: 0.09 % at +12 dBm and 0.29 % at +18 |
+| 670 | the factory curve's ratio just above threshold, 3.3 dB out for 10 dB in from +2 dBm | 2.0 dB | the knee is 1.3 dB firmer than Fairchild's. The two constants that shape it are already fitted to this same curve by least squares over its five points, so tuning them to this one figure would make both meaningless. The ratio at depth is met at 1.02 dB against a published 0.6 ± 0.6 |
+| 670 | position 5's release, 2 s for individual peaks | 3.3 s | the dossier contradicts itself here and the section above gives the ruling: the mechanism it describes works at position 6, where the node's 0.44 s is fast against the legs' 0.8 and 2.0 s, and cannot work at position 5, where the node's 0.88 s is slower than its one leg's 0.8. Its multiple-peaks figure, 10 s, is met at 6.5 |
 | 4000 G | the panel's 0.1 ms attack at 4:1, within the research's ±30 % | +30.2 % | **0.2 percentage points outside a tolerance the research itself calls wide on purpose.** The loop gain is `0.11513·d/k` and equals 3 only at the knee, so the harder the box is driven the faster it grabs, while the panel prints one number. Measured at one fixed input level giving 7 to 9.5 dB of reduction, which is how this box is used; the other five positions meet it, and at 12 dB of reduction the slowest runs 41 % fast while at 5 dB the fastest runs 176 % slow. Widening the window to 31 % to collect a green tick is the move this repository's standard forbids, so the figure stands and the miss is recorded |
 | 4000 G | the ratio rising 0.11513 per dB of gain reduction, at 4:1 and 10:1 | 0.130 and 0.180, +13 % and +56 % | that derivation treats D6 as an ideal 0.6 V drop, while the same document insists — correctly — that D6's soft turn-on **is** the knee. Both cannot hold: a real diode's incremental conductance stays below its asymptote until the control voltage is several thermal voltages, and the release resistor loads the loop by the remainder. `k` is 69, 23 and 7.7 mV/dB, so at 10:1 the whole 20 dB meter range is only 154 mV of control voltage and the diode never leaves its knee, which is the same observation the research makes from the other end when it notices that 10:1's `k` lands near the VCA's own 6.1 mV/dB. The 2:1 position meets the figure at +2.6 %. Nothing is calibrated away, because `k` is an estimate and the ratio calibration is the one test the research explicitly refuses to write |
 | dbx 160 | third harmonic 0.07 % below threshold on the 160X | 0.000 % | with no gain reduction there is no detector ripple, and the third harmonic in the hardware at that point belongs to an output stage dbx publish no distortion figure for, so anything here would be invented. The second-harmonic figure in the same row is met, because that one is the gain cell's and the cell is modelled |
@@ -1172,7 +1244,7 @@ ratio is what is asserted, and the note is at the test.
   the fixed one and that it gives up on long peaks; the meter's calibration; that the bus takes the
   larger reduction rather than the average; and the structural test whose only job is to prove the T4
   cell was not imported, which is the one that stops this becoming a third LA-2A.
-- **the Fairchild 670** (`src/dsp/vmu/tests.rs`): 35 tests numbered as its research's own test plan
+- **the Fairchild 670** (`src/dsp/vmu/tests.rs`): 37 tests numbered as its research's own test plan
   numbers them, each saying whether the figure it asserts is published and by whom, derived and by
   whom, or not available at all. The five points of the published input/output curve, its knee at
   +2 dBm, its plateau at +6 and its progressive ratio at two places — which no fixed-ratio
@@ -1185,7 +1257,13 @@ ratio is what is asserted, and the note is at the test.
   the channels match and that it is **not** a linked pair when they do not. That a moving
   common-mode voltage makes no sound at all, which is the anti-thump mechanism asserted as a
   floating-point zero rather than a chosen bound. And that turning the time-constant switch does not
-  discharge the network, which is the easy mistake here.
+  discharge the network, which is the easy mistake here. Two of the thirty-seven are **calibration
+  residuals and say so at the test**, because they read curves that engine constants were fitted to;
+  one asserts that Raffensperger's equation *as published* is 5 to 37 dB low at the deep end, which
+  is a falsifiable claim about a published equation rather than about this model; and one checks that
+  GE's tabulated amplification factor, plate resistance and transconductance close against each other
+  and against the curve spacing, which is the strongest statement available about a valve with only
+  one datasheet.
 - **the Neve 33609** (`src/dsp/bridge/tests.rs`): 30 tests numbered as its research's own test plan
   numbers them, so a failure names the test in the document it came from, and each one says whether
   the figure it asserts is published and by whom or derived and by whom. The 25 dB open bridge, which

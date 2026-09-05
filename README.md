@@ -89,7 +89,7 @@ flowchart LR
 cd web && npm install && npm run build && cd ..
 
 # standalone: demo sources through the active model, page on port 4244 (or the next free one)
-cargo run --bin noob-compressorlab-standalone -- --open
+cargo run --features plugin --bin noob-compressorlab-standalone -- --open
 
 # hot reload against the running standalone (proxies /ws and /instance* to it)
 cd web && npm run dev

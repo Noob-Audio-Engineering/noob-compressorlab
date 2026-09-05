@@ -43,6 +43,28 @@ await page.waitForFunction(
 // than empty.
 await page.waitForTimeout(2500);
 
+// The development panel is on under the standalone and off inside a host, so
+// a picture of it is a picture of something nobody using the plug-in sees.
+// Turn it off the way a person would --- by its own control --- and then look
+// again: if it is still there, put the control back rather than leaving the
+// page in a state nobody asked for.
+const devVisible = async () =>
+  page.locator('text=/development panel/i').first().isVisible().catch(() => false);
+if (await devVisible()) {
+  const toggle = page.locator('[title*="development panel" i]').first();
+  if (await toggle.count()) {
+    await toggle.click();
+    await page.waitForTimeout(400);
+    if (await devVisible()) {
+      await toggle.click();
+      console.error('the development panel would not close; photographed as it is');
+    } else {
+      console.log('closed the development panel');
+    }
+  }
+}
+await page.waitForTimeout(400);
+
 await page.screenshot({ path: out });
 await browser.close();
 

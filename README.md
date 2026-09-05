@@ -34,6 +34,19 @@ It shows what a product-sized plug-in looks like on the framework: the DSP, the 
 layout, and everything that is *not* about compressing audio (the bridge, server, host adapter,
 browser client, gestures, needle ballistics and charts) comes from noob-vst-webgui-framework.
 
+## Install it
+
+Every commit on `main` is built for Windows and macOS and published to the
+rolling [`latest`](https://github.com/Noob-Audio-Engineering/noob-compressorlab/releases/tag/latest)
+release: a VST3 and a CLAP in one zip, with a checksummed manifest beside them
+and a photograph of that build running.
+
+The easy way is the [Noob Plugin
+Manager](https://github.com/Noob-Audio-Engineering/noob-plugin-manager), which
+installs and updates every plug-in in this organisation and verifies the
+checksum before it writes anything. Or take the zip and unpack it into your
+plug-in folders yourself.
+
 ## Layout
 
 | path | what |

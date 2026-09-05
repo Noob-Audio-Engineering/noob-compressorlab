@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@noob-audio-engineering/noob-vst-webgui-framework": "github:Noob-Audio-Engineering/noob-vst-webgui-framework",
+    "@noob-audio-engineering/noob-vst-webgui-framework": "github:Noob-Audio-Engineering/noob-vst-webgui-framework#59e1f5611ab8a5fe7051f8500e627cf71761f1cb",
     "vue": "^3.5.0"
   },
   "devDependencies": {

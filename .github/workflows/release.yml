@@ -1,0 +1,185 @@
+# Build installable bundles for every commit on `main` and publish them where
+# the plug-in manager can find them.
+#
+# This file is identical in every Noob plug-in repository: the crate name, the
+# library name and the version are read from `Cargo.toml`, so nothing here is
+# edited when it is copied.
+#
+# `latest` is a prerelease on purpose --- it is the newest *commit*, not the
+# newest release, and installing it means tracking `main`. A tag push
+# (`v1.2.3`) publishes a permanent release beside it.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: windows-x86_64
+            # macOS gets one universal binary rather than two downloads, so an
+            # Apple Silicon and an Intel machine install the same file.
+            targets: ""
+          - os: macos-latest
+            label: macos-universal
+            targets: "--target aarch64-apple-darwin --target x86_64-apple-darwin"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+      - name: macOS cross targets
+        if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `include_dir!` embeds `web/dist`, so the page must exist before the
+      # library compiles or the plug-in ships with no interface.
+      - name: Build the page
+        working-directory: web
+        run: npm install --no-package-lock && npm run build
+
+      # nih-plug's own bundler rather than a hand-made layout. On Windows the
+      # difference is cosmetic; on macOS a `.vst3` is a real bundle with an
+      # `Info.plist` and a `PkgInfo`, and getting that wrong produces something
+      # that looks installed and never loads.
+      - name: Install the bundler
+        run: cargo install --git https://github.com/Noob-Audio-Engineering/nih-plug.git --branch host-resize cargo-nih-plug
+
+      - name: Read the crate's own name and version
+        id: crate
+        shell: bash
+        run: |
+          # `sed`, not `grep -oP`: this step runs on macOS too, where grep
+          # has no Perl mode.
+          pkg=$(awk -F'"' '/^name = /{print $2; exit}' Cargo.toml)
+          ver=$(awk -F'"' '/^version = /{print $2; exit}' Cargo.toml)
+          test -n "$pkg" && test -n "$ver" || { echo "could not read name/version"; exit 1; }
+          echo "pkg=$pkg" >> "$GITHUB_OUTPUT"
+          echo "ver=$ver" >> "$GITHUB_OUTPUT"
+          echo "package $pkg version $ver"
+
+      # `--features plugin` is not optional. Without it cargo builds the
+      # library without the entry points and the bundle is a shell.
+      - name: Bundle
+        run: cargo nih-plug bundle ${{ steps.crate.outputs.pkg }} --release --features plugin ${{ matrix.targets }}
+
+      # Check the artefact rather than the exit code: a library built without
+      # the feature compiles happily and exports nothing.
+      - name: Verify both entry points are present
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            bin="target/bundled/$pkg.vst3/Contents/x86_64-win/$pkg.vst3"
+          else
+            bin="target/bundled/$pkg.vst3/Contents/MacOS/$pkg"
+          fi
+          test -f "$bin" || { echo "no binary at $bin"; ls -R target/bundled; exit 1; }
+          size=$(wc -c < "$bin")
+          echo "$bin is $size bytes"
+          grep -qa GetPluginFactory "$bin" || { echo "no GetPluginFactory --- built without --features plugin?"; exit 1; }
+          grep -qa clap_entry       "$bin" || { echo "no clap_entry --- built without --features plugin?"; exit 1; }
+          test "$size" -gt 500000 || { echo "$size bytes is the stripped size"; exit 1; }
+          test -e "target/bundled/$pkg.clap" || { echo "no CLAP bundle"; exit 1; }
+
+      - name: Package
+        id: pack
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          zip="$pkg-${{ matrix.label }}.zip"
+          # Zip from inside `bundled` so the archive holds `name.vst3` and
+          # `name.clap` at its root, which is what the manifest promises.
+          (cd target/bundled && 7z a -tzip -bso0 "../../$zip" "$pkg.vst3" "$pkg.clap") \
+            || (cd target/bundled && zip -qry "../../$zip" "$pkg.vst3" "$pkg.clap")
+          if command -v sha256sum >/dev/null; then sha=$(sha256sum "$zip" | cut -d' ' -f1); else sha=$(shasum -a 256 "$zip" | cut -d' ' -f1); fi
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "$zip sha256 $sha"
+
+      # Published beside the zip so the manager can decide whether it needs
+      # the download before fetching it.
+      - name: Manifest
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          tag=latest; case "$GITHUB_REF" in refs/tags/*) tag=${GITHUB_REF#refs/tags/};; esac
+          cat > "$pkg-${{ matrix.label }}.json" <<JSON
+          {
+            "schema": 1,
+            "id": "$pkg",
+            "version": "${{ steps.crate.outputs.ver }}",
+            "commit": "$GITHUB_SHA",
+            "built": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platform": "${{ matrix.label }}",
+            "asset": "${{ steps.pack.outputs.zip }}",
+            "sha256": "${{ steps.pack.outputs.sha }}",
+            "url": "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/${{ steps.pack.outputs.zip }}",
+            "installs": [
+              { "kind": "vst3", "path": "$pkg.vst3", "into": "vst3" },
+              { "kind": "clap", "path": "$pkg.clap", "into": "clap" }
+            ]
+          }
+          JSON
+          cat "$pkg-${{ matrix.label }}.json"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: |
+            ${{ steps.pack.outputs.zip }}
+            ${{ steps.crate.outputs.pkg }}-${{ matrix.label }}.json
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # One release holding every platform, remade rather than updated so its
+      # date is the date of the build it holds. Both platforms must have
+      # succeeded to get here, so `latest` is never half a release.
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pkg=$(awk -F'"' '/^name = /{print $2; exit}' Cargo.toml)
+          ver=$(awk -F'"' '/^version = /{print $2; exit}' Cargo.toml)
+          short=${GITHUB_SHA:0:7}
+          ls -la dist
+          case "$GITHUB_REF" in
+            refs/tags/*)
+              tag=${GITHUB_REF#refs/tags/}
+              gh release create "$tag" --title "$pkg $ver" --notes "Commit $short." || true
+              ;;
+            *)
+              tag=latest
+              gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+              gh release create "$tag" --prerelease --title "$pkg (main)" \
+                --notes "The newest commit on \`main\`: $short, version $ver. Built and published automatically, so this moves every time \`main\` does."
+              ;;
+          esac
+          gh release upload "$tag" dist/* --clobber

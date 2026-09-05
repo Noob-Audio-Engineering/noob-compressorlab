@@ -1,0 +1,11 @@
+# Pinned so that "clippy is clean" means the same thing on this machine and in
+# CI. Unpinned, the runner installs whatever stable is that morning, and a lint
+# added upstream fails a build that passed locally an hour earlier --- which is
+# a check disagreeing with itself rather than a fault in the code.
+#
+# Bumping this is a deliberate act: change the version, run `cargo clippy
+# --all-targets --features plugin` locally, fix what the new toolchain finds,
+# and commit the two together.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]

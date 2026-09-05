@@ -11,6 +11,21 @@ homepage = "https://github.com/Noob-Audio-Engineering/noob-compressorlab"
 # A plug-in, not a library: nothing here goes to crates.io.
 publish = false
 
+
+# How this plug-in presents itself in the plug-in manager. It lives here so
+# each plug-in owns its own description --- the manager has no list of them.
+[package.metadata.noob]
+name = "Noob CompressorLab"
+accent = "#e2657a"
+tagline = "Eleven classic compressors behind one control, each modelled from its own sourced dossier."
+features = [
+    "Eleven models: FET, opto, VCA, variable-mu, diode bridge and more",
+    "Each engine measured against published figures: 192 met across 487 rows",
+    "The electrical parts are shared crates, so a photocell is one photocell",
+    "Per-model faces that look identical where they share controls",
+    "VU ballistics computed in the audio thread, one per needle",
+]
+
 [lib]
 crate-type = ["cdylib", "lib"]
 

@@ -121,6 +121,13 @@ jobs:
         run: |
           pkg=${{ steps.crate.outputs.pkg }}
           tag=latest; case "$GITHUB_REF" in refs/tags/*) tag=${GITHUB_REF#refs/tags/};; esac
+          # How the plug-in presents itself comes out of its own manifest,
+          # under `[package.metadata.noob]`, so the installer never holds a
+          # description of a plug-in it does not own. `null` when a crate has
+          # not filled it in --- the reader treats that as "not said" rather
+          # than as an error.
+          display=$(cargo metadata --no-deps --format-version 1             | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['packages'][0].get('metadata',{}).get('noob')))")
+          echo "display: $display"
           cat > "$pkg-${{ matrix.label }}.json" <<JSON
           {
             "schema": 1,
@@ -135,7 +142,8 @@ jobs:
             "installs": [
               { "kind": "vst3", "path": "$pkg.vst3", "into": "vst3" },
               { "kind": "clap", "path": "$pkg.clap", "into": "clap" }
-            ]
+            ],
+            "display": $display
           }
           JSON
           cat "$pkg-${{ matrix.label }}.json"

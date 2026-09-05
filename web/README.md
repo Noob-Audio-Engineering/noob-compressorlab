@@ -445,7 +445,7 @@ of Fairchild's charts and the transfer square in a row beneath.
 
 ## Styling
 
-`src/style.css` holds the Tailwind v4 setup (`@import`, the five model
+`src/style.css` holds the Tailwind v4 setup (`@import`, the eleven model
 files, `@source` pointing at the framework's Vue directory, every `@theme`
 token) and the shell: the frame, the top bar, the model switch, the grip, the shared
 workbench row and panel chrome. The two looks live side by side:

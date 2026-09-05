@@ -19,10 +19,15 @@ the tube preamp on the left and the limiter on the right; and the CL-1B's
 blue three-unit panel with its faceted black knobs, three-position levers
 and a ruby pilot jewel; and the 33609's slate blue-grey two-unit panel with
 its twelve switch knobs on bright knurled skirts, eight bat toggles and two
-staggered gain-reduction movements; and the 670's near-black eight-unit
-plate, the tallest panel here by a long way, with two cream VU faces
-recessed into moulded bezels, six black two-part knobs, two valve-current
-levers and four brass screwdriver slots. The framework
+staggered gain-reduction movements; the 160's black one-unit face with its
+red, blue and green knobs, its row of gain-reduction lamps and the 160A's
+OverEasy legend; the TG12413's grey module strip, portrait and switch-only,
+because it is a console module rather than a rack unit; the 4000 G's
+portrait 500-series module, the only face here that is taller than it is
+wide; and the 670's near-black eight-unit plate, the tallest panel here by a
+long way, with two cream VU faces recessed into moulded bezels, six black
+two-part knobs, two valve-current levers and four brass screwdriver slots.
+The framework
 supplies behaviour only: parameter handles, knob gestures in rotation space
 (`useKnobGesture` with the `rotation` option, so a printed taper stays under
 the pointer), the needle's ballistics and scale maths, the history and
@@ -150,8 +155,16 @@ Composables and data:
 
 ## The model switch
 
-The top bar's five keys are the framework's `Segmented` bound to the
-`model` parameter (non-automatable, saved in the plug-in state).
+The top bar carries a button rather than a row of keys, because eleven
+models will not fit across one. It opens a **browse view** that replaces the
+page: one model per row, grouped by family, each with its own faceplate
+drawn small as a live preview so a thumbnail cannot drift from the panel it
+represents. Each row says what the unit is, one line on how it works, and a
+**Good for** line naming actual sources rather than adjectives — snare and
+room mics for the 1176, kick and bass for the 160 where you want the body
+squeezed and the stick left alone. Picking one writes the `model` parameter
+(non-automatable, saved in the plug-in state); the settings of the model you
+were on are kept, which is what makes shopping around safe.
 `LabPage.vue` mounts the view for the active model and re-mounts it on a
 switch; every model's parameters exist all the time, so each keeps its
 settings while another is showing, and a preset of one model never touches
@@ -161,8 +174,9 @@ Rust side runs only the active engine and republishes the transfer curve on
 every switch.
 
 `MODELS` in `useLab.js` is the registry: each entry carries the view `key`,
-the label on the switch, the parameter-id prefixes the model `owns` and its
-meter selector. Ownership is a list rather than one prefix because the 6176
+the label, the name and one-line description the browse view shows, the
+`blurb` and the `uses` line under it, the `family` it is grouped by, the
+parameter-id prefixes the model `owns` and its meter selector. Ownership is a list rather than one prefix because the 6176
 owns two, its own `pre_*` section and the `fet_*` limiter it drives. That is
 what lets a 6176 preset set both halves while a 1176 preset still leaves
 `pre_*` alone.
@@ -398,12 +412,36 @@ identical under every face: the same card (`.lab-panel` in `style.css`,
 the LA-2A's workbench look, now the lab's), the same typography, grid and
 series colours (dim input, blue output, amber gain reduction hanging from
 the top of a −24..0 dB scale with a line every 6 dB; the amber transfer
-curve over −60..0 dBFS in against −60..+12 out, the dashed unity line and
-the live operating point). The framework's chart variables are fixed on
-the panel itself, so no model's root can tint them, and the row the panels
-sit in (`.lab-bench`, 12 px gaps and padding; the LA-2A adds the T4 panel
-as a first column) is shared too. Nothing about these panels differs per
-model; the faceplates and the extras strips keep their own looks.
+curve, the dashed unity line and the live operating point). The framework's
+chart variables are fixed on the panel itself, so no model's root can tint
+them, and the row the panels sit in (`.lab-bench`, 12 px gaps and padding;
+the LA-2A adds the T4 panel as a first column) is shared too. Nothing about
+these panels differs per model; the faceplates and the extras strips keep
+their own looks.
+
+**The transfer plot is square, and that is a correctness requirement rather
+than a taste.** Both axes span −60 to +12 dBFS and the plot area is held
+square, so a decibel is the same number of pixels horizontally and
+vertically and the unity line sits at 45 degrees. It did not, for a long
+time: the axes spanned 60 dB across against 72 up, in a box pinned at 300 px
+wide whose height grew with the window, so the curve stretched further the
+larger the window got. A transfer curve whose unity line is not at 45
+degrees misreads the one thing it exists to show. The square is capped at
+300 px on **both** axes — capping only the width is what let the stretch
+back in once — and centred in whatever room it is given.
+
+**And the row is capped at 366 px**, which is exactly that square plus its
+chrome and the row's own padding. Without it the row took every spare pixel
+of a tall window and the panels inside stretched to fill it: at 2560 × 1440
+the photocell panel was three thin bars at the foot of an empty box and the
+history grid spread four gridlines over 450 px. The freed height is left as
+ground below the bench rather than redistributed, because the alternatives
+both move the plate away from the bench bar that controls it.
+
+Two faces place the shared panels differently, and only the placement
+differs: the 4000 G puts them beside its portrait plate rather than under
+it, and the 670 runs the history full width with the timing network, both
+of Fairchild's charts and the transfer square in a row beneath.
 
 ## Styling
 

@@ -1,15 +1,24 @@
 # Noob CompressorLab
 
-Five classic compressors in one free plug-in by Noob Audio Engineering, built on
+Eleven classic compressors in one free plug-in by Noob Audio Engineering, built on
 [noob-vst-webgui-framework](https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework).
-Each instance is set to one model and the page draws the matching faceplate:
+Each instance is set to one model and the page draws the matching faceplate. They cover every family
+a compressor's gain element can belong to, which is the point of the collection:
 
 - the **1176**, a feedback FET compressor, in any of its nine revisions and three looks;
 - the **LA-2A**, a tube optical leveller, with its big knobs, VU face and the T4 cell laid bare;
 - the **LA-3A**, the solid-state successor: the same cell, driven far harder;
 - the **Distressor**, a VCA compressor with eight curves, two distortion modes and British mode;
 - the **6176**, the 610 tube preamp bolted to the front of the 1176;
-- the **CL 1B**, the Danish tube optical one, whose time constants are on the panel rather than in the cell.
+- the **CL 1B**, the Danish tube optical one, whose time constants are on the panel rather than in the cell;
+- the **33609**, a diode-bridge limiter and compressor in series, each with its own detector;
+- the **160**, the only one here that listens to power rather than peaks, so it has no attack or
+  release controls at all: a true-RMS detector's are one and the same;
+- the **TG12413**, a console module rather than a rack unit, with no threshold and no ratio — you
+  drive it and it decides;
+- the **4000 G**, the mix-bus one, whose ratio rises as it works so the curve never straightens;
+- the **670**, the variable-mu tube pair, which computes no gain at all: its output is the
+  difference of two valve currents and the sidechain moves a bias.
 
 Flip the model switch and the same instance becomes another box; the switch is a parameter, so a
 project remembers it.
@@ -31,29 +40,43 @@ browser client, gestures, needle ballistics and charts) comes from noob-vst-webg
 |---|---|
 | `src/dsp/mod.rs` | the lab: `Model`, `Settings`, the parameter ids and specs, the streams, the `Processor` that hosts every engine and switches between them |
 | `src/dsp/fet/` | the 1176: the oversampled feedback FET model, its revisions, knob maps and tests |
-| `src/dsp/opto/` | the LA-2A: the T4 cell model, sidechain and tube stage, and its tests |
-| `src/dsp/opto3/` | the LA-3A: the same cell with a transistor sidechain and a class-AB amplifier |
+| `src/dsp/opto/` | the LA-2A: the sidechain and tube stage around the T4 cell, and its tests |
+| `src/dsp/opto3/` | the LA-3A: the same cell lit harder, with a transistor sidechain and a class-AB amplifier |
 | `src/dsp/vca/` | the Distressor: the dB-domain feedback loop, its eight curves and its distortion generator |
 | `src/dsp/pre/` | the 610 preamp stage, which with the 1176 behind it makes the 6176 |
-| `src/dsp/opto1b/` | the CL 1B: its own optical element, the three-node attenuator and the three timing modes |
-| `src/dsp/rms/` | the dbx 160: the Blackmer gain cell, the true-RMS log-domain detector, the static curve and both units' limits |
+| `src/dsp/opto1b/` | the CL 1B: the three-node attenuator and the three timing modes, around a photoresistor that is not a T4 |
+| `src/dsp/bridge/` | the Neve 33609: a limiter and a compressor in series, each with its own detector, around a diode bridge |
+| `src/dsp/rms/` | the dbx 160: the static curve and both units' limits, around a Blackmer cell and a true-RMS detector |
+| `src/dsp/tg/` | the EMI TG12413: the germanium sidechain, the two-segment law and the twenty-one-step output ladder |
+| `src/dsp/gbus/` | the SSL 4000 G: the feedback loop whose ratio rises with reduction, and the two-section release ladder |
+| `src/dsp/vmu/` | the Fairchild 660/670: the push-pull valve pair, the six-position timing network and the lateral/vertical matrix |
 | `src/dsp/source.rs` | the standalone's demo signals (vocal, bass, drums, noises, tones) |
 | `src/dsp/tests.rs` | tests of the lab itself: the contract, the switch, the telemetry |
 | `src/plugin.rs` | the nih-plug VST3 / CLAP plug-in (feature `plugin`) |
 | `src/bin/standalone.rs` | the dev server with a fake audio thread |
 | `web/` | the Vue + Tailwind page, one view per model ([its README](web/README.md)) |
 | `research/` | how the originals work and how they are simulated, and [`SURVEY.md`](research/SURVEY.md) for what to model next and why |
+| `docs/BENCHMARK.md` | every published figure each model is measured against, with what it meets and what it misses |
+| `docs/BUILD-CONTRACT.md` | the rules every model is built to, written down because they kept having to be retyped |
+
+**The parts are not in here.** Every electrical component these engines contain — the photocell, the
+diode bridge, the diode arm pair, the Blackmer gain cell, the true-RMS detector, the remote-cutoff
+triode, the small-signal triode, the transformer and the field-effect transistor used as a variable
+resistor — lives in
+[noob-electrical-components](https://github.com/Noob-Audio-Engineering/noob-electrical-components),
+one crate per part behind a feature. What stays here is the machine around them: the resistors that
+bias a part, the sidechain that drives it, the make-up gain after it, and every number fitted against
+this plug-in's own tests rather than published. That line is the components repository's rule and it
+is worth reading before adding a model.
 
 ```mermaid
 flowchart LR
     subgraph instance["one instance"]
         model["model parameter"] --> proc["Processor"]
-        proc -->|"active"| fet["fet::Compressor (1176)"]
-        proc -.->|"idle"| opto["opto (LA-2A)"]
-        proc -.->|"idle"| opto3["opto3 (LA-3A)"]
-        proc -.->|"idle"| vca["vca (Distressor)"]
-        proc -.->|"idle"| pre["pre + fet (6176)"]
-        fet --> meter["meter / cell / transfer / lamps streams"]
+        proc -->|"active"| fet["fet (1176)"]
+        proc -.->|"idle"| rest["the other ten engines"]
+        fet --> parts["parts from noob-electrical-components"]
+        parts --> meter["meter / cell / transfer / lamps streams"]
     end
     meter --> page["page: the faceplate of the active model"]
     model --> page

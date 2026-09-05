@@ -230,4 +230,28 @@ jobs:
                 --notes "The newest commit on \`main\`: $short, version $ver. Built and published automatically, so this moves every time \`main\` does."
               ;;
           esac
+          # The photograph is of the interface, which is the same on both
+          # platforms, so one is taken and every manifest names it. Doing this
+          # here rather than in the build is what makes that possible: only
+          # this job can see both platforms' files at once, and it can tell
+          # whether the picture exists rather than naming a URL and hoping.
+          shot=$(ls dist/*-banner.png 2>/dev/null | head -1)
+          if [ -n "$shot" ]; then
+            url="https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$(basename "$shot")"
+            for f in dist/*.json; do
+              python3 - "$f" "$url" <<'PY'
+          import json, sys
+          path, url = sys.argv[1], sys.argv[2]
+          with open(path) as fh:
+              doc = json.load(fh)
+          doc["banner"] = url
+          with open(path, "w") as fh:
+              json.dump(doc, fh, indent=2)
+          PY
+              echo "$f -> $url"
+            done
+          else
+            echo "no photograph was taken; the manifests say so"
+          fi
+
           gh release upload "$tag" dist/* --clobber

@@ -99,6 +99,36 @@ jobs:
           test "$size" -gt 500000 || { echo "$size bytes is the stripped size"; exit 1; }
           test -e "target/bundled/$pkg.clap" || { echo "no CLAP bundle"; exit 1; }
 
+      # A photograph of the plug-in running, for the manager's banner. The
+      # standalone serves exactly the page the plug-in embeds over exactly the
+      # same bridge, so this is the plug-in rather than a drawing of it --- and
+      # it cannot go stale, because it is taken from the build it ships beside.
+      #
+      # One platform only: the interface is the same on both, and two banners
+      # would be two things to keep agreeing with each other.
+      - name: Photograph it running
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          # The standalone runs a fake audio thread and opens no window, so it
+          # needs neither a sound card nor a desktop to be photographed.
+          cargo build --release --features plugin --bin "$pkg-standalone"
+          ./target/release/"$pkg-standalone".exe --port 4400 &
+          echo $! > standalone.pid
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:4400/ && break
+            sleep 1
+          done
+          # Installed at the repository root, unsaved, so `playwright` resolves
+          # for the script and nothing about the page's own dependencies moves.
+          npm install --no-save --no-package-lock playwright@1.49.0
+          npx playwright install chromium
+          node .github/screenshot.mjs http://127.0.0.1:4400/ "$pkg-banner.png" 1200 700
+          kill "$(cat standalone.pid)" 2>/dev/null || true
+          test -s "$pkg-banner.png" || { echo "no banner was written"; exit 1; }
+        continue-on-error: true
+
       - name: Package
         id: pack
         shell: bash
@@ -128,6 +158,13 @@ jobs:
           # than as an error.
           display=$(cargo metadata --no-deps --format-version 1             | python3 -c "import json,sys; print(json.dumps(json.load(sys.stdin)['packages'][0].get('metadata',{}).get('noob')))")
           echo "display: $display"
+          # Null when the photograph could not be taken --- the manager treats
+          # that as "no banner" rather than as a broken plug-in.
+          banner=null
+          if [ -f "$pkg-banner.png" ]; then
+            banner="\"https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$pkg-banner.png\""
+          fi
+          echo "banner: $banner"
           cat > "$pkg-${{ matrix.label }}.json" <<JSON
           {
             "schema": 1,
@@ -143,7 +180,8 @@ jobs:
               { "kind": "vst3", "path": "$pkg.vst3", "into": "vst3" },
               { "kind": "clap", "path": "$pkg.clap", "into": "clap" }
             ],
-            "display": $display
+            "display": $display,
+            "banner": $banner
           }
           JSON
           cat "$pkg-${{ matrix.label }}.json"
@@ -154,6 +192,8 @@ jobs:
           path: |
             ${{ steps.pack.outputs.zip }}
             ${{ steps.crate.outputs.pkg }}-${{ matrix.label }}.json
+            ${{ steps.crate.outputs.pkg }}-banner.png
+          if-no-files-found: warn
 
   publish:
     name: Publish

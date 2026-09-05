@@ -15,6 +15,7 @@ publish = false
 # How this plug-in presents itself in the plug-in manager. It lives here so
 # each plug-in owns its own description --- the manager has no list of them.
 [package.metadata.noob]
+kind = "effect"
 name = "Noob CompressorLab"
 accent = "#e2657a"
 tagline = "Eleven classic compressors behind one control, each modelled from its own sourced dossier."

@@ -9,7 +9,7 @@
  * `v-if="ready"`). Handles are cached by the framework, so every component
  * shares one subscription per parameter.
  */
-import { computed, reactive } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import {
   getClient,
   hasParam,
@@ -17,6 +17,7 @@ import {
   stateToJson as stateToJsonGeneric,
   useParam,
   useNoobVstWebguiFramework,
+  useStore,
   useStoredRef,
   useWindowSize,
 } from '@noob-audio-engineering/noob-vst-webgui-framework/vue';
@@ -114,6 +115,7 @@ let lab = null;
  */
 export function useLab() {
   if (lab) return lab;
+  restorePresetNames();
   const model = useParam('model');
   const active = computed(() => MODELS[model.index] || MODELS[0]);
   lab = {
@@ -129,7 +131,20 @@ export function useLab() {
   return lab;
 }
 
-/** Page-only state (not parameters): the preset name shown in the top bar, per model. */
+/**
+ * Page state that is not a parameter: the preset name shown in the top bar,
+ * per model, and whether the browse view is up.
+ *
+ * **The preset names are persisted, and they have to be.** They are not
+ * parameters — a preset's *name* changes no audio and belongs in no
+ * automation lane — but a host closes and reopens the editor freely, and
+ * each time it does the page is built again from nothing. Without this the
+ * parameters came back correctly, because they are plug-in state, while the
+ * top bar reset to every model's initial preset name: the panel said one
+ * thing and the knobs another. So the map lives in the UI store, which is
+ * serialised with the plug-in state, exactly as the user preset lists and
+ * the debug toggle already are.
+ */
 export const ui = reactive({
   preset: Object.fromEntries(MODELS.map((m) => [m.key, m.initPreset])),
   /*
@@ -141,6 +156,63 @@ export const ui = reactive({
    */
   browsing: false,
 });
+
+/** Set once the preset names have been seeded from the store and hooked up to it. */
+let presetsRestored = false;
+
+/**
+ * Seed [`ui.preset`] from the UI store and keep the store in step with it.
+ *
+ * Called from [`useLab`] rather than at module scope, because the store
+ * needs a client and this module is imported before one exists. Names the
+ * store does not carry keep the model's initial preset, so a project saved
+ * before this existed opens with the old behaviour rather than a blank bar.
+ */
+function restorePresetNames() {
+  if (presetsRestored) return;
+  presetsRestored = true;
+  const store = useStore();
+  const stored = useStoredRef('preset.names', null);
+  let seeded = false;
+
+  /*
+   * **Wait for the store before reading it, and only start writing after.**
+   * The store arrives from the plug-in as a message, so at the moment a
+   * component calls `useLab()` it is usually still empty. Seeding then would
+   * read nothing, and attaching the writer then would save that nothing back
+   * over the names the project actually holds — turning a display bug into a
+   * data-loss one. `ready` is set when the plug-in's `store.all` lands, and
+   * immediately in offline design mode.
+   */
+  const seed = () => {
+    if (seeded) return;
+    seeded = true;
+    const saved = stored.value;
+    if (saved && typeof saved === 'object') {
+      for (const m of MODELS) if (typeof saved[m.key] === 'string') ui.preset[m.key] = saved[m.key];
+    }
+    // A shallow copy per change: the map is eleven short strings, and a deep
+    // watcher on a reactive object would fire on its own writes.
+    watch(
+      () => ({ ...ui.preset }),
+      (v) => {
+        stored.value = v;
+      },
+    );
+  };
+
+  if (store.ready) seed();
+  else {
+    const stop = watch(
+      () => store.ready,
+      (r) => {
+        if (!r) return;
+        stop();
+        seed();
+      },
+    );
+  }
+}
 
 let win = null;
 

@@ -19,6 +19,16 @@ on:
 permissions:
   contents: write
 
+# `latest` is one rolling release that this workflow deletes and remakes, so
+# two runs of it are two runs fighting over the same tag: one deletes the tag
+# while the other is creating its release, and the release that loses comes out
+# a **draft** --- which looks published in the run log, lists its assets in the
+# API, and serves 404 for every download URL. Queued rather than cancelled: a
+# cancellation lands mid-delete and leaves no release at all.
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     name: ${{ matrix.label }}
@@ -255,3 +265,11 @@ jobs:
           fi
 
           gh release upload "$tag" dist/* --clobber
+
+          # A draft has no download URLs, so every manifest and every bundle is
+          # a 404 while the run says it succeeded. Check the artefact.
+          if [ "$(gh release view "$tag" --json isDraft -q .isDraft)" = "true" ]; then
+            echo "the release came out a draft; publishing it"
+            gh release edit "$tag" --draft=false
+          fi
+          test "$(gh release view "$tag" --json isDraft -q .isDraft)" = "false"             || { echo "the release is still a draft"; exit 1; }

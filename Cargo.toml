@@ -21,7 +21,7 @@ accent = "#e2657a"
 tagline = "Eleven classic compressors behind one control, each modelled from its own sourced dossier."
 features = [
     "Eleven models: FET, opto, VCA, variable-mu, diode bridge and more",
-    "Each engine measured against published figures: 192 met across 487 rows",
+    "Each engine measured against published figures: 192 met, 19 missed, 23 with nothing published to compare against",
     "The electrical parts are shared crates, so a photocell is one photocell",
     "Per-model faces that look identical where they share controls",
     "VU ballistics computed in the audio thread, one per needle",

@@ -41,16 +41,25 @@ jobs:
             label: windows-x86_64
             # macOS gets one universal binary rather than two downloads, so an
             # Apple Silicon and an Intel machine install the same file.
-            targets: ""
+            #
+            # **`bundle-universal`, not `bundle --target x --target y`.** The
+            # bundler refuses `--target` for a universal build and the two
+            # together do not lipo anything: they build one architecture and
+            # name it universal. Shipped that way, the macOS download was
+            # arm64 only --- invisible on every Intel Mac and on Apple Silicon
+            # whenever Live is run under Rosetta.
+            bundle: bundle
           - os: macos-latest
             label: macos-universal
-            targets: "--target aarch64-apple-darwin --target x86_64-apple-darwin"
+            bundle: bundle-universal
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.96.0"
           components: rustfmt, clippy
+      # `bundle-universal` builds both and lipos them, so both toolchains
+      # have to be present.
       - name: macOS cross targets
         if: matrix.os == 'macos-latest'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
@@ -88,7 +97,7 @@ jobs:
       # `--features plugin` is not optional. Without it cargo builds the
       # library without the entry points and the bundle is a shell.
       - name: Bundle
-        run: cargo nih-plug bundle ${{ steps.crate.outputs.pkg }} --release --features plugin ${{ matrix.targets }}
+        run: cargo nih-plug ${{ matrix.bundle }} ${{ steps.crate.outputs.pkg }} --release --features plugin
 
       # Check the artefact rather than the exit code: a library built without
       # the feature compiles happily and exports nothing.
@@ -108,6 +117,20 @@ jobs:
           grep -qa clap_entry       "$bin" || { echo "no clap_entry --- built without --features plugin?"; exit 1; }
           test "$size" -gt 500000 || { echo "$size bytes is the stripped size"; exit 1; }
           test -e "target/bundled/$pkg.clap" || { echo "no CLAP bundle"; exit 1; }
+          # **An artefact called universal has to be universal.** Everything
+          # above passes on a single-architecture binary --- the exports are
+          # there and the size is right --- which is exactly how an arm64-only
+          # build shipped for months under the name `macos-universal`, working
+          # on Apple Silicon and invisible on every Intel Mac.
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            echo "architectures: $(lipo -archs "$bin")"
+            for want in arm64 x86_64; do
+              lipo -archs "$bin" | grep -qw "$want" \
+                || { echo "the universal bundle has no $want slice"; exit 1; }
+            done
+            lipo -archs "target/bundled/$pkg.clap/Contents/MacOS/$pkg" | grep -qw x86_64 \
+              || { echo "the CLAP bundle is not universal either"; exit 1; }
+          fi
 
       # A photograph of the plug-in running, for the manager's banner. The
       # standalone serves exactly the page the plug-in embeds over exactly the

@@ -165,8 +165,17 @@ jobs:
           esac
           echo "building a $kind: type $autype, subtype $sub"
 
-          git clone --depth 1 --branch v0.16.0 \
-            https://github.com/free-audio/clap-wrapper.git .au/clap-wrapper
+          # Retried: this is a network clone in CI and a single refused
+          # connection has failed a whole release for no reason anyone could
+          # act on. Three tries, then give up and say so.
+          for attempt in 1 2 3; do
+            rm -rf .au/clap-wrapper
+            git clone --depth 1 --branch v0.16.0 \
+              https://github.com/free-audio/clap-wrapper.git .au/clap-wrapper && break
+            echo "clap-wrapper clone failed (attempt $attempt)"
+            [ "$attempt" = 3 ] && { echo "could not clone clap-wrapper"; exit 1; }
+            sleep 5
+          done
 
           # The CLAP is embedded in the component rather than loaded by name,
           # so the Audio Unit is self-contained and does not quietly stop
@@ -201,7 +210,23 @@ jobs:
           cmake --build .au/build --config Release
           comp=$(find .au/build -maxdepth 6 -name "$pkg.component" -type d | head -1)
           test -n "$comp" || { echo "no .component was produced"; find .au/build -name "*.component" | head; exit 1; }
+          # **Remove the destination first.** `cp -R src dst` copies *into*
+          # `dst` when `dst` is an existing directory, so a `.component` left
+          # in `target/` by an earlier run --- which `Swatinem/rust-cache`
+          # restores --- turned this into
+          # `target/bundled/x.component/x.component/...`. The bundle then had
+          # no binary where one belongs, and the release died in the verify
+          # step below with an arch error that had nothing to do with
+          # architectures.
+          rm -rf "target/bundled/$pkg.component"
           cp -R "$comp" "target/bundled/$pkg.component"
+          # And say it plainly if the nesting ever comes back: the binary is
+          # `Contents/MacOS/<pkg>` and nowhere else.
+          test -f "target/bundled/$pkg.component/Contents/MacOS/$pkg" || {
+            echo "the copied bundle has no binary at Contents/MacOS/$pkg --- nested copy?"
+            find "target/bundled/$pkg.component" -maxdepth 3
+            exit 1
+          }
           echo "built target/bundled/$pkg.component"
 
       # The Audio Unit, checked after it is built rather than trusted.

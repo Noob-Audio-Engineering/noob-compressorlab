@@ -135,38 +135,72 @@ jobs:
       # An Audio Unit, for Logic and for anyone on macOS whose host does not
       # take VST3 or CLAP.
       #
-      # **Wrapped, not written.** nih-plug exports CLAP and VST3 and has no AU
-      # backend, so the choice was to fork it and implement one --- the AUv2
-      # Component API, in Rust, maintained for ever across six plug-ins --- or
-      # to wrap the CLAP this job has already built. `clap-wrapper` is the
-      # CLAP project's own tool for exactly that, and the plug-in it produces
-      # is this plug-in: the same DSP, the same page, the same parameters,
-      # reached through a different door.
+      # **Wrapped, not written --- for now.** nih-plug exports CLAP and VST3 and
+      # has no AU backend; one is being written in our fork of it, and until
+      # that passes `auval` the CLAP this job already built is wrapped. What
+      # comes out is this plug-in: the same DSP, the same page, the same
+      # parameters, reached through a different door.
       #
-      # `CLAP_WRAPPER_OUTPUT_NAME` is both the name of the `.component` and the
-      # name of the `.clap` it loads at run time, which is why the manifest
-      # installs the CLAP alongside it. An Audio Unit on its own would find
-      # nothing.
+      # **Our own CMake project, not clap-wrapper's top-level build.** That
+      # build says of itself that AUv2 is a work in progress and hard-codes
+      # `INSTRUMENT_TYPE "aumu"`, `MANUFACTURER_CODE "clAd"` and
+      # `SUBTYPE_CODE "gWrp"`. Using it registered this effect as a music
+      # device --- Logic would only have offered it on an instrument track ---
+      # and gave all six plug-ins the same manufacturer and subtype, which to
+      # macOS means they are all the same component. Three fields decide a
+      # unit's identity and none of them were ours.
       - name: Wrap the CLAP as an Audio Unit
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
           pkg=${{ steps.crate.outputs.pkg }}
           ver=${{ steps.crate.outputs.ver }}
+          meta=$(cargo metadata --no-deps --format-version 1)
+          kind=$(echo "$meta" | python3 -c "import json,sys; print((json.load(sys.stdin)['packages'][0].get('metadata') or {}).get('noob',{}).get('kind','effect'))")
+          sub=$(echo "$meta" | python3 -c "import json,sys; print((json.load(sys.stdin)['packages'][0].get('metadata') or {}).get('noob',{}).get('au_subtype',''))")
+          test -n "$sub" || { echo "the crate declares no au_subtype, and a component needs one"; exit 1; }
+          case "$kind" in
+            instrument) autype=aumu ;;
+            *)          autype=aufx ;;
+          esac
+          echo "building a $kind: type $autype, subtype $sub"
+
           git clone --depth 1 --branch v0.16.0 \
-            https://github.com/free-audio/clap-wrapper.git .clap-wrapper
-          cmake -S .clap-wrapper -B .clap-wrapper/build \
+            https://github.com/free-audio/clap-wrapper.git .au/clap-wrapper
+
+          # The CLAP is embedded in the component rather than loaded by name,
+          # so the Audio Unit is self-contained and does not quietly stop
+          # working when somebody installs it without the CLAP beside it.
+          cat > .au/CMakeLists.txt <<CMAKE
+          cmake_minimum_required(VERSION 3.21)
+          # OBJC and OBJCXX are not optional: the AUv2 wrapper is Objective-C++,
+          # and without them CMake configures cleanly and then fails to generate
+          # with a missing CMAKE_OBJCXX_COMPILE_OBJECT.
+          project(noob_au VERSION ${ver} LANGUAGES C CXX OBJC OBJCXX)
+          set(CMAKE_CXX_STANDARD 17)
+          set(CLAP_WRAPPER_DOWNLOAD_DEPENDENCIES ON CACHE BOOL "" FORCE)
+          set(CLAP_WRAPPER_BUILD_AUV2 ON CACHE BOOL "" FORCE)
+          add_subdirectory(clap-wrapper EXCLUDE_FROM_ALL)
+          add_library(${pkg}_as_auv2 MODULE)
+          target_add_auv2_wrapper(
+            TARGET ${pkg}_as_auv2
+            OUTPUT_NAME "${pkg}"
+            BUNDLE_IDENTIFIER "io.github.noob-audio-engineering.${pkg}"
+            BUNDLE_VERSION "${ver}"
+            INSTRUMENT_TYPE "${autype}"
+            MANUFACTURER_NAME "Noob Audio Engineering"
+            MANUFACTURER_CODE "Noob"
+            SUBTYPE_CODE "${sub}"
+            MACOS_EMBEDDED_CLAP_LOCATION "\${CMAKE_CURRENT_SOURCE_DIR}/../target/bundled/${pkg}.clap"
+          )
+          CMAKE
+
+          cmake -S .au -B .au/build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DCLAP_WRAPPER_BUILD_AUV2=ON \
-            -DCLAP_WRAPPER_DOWNLOAD_DEPENDENCIES=ON \
-            -DCLAP_WRAPPER_OUTPUT_NAME="$pkg" \
-            -DCLAP_WRAPPER_BUNDLE_IDENTIFIER="io.github.noob-audio-engineering.$pkg" \
-            -DCLAP_WRAPPER_BUNDLE_VERSION="$ver"
-          cmake --build .clap-wrapper/build --config Release
-          # Wherever it landed, there is exactly one of them.
-          comp=$(find .clap-wrapper/build -maxdepth 6 -name "$pkg.component" -type d | head -1)
-          test -n "$comp" || { echo "no .component was produced"; find .clap-wrapper/build -name "*.component" -o -name "*.vst3" | head; exit 1; }
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          cmake --build .au/build --config Release
+          comp=$(find .au/build -maxdepth 6 -name "$pkg.component" -type d | head -1)
+          test -n "$comp" || { echo "no .component was produced"; find .au/build -name "*.component" | head; exit 1; }
           cp -R "$comp" "target/bundled/$pkg.component"
           echo "built target/bundled/$pkg.component"
 

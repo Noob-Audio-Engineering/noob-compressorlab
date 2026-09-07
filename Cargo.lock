@@ -1637,7 +1637,7 @@ source = "git+https://github.com/Noob-Audio-Engineering/noob-electrical-componen
 [[package]]
 name = "noob-vst-webgui-framework"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#e50f39fbcaff769c5b0dc39138393853fe99e0f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#37d18e34555373bbde14321fb9c3f665b1414e1c"
 dependencies = [
  "axum",
  "crossbeam-queue",
@@ -1651,7 +1651,7 @@ dependencies = [
 [[package]]
 name = "noob-vst-webgui-framework-nih"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#e50f39fbcaff769c5b0dc39138393853fe99e0f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#37d18e34555373bbde14321fb9c3f665b1414e1c"
 dependencies = [
  "log",
  "nih_plug",
@@ -1663,9 +1663,12 @@ dependencies = [
 [[package]]
 name = "noob-vst-webgui-framework-webview"
 version = "0.1.0"
-source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#e50f39fbcaff769c5b0dc39138393853fe99e0f3"
+source = "git+https://github.com/Noob-Audio-Engineering/noob-vst-webgui-framework#37d18e34555373bbde14321fb9c3f665b1414e1c"
 dependencies = [
+ "block2",
  "log",
+ "objc2",
+ "objc2-foundation",
  "raw-window-handle 0.6.2",
  "windows-sys 0.60.2",
  "wry",

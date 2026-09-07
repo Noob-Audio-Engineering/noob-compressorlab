@@ -132,6 +132,80 @@ jobs:
               || { echo "the CLAP bundle is not universal either"; exit 1; }
           fi
 
+      # An Audio Unit, for Logic and for anyone on macOS whose host does not
+      # take VST3 or CLAP.
+      #
+      # **Wrapped, not written.** nih-plug exports CLAP and VST3 and has no AU
+      # backend, so the choice was to fork it and implement one --- the AUv2
+      # Component API, in Rust, maintained for ever across six plug-ins --- or
+      # to wrap the CLAP this job has already built. `clap-wrapper` is the
+      # CLAP project's own tool for exactly that, and the plug-in it produces
+      # is this plug-in: the same DSP, the same page, the same parameters,
+      # reached through a different door.
+      #
+      # `CLAP_WRAPPER_OUTPUT_NAME` is both the name of the `.component` and the
+      # name of the `.clap` it loads at run time, which is why the manifest
+      # installs the CLAP alongside it. An Audio Unit on its own would find
+      # nothing.
+      - name: Wrap the CLAP as an Audio Unit
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          ver=${{ steps.crate.outputs.ver }}
+          git clone --depth 1 --branch v0.16.0 \
+            https://github.com/free-audio/clap-wrapper.git .clap-wrapper
+          cmake -S .clap-wrapper -B .clap-wrapper/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCLAP_WRAPPER_BUILD_AUV2=ON \
+            -DCLAP_WRAPPER_DOWNLOAD_DEPENDENCIES=ON \
+            -DCLAP_WRAPPER_OUTPUT_NAME="$pkg" \
+            -DCLAP_WRAPPER_BUNDLE_IDENTIFIER="io.github.noob-audio-engineering.$pkg" \
+            -DCLAP_WRAPPER_BUNDLE_VERSION="$ver"
+          cmake --build .clap-wrapper/build --config Release
+          # Wherever it landed, there is exactly one of them.
+          comp=$(find .clap-wrapper/build -maxdepth 6 -name "$pkg.component" -type d | head -1)
+          test -n "$comp" || { echo "no .component was produced"; find .clap-wrapper/build -name "*.component" -o -name "*.vst3" | head; exit 1; }
+          cp -R "$comp" "target/bundled/$pkg.component"
+          echo "built target/bundled/$pkg.component"
+
+      # The Audio Unit, checked after it is built rather than trusted.
+      - name: Verify the Audio Unit
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          pkg=${{ steps.crate.outputs.pkg }}
+          comp="target/bundled/$pkg.component"
+          test -d "$comp" || { echo "no Audio Unit at $comp"; exit 1; }
+          bin="$comp/Contents/MacOS/$pkg"
+          test -f "$bin" || { echo "the bundle has no binary at $bin"; ls -R "$comp"; exit 1; }
+          test -f "$comp/Contents/Info.plist" || { echo "the bundle has no Info.plist"; exit 1; }
+          # An Audio Unit that is not registered as one is a folder. The
+          # component type, subtype and manufacturer live here, and a bundle
+          # missing them loads and is never offered by any host.
+          got=$(/usr/libexec/PlistBuddy -c "Print :AudioComponents:0:type" "$comp/Contents/Info.plist") \
+            || { echo "no AudioComponents entry --- no host will list this"; exit 1; }
+          # **An instrument has to register as one.** `aumu` is a music device
+          # and `aufx` an effect, and a host reads that code to decide which
+          # slot the plug-in is offered in --- an instrument typed as an effect
+          # loads perfectly and can never be put on an instrument track, which
+          # is the same shape as an arm64 build that calls itself universal.
+          # The crate already says which it is, so this asks the crate.
+          kind=$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c "import json,sys; print((json.load(sys.stdin)['packages'][0].get('metadata') or {}).get('noob',{}).get('kind','effect'))")
+          case "$kind" in
+            instrument) want=aumu ;;
+            *)          want=aufx ;;
+          esac
+          echo "component type: $got (the crate calls itself a $kind, so $want)"
+          [ "$got" = "$want" ] || { echo "a $kind registered as $got"; exit 1; }
+          echo "architectures: $(lipo -archs "$bin")"
+          for want in arm64 x86_64; do
+            lipo -archs "$bin" | grep -qw "$want" \
+              || { echo "the Audio Unit has no $want slice"; exit 1; }
+          done
+
       # A photograph of the plug-in running, for the manager's banner. The
       # standalone serves exactly the page the plug-in embeds over exactly the
       # same bridge, so this is the plug-in rather than a drawing of it --- and
@@ -170,8 +244,13 @@ jobs:
           zip="$pkg-${{ matrix.label }}.zip"
           # Zip from inside `bundled` so the archive holds `name.vst3` and
           # `name.clap` at its root, which is what the manifest promises.
-          (cd target/bundled && 7z a -tzip -bso0 "../../$zip" "$pkg.vst3" "$pkg.clap") \
-            || (cd target/bundled && zip -qry "../../$zip" "$pkg.vst3" "$pkg.clap")
+          # The Audio Unit only exists on the macOS build, so the archive is
+          # whatever was actually produced rather than a fixed list.
+          parts="$pkg.vst3 $pkg.clap"
+          [ -d "target/bundled/$pkg.component" ] && parts="$parts $pkg.component"
+          echo "packing: $parts"
+          (cd target/bundled && 7z a -tzip -bso0 "../../$zip" $parts) \
+            || (cd target/bundled && zip -qry "../../$zip" $parts)
           if command -v sha256sum >/dev/null; then sha=$(sha256sum "$zip" | cut -d' ' -f1); else sha=$(shasum -a 256 "$zip" | cut -d' ' -f1); fi
           echo "zip=$zip" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -198,6 +277,14 @@ jobs:
             banner="\"https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$pkg-banner.png\""
           fi
           echo "banner: $banner"
+          # The Audio Unit loads the CLAP by name at run time, so the two are
+          # installed together and the CLAP entry above is not optional on
+          # macOS.
+          au=""
+          if [ -d "target/bundled/$pkg.component" ]; then
+            au=',
+              { "kind": "au", "path": "'"$pkg"'.component", "into": "au" }'
+          fi
           cat > "$pkg-${{ matrix.label }}.json" <<JSON
           {
             "schema": 1,
@@ -211,7 +298,7 @@ jobs:
             "url": "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/${{ steps.pack.outputs.zip }}",
             "installs": [
               { "kind": "vst3", "path": "$pkg.vst3", "into": "vst3" },
-              { "kind": "clap", "path": "$pkg.clap", "into": "clap" }
+              { "kind": "clap", "path": "$pkg.clap", "into": "clap" }$au
             ],
             "display": $display,
             "banner": $banner
